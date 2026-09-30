@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Gantry</title><link rel="stylesheet" href="./style.css"><script type="module" src="./app.js"></script></head>
+<body>
+<a href="#main" class="skip-link">Skip to content</a>
+<div id="login" class="login-layout"><form id="login-form" class="login-panel">
+<div class="wordmark"><span class="brand-mark">G</span> Gantry</div>
+<h1>Continue where you left off.</h1><p class="muted">A shared workspace for robot maintenance and improvement.</p>
+<label>Workspace<input id="workspace" placeholder="Workspace ID (cloud only)" autocomplete="organization" maxlength="48"></label>
+<label>Access token<input id="token" type="password" autocomplete="off" placeholder="Workspace access token"></label>
+<label class="file-label">Or open your token file<input id="token-file" type="file" accept=".token,.txt"></label>
+<p id="login-error" role="alert" class="error-text"></p><button class="primary" type="submit">Open workspace →</button>
+<p class="caption">Your token stays in this tab's memory. Ask your workspace administrator for access.</p>
+</form></div>
+<div id="shell" hidden>
+<aside class="sidebar" aria-label="Workspace navigation">
+<a class="wordmark" href="#sessions"><span class="brand-mark">G</span> Gantry <span class="workspace-tag" id="workspace-name">Workspace</span></a>
+<button id="new-session" class="new-session">＋ <span>New session</span></button><nav id="nav"></nav>
+<div class="sidebar-heading">Projects <button class="icon-button" data-action="new-project" aria-label="Create project">＋</button></div>
+<div id="sidebar-projects" class="sidebar-projects"></div><div class="sidebar-heading">Recent sessions</div><div id="recent-sessions" class="recent-sessions"></div>
+<div class="sidebar-footer"><span class="avatar" id="actor-avatar">A</span><div><strong id="actor-name"></strong><div class="caption" id="connection-status">Connected</div></div><button class="icon-button" id="logout" aria-label="Sign out">↪</button></div>
+</aside>
+<div class="main-shell"><header class="topbar"><button class="icon-button" id="menu-button" aria-label="Toggle navigation" aria-expanded="false">☰</button><div id="breadcrumb">Sessions</div><div class="topbar-right"><span id="refresh-status" class="caption"></span><button id="refresh" class="icon-button" aria-label="Refresh workspace">↻</button></div></header>
+<div id="error-banner" role="alert" hidden></div><main id="main" tabindex="-1"></main></div></div>
+<dialog id="dialog" aria-labelledby="dialog-title"><form id="dialog-form"><header><h2 id="dialog-title"></h2><button type="button" class="icon-button" id="dialog-close" aria-label="Close dialog">×</button></header><div id="dialog-body"></div><p id="dialog-error" class="error-text" role="alert"></p><footer><button type="button" id="dialog-cancel">Cancel</button><button class="primary" id="dialog-submit" type="submit">Save</button></footer></form></dialog>
+<div id="toast" role="status" hidden></div></body></html>
