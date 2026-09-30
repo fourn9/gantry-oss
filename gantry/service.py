@@ -31,9 +31,10 @@ from .validation_map import ValidationMixin
 from .change_review import ChangeReviewMixin
 from .mentor_jobs import MentorJobsMixin
 from .review_context import ReviewContextMixin
+from .connections import ConnectionMixin
 
 
-class Service(ReviewContextMixin, MentorJobsMixin, ChangeReviewMixin, ValidationMixin, EvidenceMixin, AutonomyMixin, ProductMixin, ContinuityMixin, DevelopmentMixin):
+class Service(ConnectionMixin, ReviewContextMixin, MentorJobsMixin, ChangeReviewMixin, ValidationMixin, EvidenceMixin, AutonomyMixin, ProductMixin, ContinuityMixin, DevelopmentMixin):
     READS = {"state", "design", "diff", "history", "impact", "open", "reviews", "why",
              "outcomes", "operations", "restore_artifact", "read_artifact_chunk", "verify", "work", "context", "events", "export", "identity", "review_context", "development_state", "mentor_context", "check_execution"}
 
@@ -48,11 +49,13 @@ class Service(ReviewContextMixin, MentorJobsMixin, ChangeReviewMixin, Validation
     READS |= {'get_change_review', 'list_change_reviews'}
     READS |= {'automation_status', 'get_analysis'}
     READS |= {'product_overview', 'project_details', 'session_details', 'get_signal'}
+    READS |= {'connection_context', 'inspect_connection', 'connection_review'}
 
-    def bootstrap(self, actor_id="admin", consent_seconds=None):
+    def bootstrap(self, actor_id="admin", consent_seconds=None, _token=None):
         identifier(actor_id)
         require(actor_id not in {"root", "policy"}, "invalid_input", "Reserved actor ID")
-        token = secrets.token_urlsafe(32)
+        token = _token if _token is not None else secrets.token_urlsafe(32)
+        require(isinstance(token, str) and len(token) >= 32, 'invalid_input', 'Strong initial credential required')
         with closing(self.store.connect()) as con:
             con.execute("BEGIN IMMEDIATE")
             s = self.store.state(con)

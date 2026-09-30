@@ -3182,6 +3182,448 @@
       "additionalProperties": false
     }
   },
+  "request_connection": {
+    "description": "request connection",
+    "schema": {
+      "type": "object",
+      "properties": {
+        "plan": {
+          "type": "object"
+        },
+        "token_hash": {
+          "type": "string",
+          "minLength": 1
+        },
+        "mentor_token_hash": {
+          "type": "string",
+          "minLength": 1
+        },
+        "basis": {
+          "type": "object"
+        },
+        "intent": {
+          "type": "object"
+        }
+      },
+      "required": [
+        "plan",
+        "token_hash",
+        "mentor_token_hash"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "approve_connection": {
+    "description": "approve connection",
+    "schema": {
+      "type": "object",
+      "properties": {
+        "connection_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "plan_hash": {
+          "type": "string",
+          "minLength": 1
+        },
+        "files": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        "basis": {
+          "type": "object"
+        },
+        "intent": {
+          "type": "object"
+        }
+      },
+      "required": [
+        "connection_id",
+        "plan_hash",
+        "files"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "inspect_connection": {
+    "description": "inspect connection",
+    "schema": {
+      "type": "object",
+      "properties": {
+        "connection_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "basis": {
+          "type": "object"
+        },
+        "intent": {
+          "type": "object"
+        }
+      },
+      "required": [
+        "connection_id"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "disconnect_connection": {
+    "description": "disconnect connection",
+    "schema": {
+      "type": "object",
+      "properties": {
+        "connection_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "basis": {
+          "type": "object"
+        },
+        "intent": {
+          "type": "object"
+        }
+      },
+      "required": [
+        "connection_id"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "connection_context": {
+    "description": "connection context",
+    "schema": {
+      "type": "object",
+      "properties": {
+        "basis": {
+          "type": "object"
+        },
+        "intent": {
+          "type": "object"
+        }
+      },
+      "required": [],
+      "additionalProperties": false
+    }
+  },
+  "authorize_connection_operation": {
+    "description": "authorize connection operation",
+    "schema": {
+      "type": "object",
+      "properties": {
+        "operation": {
+          "type": "string",
+          "minLength": 1
+        },
+        "path": {
+          "type": "string",
+          "minLength": 1
+        },
+        "command": {
+          "type": "string",
+          "minLength": 1
+        },
+        "command_hash": {
+          "type": "string",
+          "minLength": 1
+        },
+        "input_hash": {
+          "type": "string",
+          "minLength": 1
+        },
+        "branch": {
+          "type": "string",
+          "minLength": 1
+        },
+        "from_review": {
+          "type": "string",
+          "minLength": 1
+        },
+        "basis": {
+          "type": "object"
+        },
+        "intent": {
+          "type": "object"
+        }
+      },
+      "required": [
+        "operation",
+        "input_hash"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "complete_connection_operation": {
+    "description": "complete connection operation",
+    "schema": {
+      "type": "object",
+      "properties": {
+        "operation_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "status": {
+          "enum": [
+            "completed",
+            "failed",
+            "interrupted"
+          ]
+        },
+        "summary": {
+          "type": "string",
+          "minLength": 1
+        },
+        "output_hash": {
+          "type": "string",
+          "minLength": 1
+        },
+        "details": {
+          "type": "object"
+        },
+        "basis": {
+          "type": "object"
+        },
+        "intent": {
+          "type": "object"
+        }
+      },
+      "required": [
+        "operation_id",
+        "status",
+        "summary",
+        "output_hash",
+        "details"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "connection_checkpoint": {
+    "description": "connection checkpoint",
+    "schema": {
+      "type": "object",
+      "properties": {
+        "expected_state": {
+          "type": "string",
+          "minLength": 1
+        },
+        "files": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        "summary": {
+          "type": "string",
+          "minLength": 1
+        },
+        "rationale": {
+          "type": "string",
+          "minLength": 1
+        },
+        "unfinished": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "branch": {
+          "type": "string",
+          "minLength": 1
+        },
+        "basis": {
+          "type": "object"
+        },
+        "intent": {
+          "type": "object"
+        }
+      },
+      "required": [
+        "expected_state",
+        "files",
+        "summary",
+        "rationale",
+        "unfinished"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "connection_submit": {
+    "description": "connection submit",
+    "schema": {
+      "type": "object",
+      "properties": {
+        "question": {
+          "type": "string",
+          "minLength": 1
+        },
+        "branch": {
+          "type": "string",
+          "minLength": 1
+        },
+        "basis": {
+          "type": "object"
+        },
+        "intent": {
+          "type": "object"
+        }
+      },
+      "required": [
+        "question"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "connection_review": {
+    "description": "connection review",
+    "schema": {
+      "type": "object",
+      "properties": {
+        "submission_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "basis": {
+          "type": "object"
+        },
+        "intent": {
+          "type": "object"
+        }
+      },
+      "required": [
+        "submission_id"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "connection_respond": {
+    "description": "connection respond",
+    "schema": {
+      "type": "object",
+      "properties": {
+        "submission_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "responses": {
+          "type": "array",
+          "items": {
+            "type": "object"
+          }
+        },
+        "branch": {
+          "type": "string",
+          "minLength": 1
+        },
+        "basis": {
+          "type": "object"
+        },
+        "intent": {
+          "type": "object"
+        }
+      },
+      "required": [
+        "submission_id",
+        "responses"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "connection_assumption": {
+    "description": "connection assumption",
+    "schema": {
+      "type": "object",
+      "properties": {
+        "statement": {
+          "type": "string",
+          "minLength": 1
+        },
+        "scope": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "evidence": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "dependencies": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "adoption_blocker": {
+          "type": "string",
+          "minLength": 1
+        },
+        "decision_owner": {
+          "enum": [
+            "agent",
+            "human"
+          ]
+        },
+        "branch": {
+          "type": "string",
+          "minLength": 1
+        },
+        "basis": {
+          "type": "object"
+        },
+        "intent": {
+          "type": "object"
+        }
+      },
+      "required": [
+        "statement",
+        "scope",
+        "evidence",
+        "dependencies",
+        "adoption_blocker",
+        "decision_owner"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "connection_branch": {
+    "description": "connection branch",
+    "schema": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "base_state": {
+          "type": "string",
+          "minLength": 1
+        },
+        "purpose": {
+          "type": "string",
+          "minLength": 1
+        },
+        "basis": {
+          "type": "object"
+        },
+        "intent": {
+          "type": "object"
+        }
+      },
+      "required": [
+        "name",
+        "base_state",
+        "purpose"
+      ],
+      "additionalProperties": false
+    }
+  },
   "product_overview": {
     "description": "product overview",
     "schema": {

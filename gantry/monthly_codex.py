@@ -17,7 +17,8 @@ def infer_monthly(context,schema,directory,timeout_seconds=180):
         require(state['context']==context and state['schema']==schema,'idempotency_mismatch','Inference input changed')
         if state['phase']=='completed':return state['receipt']
         raise Fault('outcome_unknown','Prior Codex invocation is uncertain; inspect journal before retry')
-    env={k:v for k,v in os.environ.items() if k not in {'OPENAI_API_KEY','CODEX_API_KEY','CODEX_ACCESS_TOKEN','OPENAI_BASE_URL'}}
+    env={k:v for k,v in os.environ.items() if k not in {'OPENAI_API_KEY','CODEX_API_KEY','CODEX_ACCESS_TOKEN','OPENAI_BASE_URL',
+        'GANTRY_TOKEN','GANTRY_TOKEN_FILE','GANTRY_URL'}}
     status=subprocess.run(['codex','login','status'],env=env,capture_output=True,text=True,timeout=15)
     require(status.returncode==0 and 'ChatGPT' in status.stdout+status.stderr,'subscription_login_required','Sign in to official Codex with ChatGPT; API-key login is not used')
     require(len(canonical(context).encode())<=500000,'context_limit','Review context exceeds 500KB; narrow submission')

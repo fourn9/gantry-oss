@@ -2,6 +2,8 @@
 
 Date: 2026-09-30. This is a maintainer review with local tests, not an independent penetration test, certification or exhaustive source audit. The supported starting point remains a trusted local machine.
 
+This records the 2.0.2 publication review. The additional scoped project bridge introduced in 2.0.3 is covered by [its separate review](CONNECT-REVIEW.md); the legacy Runner limitations below still apply.
+
 ## Changes
 
 - Git capture now rejects common sensitive tracked filenames and credential patterns before uploading any snapshot. The check also covers removed text in a requested historical diff. Snapshot size/file-count limits apply, and a diff base must resolve to a commit rather than a Git option. Detection remains best-effort: binary secrets and arbitrary credential formats are not guaranteed to be detected. Explicit artifact APIs still require the caller to inspect their contents.

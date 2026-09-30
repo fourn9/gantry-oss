@@ -1,5 +1,24 @@
 # Architecture
 
+The local `connect` layer is additive. It bundles an owner-approved plan into the existing principal approval chain, a dedicated project zone, session, immutable baseline and change. Developer and Mentor capabilities use separate identities. The local bridge calls the same authenticated `Service.call` entry point as HTTP; it does not bypass Core authorization.
+
+```mermaid
+flowchart TD
+  Owner[Owner: one reviewed delegation] --> Connect[connect: discovery and approval]
+  Connect --> Core[Core: existing approvals and atomic activation]
+  Agent[User Claude / Codex / Cursor] --> MCP[Scoped project CLI / MCP]
+  MCP --> Core
+  MCP --> Files[Guarded approved files]
+  MCP --> Sandbox[Sandbox: approved command on scratch copy]
+  Core --> Store[Events + states + artifacts]
+  MCP --> Mentor[Submitted milestone review]
+  Mentor --> Model[User model / opted-in subscription]
+  Mentor --> Core
+  Core --> MCP
+```
+
+The plan fixes goal, completion/hold conditions, read/write paths, exact commands, expiry and exploration limits. General principal/proposal/commit methods are not exposed to these capabilities. A checkpoint is not an adoption. Tests are adapter-reported observations tied to input hashes, not Core certification of physical performance. External agents' direct host operations remain under their own host permissions.
+
 ```mermaid
 flowchart TD
   Human[Human owner / CLI / optional UI] --> API[Gantry HTTP API]

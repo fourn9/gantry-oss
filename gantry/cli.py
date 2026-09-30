@@ -16,6 +16,31 @@ def main():
     parser.add_argument("--url", default=os.getenv("GANTRY_URL", "http://127.0.0.1:8765"))
     parser.add_argument("--token-file", default=os.getenv("GANTRY_TOKEN_FILE"))
     sub = parser.add_subparsers(dest="command", required=True)
+    connect = sub.add_parser('connect', help='Discover a local project and approve one scoped agent connection')
+    connect.add_argument('root', nargs='?', default='.')
+    connect.add_argument('--mode', choices=['record-only', 'work-capable'], default='work-capable')
+    connect.add_argument('--client', choices=['claude', 'codex', 'cursor', 'generic'], default='generic')
+    connect.add_argument('--path', action='append', help='Relative file or directory/ scope; default is discovered files only')
+    connect.add_argument('--write-path', action='append', help='Writable subset of --path; use to keep acceptance tests read-only')
+    connect.add_argument('--test-command', action='append', help='NAME=JSON_ARGV; explicitly replaces detected commands')
+    connect.add_argument('--ttl', type=int, default=3600, help='Capability lifetime in seconds, at most eight hours')
+    connect.add_argument('--prepare', action='store_true', help='Only save and display a plan; no token activated')
+    connect.add_argument('--approve', help='Exact plan hash, for an owner who already reviewed a prepared plan')
+    connect.add_argument('--goal', help='Delegated development goal')
+    connect.add_argument('--done', action='append', help='Completion condition; repeat as needed')
+    connect.add_argument('--constraint', action='append', help='Fixed constraint')
+    connect.add_argument('--hold', action='append', help='Hold condition requiring owner decision')
+    connect.add_argument('--mentor', choices=['client', 'codex-subscription'], default='client')
+    disconnect = sub.add_parser('disconnect', help='Revoke this project connection; preserve audit history')
+    disconnect.add_argument('root', nargs='?', default='.')
+    project = sub.add_parser('project', help='Use scoped project operations with the agent credential')
+    project.add_argument('action', choices=['status', 'read', 'edit', 'test', 'checkpoint', 'audit',
+        'submit', 'review', 'respond', 'assumption', 'branch', 'mentor-prepare', 'mentor-finish', 'mentor-run'])
+    project.add_argument('--root', default='.')
+    project.add_argument('--input', help='JSON arguments file; - reads stdin')
+    project.add_argument('--request-id', help='Stable ID for safe retries')
+    project_mcp = sub.add_parser('project-mcp', help='Serve only the scoped local project tools over stdio')
+    project_mcp.add_argument('--root', required=True)
     init = sub.add_parser("init", help="Local, one-time initialization")
     init.add_argument("--data", default=".gantry")
     init.add_argument("--actor", default="admin")
@@ -124,7 +149,49 @@ def main():
     feedback_parser(sub)
     args = parser.parse_args()
     try:
-        if args.command == 'feedback':
+        if args.command == 'connect':
+            from .project_connect import connect as connect_project
+            commands = None
+            if args.test_command:
+                commands = {}
+                for value in args.test_command:
+                    name, raw = value.split('=', 1)
+                    commands[name] = {'argv': json.loads(raw), 'timeout_seconds': 60}
+            def confirm(preview):
+                print(json.dumps(preview, indent=2), file=sys.stderr)
+                if not sys.stdin.isatty(): return False
+                print('Approve this connection? [y/N] ', end='', file=sys.stderr, flush=True)
+                return sys.stdin.readline().strip().lower() == 'y'
+            delegation = None
+            if args.goal or args.done or args.constraint or args.hold or args.mentor != 'client':
+                from .model import require
+                require(args.goal and args.done, 'invalid_input', 'Provide --goal and at least one --done')
+                delegation = {'goal': args.goal, 'done': args.done,
+                    'constraints': args.constraint or ['No changed requirements or hardware operation'],
+                    'hold': args.hold or ['An owner-only decision is necessary'], 'max_reviews': 3,
+                    'max_tests': 10, 'max_branches': 3, 'mentor': args.mentor}
+            result = connect_project(args.root, mode=args.mode, paths=args.path, commands=commands,
+                client=args.client, ttl=args.ttl, prepare=args.prepare, approval=args.approve, confirm=confirm,
+                delegation=delegation, write_paths=args.write_path)
+        elif args.command == 'disconnect':
+            from .project_connect import disconnect as disconnect_project
+            result = disconnect_project(args.root)
+        elif args.command == 'project-mcp':
+            from .project_mcp import run as project_run
+            project_run(args.root); return
+        elif args.command == 'project':
+            from .project_connect import Project, owner_client
+            project = Project(args.root)
+            if args.action == 'audit':
+                result = owner_client(project.meta).call('inspect_connection', {'connection_id': project.receipt['connection_id']})
+                result['history'] = owner_client(project.meta).call('history', {'limit': 500})
+            else:
+                payload = json.loads(sys.stdin.read() if args.input == '-' else Path(args.input).read_text()) if args.input else {}
+                from .project_mcp import dispatch
+                if args.action not in {'status', 'review', 'mentor-prepare', 'mentor-finish', 'mentor-run'}:
+                    payload['request_id'] = args.request_id or payload.get('request_id') or secrets.token_hex(16)
+                result = dispatch(project, 'project_'+args.action.replace('-', '_'), payload)
+        elif args.command == 'feedback':
             from .feedback import command
             result = command(args)
         elif args.command == 'agent-config':

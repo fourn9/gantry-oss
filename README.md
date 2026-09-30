@@ -6,7 +6,7 @@ Gantry stores versioned development states, artifacts, changes, evidence and dec
 
 **Status: early public release.** Local operation is the supported starting point. Human adoption, agent proposals and execution results remain separate. Gantry does not certify a design's physical safety or operate hardware by default.
 
-## Start locally
+## Connect a project
 
 Python 3.11+ on macOS or Linux. No model account is needed to store and retrieve development state.
 
@@ -15,33 +15,33 @@ git clone https://github.com/fourn9/gantry-oss.git
 cd gantry-oss
 python3 -m venv .venv
 .venv/bin/python -m pip install .
-.venv/bin/gantry init --data .gantry
-.venv/bin/gantry serve --data .gantry
+.venv/bin/gantry connect /path/to/your/project --client codex \
+  --path src/ --path tests/ --write-path src/ \
+  --goal "Improve request clamping" \
+  --done "Existing boundary tests pass without changing their assertions"
 ```
 
-The API and optional UI are at `http://127.0.0.1:8765`. Initialization creates `.gantry/admin.token`; keep it private and use it only for owner administration. The browser asks for this token. Do not expose this local server directly to the Internet.
+Review one permission plan: project, readable/writable files, exact test commands, expiry, goal, completion conditions and limits. Confirm once. Gantry creates the ledger, records the internal owner approvals, saves current files, registers separate developer/reviewer identities and adds only its MCP entry to the selected client's project configuration. It does not change that client's approval or trust settings.
 
-In another terminal:
+Use `--client claude`, `cursor`, or `generic` for other clients. Without explicit paths, only discovered files are delegated. The default is **work-capable**, displayed before approval. Use `--mode record-only` when you only want to save externally edited files. The current agent can use scoped MCP tools or CLI:
 
 ```sh
-printf '{}\n' | .venv/bin/gantry --token-file .gantry/admin.token call identity
-.venv/bin/python examples/development_loop.py
+gantry project status --root /path/to/your/project
+# Pass tool arguments using --input file.json and a stable --request-id.
+gantry disconnect /path/to/your/project
 ```
 
-The example uses a temporary ledger and synthetic gripper files. It captures a baseline, checkpoints an unverified change, shares it, restores it into another directory and verifies the event history. It does not contact a model or prove physical performance.
+No server or manual principal/proposal sequence is required for this local route. First-time client trust/MCP enablement remains a client decision. See [setup and daily use](docs/AGENTS.md). If no supported command sandbox is available, tests are refused; Gantry never silently runs them unrestricted.
 
-## Connect your agent
+## Continue through review
 
-Use a dedicated, expiring identity with one of three MCP profiles: `read-only`, `developer`, or `reviewer`. Owner credentials and formal-adoption tools are not given to agents. Generate configuration for Claude Code, Cursor, Codex, or a compatible stdio MCP client:
+Read the saved goal and state → edit within scope → checkpoint unfinished work → submit a meaningful milestone → review grounded Mentor findings → correct/test → checkpoint and respond. Agents do not need another owner decision for these delegated steps. Independent candidates can start from the same state in separate workspaces. Sharing and a successful test do not formally adopt a design.
 
-```sh
-.venv/bin/gantry agent-request --name my-agent --profile developer \
-  --output-token .gantry/my-agent.token --output-proposal agent-request.json
-```
+Mentor uses your existing client model through structured prepare/finish tools. This path does not automatically launch another agent and is not an independent-review claim. Optionally choose `--mentor codex-subscription` with `--goal` and `--done` to automatically review submissions using the installed official Codex CLI and your ChatGPT login. The approval plan covers that source-sharing inference route. No API-key fallback or publisher-funded inference account is included; provider limits still apply.
 
-The token is **inactive until the owner reviews and commits its principal proposal**. See [agent setup](docs/AGENTS.md) for the complete activation and configuration steps. Installing the MCP configuration alone does not grant execution permission.
+For the legacy HTTP server, web interface, scoped MCP profiles and advanced multi-user administration, see [administrator setup](docs/ADMIN-AGENTS.md). Existing APIs remain supported.
 
-You supply your agent subscription or inference credentials. Gantry has no bundled paid inference account and makes no model calls on install or server startup. Provider limits and billing still apply when you explicitly configure a worker. General MCP connectivity is supported; identical capabilities in every agent application are not guaranteed.
+Run [the synthetic end-to-end example](examples/connected_project.py) after installation. Its default model responses are marked fixtures; `--live` performs two bounded calls under your subscription. It demonstrates software bounds, not physical robot performance.
 
 ## What is included
 

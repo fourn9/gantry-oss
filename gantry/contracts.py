@@ -127,6 +127,7 @@ def validate(value, schema, path='arguments'):
 # Extension registrations share the validator and command registry.
 from . import development_contracts  # noqa: E402,F401
 from . import continuity_contracts  # noqa: E402,F401
+from . import connection_contracts  # noqa: E402,F401
 from . import product_contracts  # noqa: E402,F401
 
 from . import autonomy_contracts  # noqa: E402,F401
