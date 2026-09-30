@@ -25,7 +25,12 @@ def run(client, profile='read-only', require_agent=False):
         if identity.get('kind') != 'agent' or 'admin' in identity.get('permissions', []):
             raise Fault('unauthorized', 'Use a dedicated non-admin agent credential, not a human token')
     initialized = False
-    for line in sys.stdin:
+    while True:
+        line = sys.stdin.readline(8 * 1024 * 1024 + 1)
+        if not line: break
+        if len(line) > 8 * 1024 * 1024:
+            print(canonical({'jsonrpc':'2.0','id':None,'error':{'code':-32600,'message':'Message exceeds 8 MiB'}}), flush=True)
+            return
         request = None
         try:
             request = json.loads(line)

@@ -22,6 +22,14 @@ class Server(ThreadingHTTPServer):
         self.failure_lock = threading.Lock()
         super().__init__(address, Handler)
 
+    def get_request(self):
+        sock, address = super().get_request()
+        sock.settimeout(30)
+        return sock, address
+
+    def handle_error(self, request, client_address):
+        sys.stderr.write('gantry-http: connection_error\n')
+
     def resolve(self, path):
         return self.service, path
 
@@ -56,7 +64,7 @@ class Handler(BaseHTTPRequestHandler):
     server_version = "Gantry/" + __version__
     def log_message(self, fmt, *args):
         # Never log Authorization headers or request bodies.
-        sys.stderr.write("gantry-http: " + fmt % args + "\n")
+        sys.stderr.write("gantry-http: " + self.command + " " + str(args[1] if len(args)>1 else "") + "\n")
 
     def respond(self, code, body):
         raw = canonical(body).encode()
@@ -74,9 +82,11 @@ class Handler(BaseHTTPRequestHandler):
         if isinstance(self.server, CloudServer) or self.server.server_address[0] not in {'127.0.0.1', '::1'}:
             return True
         try:
+            if len(self.headers.get_all('Host', [])) != 1: return False
             value = urlparse('http://' + self.headers.get('Host', ''))
             return (value.hostname in {'127.0.0.1', 'localhost', '::1'} and
-                    (value.port or 80) == self.server.server_port and not value.username and not value.password)
+                    (value.port or 80) == self.server.server_port and not value.username and not value.password
+                    and not value.path and not value.query and not value.fragment)
         except ValueError:
             return False
 
@@ -126,6 +136,11 @@ class Handler(BaseHTTPRequestHandler):
             if service is None:
                 raise Fault('unauthorized', 'Workspace or credential unavailable')
             command = path.removeprefix("/v1/commands/")
+            if len(self.headers.get_all('Authorization', [])) != 1:
+                raise Fault('unauthorized', 'Exactly one authorization header required')
+            auth = self.headers.get('Authorization', '')
+            token = auth[7:] if auth.startswith('Bearer ') else ''
+            service.preflight(token, command)
             length = int(self.headers.get("Content-Length", "0"))
             if length <= 0 or length > 90 * 1024 * 1024:
                 raise Fault("invalid_input", "Invalid body size")
@@ -149,8 +164,7 @@ class Handler(BaseHTTPRequestHandler):
         except (ValueError, TypeError, KeyError) as exc:
             self.respond(400, {"error": {"code": "invalid_input", "message": str(exc)}})
         except Exception:
-            import traceback
-            traceback.print_exc(file=sys.stderr)
+            sys.stderr.write("gantry-http: internal_error\n")
             self.respond(500, {"error": {"code": "internal_error", "message": "Request failed; inspect server log"}})
 
 

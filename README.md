@@ -61,7 +61,7 @@ See [architecture and boundaries](docs/ARCHITECTURE.md), [workflow](docs/WORKFLO
 
 Report bugs, propose adapters, discuss workflows and contribute tests through GitHub issues and pull requests. Share a **minimal synthetic example**, not confidential CAD, source, logs or credentials.
 
-Optional usage statistics are disabled by default. When enabled, they stay locally; you can inspect and voluntarily share an aggregate export. Nothing is automatically sent to the maintainer.
+On first initialization, choose no feedback (default), statistics, or statistics plus explicitly selected diagnostics. Noninteractive initialization defaults to off. Nothing is sent in the background. Every encrypted upload requires preview confirmation. See [encrypted feedback](docs/FEEDBACK.md) for the optional extra, recipient setup and receiver deployment. A public receiver is not bundled or preconfigured.
 
 ```sh
 .venv/bin/gantry usage enable --data .gantry
@@ -73,6 +73,7 @@ Optional usage statistics are disabled by default. When enabled, they stay local
 ## Development
 
 ```sh
+python3 -m pip install ".[feedback]"
 python3 -m unittest discover -s tests -p 'test_*.py' -q
 node --test tests/test_review_web.mjs
 ```

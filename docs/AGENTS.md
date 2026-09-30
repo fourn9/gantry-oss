@@ -60,3 +60,7 @@ Ask the agent to call `identity`, then retrieve the state you delegated. Writes 
 An external agent can read a review task and submit structured findings through MCP. Automated Mentor/Runner workers are an additional opt-in setup requiring inference configuration, delegated identities, a review team and allowed execution scope. Merely connecting Claude/Cursor/Codex does not start those workers.
 
 The included subscription-backed Codex adapter invokes the installed official CLI under the user's own login and refuses API-key login in that mode. Provider quotas still apply. Other model integrations or API providers use their explicitly configured credentials. Do not assume a flat-rate subscription gives unlimited inference.
+
+## Scoped read authority (2.0.1)
+
+Zone-scoped identities cannot use legacy ledger-wide `state`, `history`, `design`, `context` and related aggregate queries. Use delegated `development_state`, `get_development_state` and review APIs instead. Artifact reads and assembly references are checked against the identity's zones. A zone is a shared artifact trust boundary, not per-file or per-session secrecy. Use separate ledgers for mutually untrusted projects. Principals without `zones` retain ledger-wide authority; grant that deliberately.

@@ -20,12 +20,15 @@ class UsageMetrics:
         self.config = self.root / 'consent.json'
 
     def enabled(self):
+        require(not self.root.is_symlink() and not self.config.is_symlink(), "invalid_input", "No metrics symlinks")
         if not self.config.is_file(): return False
         return json.loads(self.config.read_text()).get('local_collection') is True
 
     def configure(self, enabled):
         require(type(enabled) is bool, 'invalid_input', 'Explicit collection choice required')
+        require(not self.root.is_symlink(), "invalid_input", "No metrics directory symlink")
         self.root.mkdir(parents=True, exist_ok=True, mode=0o700)
+        os.chmod(self.root, 0o700)
         require(not self.config.is_symlink() and not self.db.is_symlink(), 'invalid_input', 'No metrics symlinks')
         with closing(sqlite3.connect(self.db)) as con:
             con.execute('CREATE TABLE IF NOT EXISTS counts(day TEXT, operation TEXT, outcome TEXT, bucket TEXT, n INTEGER, PRIMARY KEY(day,operation,outcome,bucket))')

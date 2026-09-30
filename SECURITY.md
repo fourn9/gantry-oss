@@ -14,3 +14,5 @@ This is an early release, not an externally audited security product. Use a trus
 - Review conclusions and model-generated engineering checks are proposals. They do not establish physical compatibility, safety or regulatory compliance. Human formal adoption remains separate.
 
 No third-party security audit or supported public multi-tenant hosting guarantee is claimed. Maintainers handle security reports on a best-effort basis without an SLA.
+
+For the targeted 2.0.1 review, fixes and remaining boundaries, see [SECURITY-REVIEW.md](docs/SECURITY-REVIEW.md). In particular, isolate mutually untrusted projects into separate ledgers, and do not equate zone-scoped writes with universal per-session read isolation. The optional feedback receiver holds encrypted envelopes only; its offline recipient key and public-facing deployment require separate operator controls.

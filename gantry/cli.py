@@ -19,6 +19,7 @@ def main():
     init = sub.add_parser("init", help="Local, one-time initialization")
     init.add_argument("--data", default=".gantry")
     init.add_argument("--actor", default="admin")
+    init.add_argument("--feedback", choices=["off","statistics","diagnostics"], help="Explicit optional feedback choice; noninteractive default is off")
     init.add_argument("--consent-seconds", type=int, help="Explicit multi-zone consent period; unset blocks multi-zone review")
     serve = sub.add_parser("serve", help="Start authenticated HTTP API")
     serve.add_argument("--data", default=".gantry")
@@ -119,9 +120,14 @@ def main():
     checkpoint.add_argument('--status', choices=['working', 'paused', 'completed', 'failed'], default='working')
     resume = sub.add_parser('restore-development-state', help='Restore saved bytes and continuation context into a new bundle')
     resume.add_argument('state_id'); resume.add_argument('--destination', required=True); resume.add_argument('--key', required=True)
+    from .feedback import add_parser as feedback_parser
+    feedback_parser(sub)
     args = parser.parse_args()
     try:
-        if args.command == 'agent-config':
+        if args.command == 'feedback':
+            from .feedback import command
+            result = command(args)
+        elif args.command == 'agent-config':
             from .agent_connection import connection_config
             raw = connection_config(args.client,args.url,args.agent_token_file,args.profile,args.executable)
             with open(args.output,'x') as f:
@@ -162,6 +168,8 @@ def main():
             with open(path, "x") as f:
                 os.chmod(path, 0o600); f.write(result.pop("token") + "\n")
             result["token_file"] = str(path)
+            from .feedback import onboarding
+            result["feedback"] = onboarding(args.data,args.feedback)
         elif args.command == "serve":
             from .server import serve
             serve(args.data, args.host, args.port); return

@@ -1,0 +1,20 @@
+[Unit]
+Description=Gantry encrypted feedback inbox
+After=network.target
+
+[Service]
+User=gantry-feedback
+Group=gantry-feedback
+EnvironmentFile=/etc/gantry-feedback/receiver.env
+ExecStart=/opt/gantry/.venv/bin/gantry feedback receive --directory /var/lib/gantry-feedback --upload-token-file /etc/gantry-feedback/invite.token --key-id ${GANTRY_FEEDBACK_KEY_ID} --port 8780
+Restart=on-failure
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/gantry-feedback
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+
+[Install]
+WantedBy=multi-user.target

@@ -22,3 +22,7 @@ dist/
 *.log
 agent-*.json
 usage-preview.json
+
+feedback-preview*.json
+*.sealed.json
+feedback-inbox/

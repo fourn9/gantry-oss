@@ -1,0 +1,19 @@
+{$GANTRY_FEEDBACK_DOMAIN} {
+    @feedback path /v1/feedback /health
+    handle @feedback {
+        request_body {
+            max_size 2MB
+        }
+        reverse_proxy 127.0.0.1:8780
+    }
+    handle {
+        respond 404
+    }
+    header {
+        Strict-Transport-Security "max-age=31536000"
+        X-Content-Type-Options "nosniff"
+        Cache-Control "no-store"
+    }
+}
+# No access-log directive: do not collect sender IPs/query strings in application logs.
+# Apply provider/WAF connection and per-source request limits before Internet exposure.

@@ -111,6 +111,22 @@ class Service(ReviewContextMixin, MentorJobsMixin, ChangeReviewMixin, Validation
         require(permission in actor["permissions"] or "admin" in actor["permissions"],
                 "unauthorized", "Permission required", permission=permission)
 
+    def _authenticate(self, con, state, token, command):
+        require(isinstance(token, str) and 20 <= len(token) <= 4096, 'unauthorized', 'Bearer token required')
+        credential = con.execute('SELECT actor FROM credentials WHERE hash=?', (token_hash(token),)).fetchone()
+        actor = state['principals'].get(credential[0]) if credential else None
+        require(actor and actor.get('enabled', True) and secrets.compare_digest(actor['token_hash'], token_hash(token)),
+                'unauthorized', 'Invalid or revoked credential')
+        require(actor.get('expires_at') is None or self.clock() < actor['expires_at'], 'unauthorized', 'Credential expired')
+        require('allowed_commands' not in actor or command in actor['allowed_commands'], 'unauthorized', 'Command not delegated')
+        self.allowed(actor, 'read')
+        return actor
+
+    def preflight(self, token, command):
+        # Authenticate before accepting a potentially large HTTP upload; the transaction rechecks.
+        with closing(self.store.connect()) as con:
+            self._authenticate(con, self.store.state(con), token, command)
+
     @staticmethod
     def zone_write(actor, zone):
         require("admin" in actor["permissions"] or "zones" not in actor or zone in actor["zones"],
@@ -163,17 +179,21 @@ class Service(ReviewContextMixin, MentorJobsMixin, ChangeReviewMixin, Validation
                 self.store.verify(con=con)
                 last_seq = con.execute("SELECT COALESCE(MAX(seq),0) FROM events").fetchone()[0]
                 s = self.store.state(con, last_seq)
-            require(isinstance(token, str) and len(token) >= 20, 'unauthorized', 'Bearer token required')
-            credential = con.execute('SELECT actor FROM credentials WHERE hash=?', (token_hash(token),)).fetchone()
-            candidate = s['principals'].get(credential[0]) if credential else None
-            require(candidate and candidate.get('enabled', True) and secrets.compare_digest(candidate['token_hash'], token_hash(token)),
-                    'unauthorized', 'Invalid or revoked credential')
-            actor = candidate
-            require(actor.get('expires_at') is None or self.clock() < actor['expires_at'],
-                    'unauthorized', 'Credential expired')
-            require('allowed_commands' not in actor or command in actor['allowed_commands'],
-                    'unauthorized', 'Command not delegated to this credential')
-            self.allowed(actor, "read")
+            actor = self._authenticate(con, s, token, command)
+            # Legacy aggregate queries predate scoped sessions; fail closed for scoped actors.
+            if 'zones' in actor and 'admin' not in actor['permissions']:
+                require(command not in {'state','design','diff','history','impact','open','reviews','why',
+                    'outcomes','operations','work','context','review_context','export'},
+                    'unauthorized', 'This legacy query requires ledger-wide read authority; use scoped development APIs')
+                def check_refs(value):
+                    if isinstance(value, dict):
+                        for child in value.values(): check_refs(child)
+                    elif isinstance(value, list):
+                        for child in value: check_refs(child)
+                    elif isinstance(value, str) and value.startswith('rev_'):
+                        entry = s['revisions'].get(value)
+                        if entry: self.zone_write(actor, entry.get('zone', 'root'))
+                check_refs(args)
             if not readonly:
                 cached = con.execute("SELECT * FROM requests WHERE actor=? AND key=?", (actor["id"], key)).fetchone()
                 fp = digest({"command": command, "args": args})
