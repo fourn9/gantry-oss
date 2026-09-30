@@ -178,7 +178,7 @@ def send(directory, preview, confirmation, output, token_file):
         require(response.status==201, 'upload_failed', 'Unexpected receiver response')
         receipt=json.loads(response.read(8192))
     require(isinstance(receipt,dict) and set(receipt)=={'receipt','retention_days'} and
-            re.fullmatch(r'[a-f0-9]{64}',receipt['receipt']) and receipt['retention_days']==30,
+            receipt['receipt']==hashlib.sha256(canonical(envelope).encode()).hexdigest() and receipt['retention_days']==30,
             'upload_failed','Invalid receiver receipt')
     return {'sent':True,**receipt,'encrypted_file':str(output)}
 

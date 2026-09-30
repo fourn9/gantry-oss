@@ -61,6 +61,6 @@ An external agent can read a review task and submit structured findings through 
 
 The included subscription-backed Codex adapter invokes the installed official CLI under the user's own login and refuses API-key login in that mode. Provider quotas still apply. Other model integrations or API providers use their explicitly configured credentials. Do not assume a flat-rate subscription gives unlimited inference.
 
-## Scoped read authority (2.0.1)
+## Scoped read authority
 
 Zone-scoped identities cannot use legacy ledger-wide `state`, `history`, `design`, `context` and related aggregate queries. Use delegated `development_state`, `get_development_state` and review APIs instead. Artifact reads and assembly references are checked against the identity's zones. A zone is a shared artifact trust boundary, not per-file or per-session secrecy. Use separate ledgers for mutually untrusted projects. Principals without `zones` retain ledger-wide authority; grant that deliberately.

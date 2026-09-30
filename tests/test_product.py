@@ -197,6 +197,31 @@ class ProductTests(unittest.TestCase):
         self.assertNotIn('checks',item)
 
 
+    def test_expired_or_disallowed_identity_cannot_fetch_or_reuse_cached_sync(self):
+        from contextlib import closing
+        from gantry import indexed
+        from gantry.model import canonical
+        integration=self.integration('github')
+        fake={'signals':[],'repository_id':1,'partial':False,'coverage':'fixture','requests':1}
+        with patch('gantry.github_connector.fetch_repository',return_value=fake):
+            self.call('sync_integration',{'integration_id':integration['id']},key='cached-sync')
+        with closing(self.service.store.connect()) as con:
+            s=self.service.store.state(con);principal=dict(s['principals']['admin'])
+            principal['expires_at']=self.service.clock()-1
+            indexed.put(con,'principals','admin',principal,canonical);con.commit()
+        with patch('gantry.github_connector.fetch_repository') as acquire:
+            for key in ('cached-sync','new-sync'):
+                with self.assertRaises(Fault) as error:self.call('sync_integration',{'integration_id':integration['id']},key=key)
+                self.assertEqual(error.exception.code,'unauthorized')
+            acquire.assert_not_called()
+        with closing(self.service.store.connect()) as con:
+            principal.pop('expires_at');principal['allowed_commands']=['identity']
+            indexed.put(con,'principals','admin',principal,canonical);con.commit()
+        with patch('gantry.github_connector.fetch_repository') as acquire:
+            with self.assertRaises(Fault):self.call('sync_integration',{'integration_id':integration['id']},key='cached-sync')
+            acquire.assert_not_called()
+
+
 class CloudTests(unittest.TestCase):
     def test_workspace_isolation_and_static_routes(self):
         with tempfile.TemporaryDirectory() as tmp:

@@ -86,7 +86,7 @@ class ProductMixin:
         from .github_connector import fetch_repository
         require(isinstance(key, str) and 1 <= len(key) <= 200, 'invalid_input', 'Idempotency key required')
         with closing(self.store.connect()) as con:
-            s = self.store.state(con); actor = self.authenticate(s, token)
+            s = self.store.state(con); actor = self._authenticate(con, s, token, "sync_integration")
             self.allowed(actor, 'admin')
             item = self._integration(s, actor, args['integration_id'])
             cached = con.execute('SELECT * FROM requests WHERE actor=? AND key=?', (actor['id'], key)).fetchone()

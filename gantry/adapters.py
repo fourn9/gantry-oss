@@ -118,16 +118,35 @@ def capture_git(client, repository, work_id, zone="root", base=None):
         require(proc.returncode == 0, "adapter_error", proc.stderr.decode(errors="replace")[:2000])
         return proc.stdout
     head = git("rev-parse", "--verify", "HEAD").decode().strip()
-    files = {}
+    # Resolve the user's base as a commit, never as a git-diff option.
+    if base:
+        base = git('rev-parse', '--verify', '--end-of-options', base + '^{commit}').decode().strip()
+    from .continuity_adapter import SECRET, EXCLUDED
+    files = {}; total = 0
     for record in git("ls-tree", "-rz", "--full-tree", head).split(b"\0"):
         if not record: continue
         meta, path = record.split(b"\t", 1); mode, kind, obj = meta.split()
         name = path.decode("utf-8"); Store.safe_name(name)
         require(mode in {b"100644", b"100755"} and kind == b"blob", "capture_incomplete", "Symlink/submodule requires explicit capture support")
-        files[name] = base64.b64encode(git("cat-file", "blob", obj.decode())).decode()
+        path = Path(name)
+        require(not any(part in EXCLUDED for part in path.parts) and not path.name.startswith('.env')
+                and path.suffix.lower() not in {'.token','.pem','.key'}
+                and path.name not in {'credentials','credentials.json','auth.json'},
+                'credential_detected', 'Sensitive tracked filename; remove it before capture')
+        size = int(git('cat-file', '-s', obj.decode()).decode())
+        total += size
+        require(size <= 32*1024*1024 and total <= 48*1024*1024 and len(files) < 1000,
+                'capture_incomplete', 'Git capture exceeds bounded snapshot limits; narrow the project')
+        raw = git('cat-file', 'blob', obj.decode())
+        require(len(raw) == size, 'capture_incomplete', 'Git blob size differs')
+        require(not SECRET.search(raw), 'credential_detected', 'Potential credential in tracked content')
+        files[name] = base64.b64encode(raw).decode()
     content_key = "git:" + digest({"head": head, "path": str(root), "zone": zone})
     key = "git-operation:" + digest({"work": work_id, "head": head, "path": str(root), "base": base, "zone": zone})
     diff = git("diff", "--no-ext-diff", "--no-textconv", base, head, "--").decode(errors="replace") if base else None
+    if diff:
+        require(len(diff.encode()) <= 4*1024*1024, 'capture_incomplete', 'Diff exceeds capture limit')
+        require(not SECRET.search(diff.encode()), 'credential_detected', 'Potential credential in historical diff')
     artifact = client.call("capture_artifact", {"zone": zone, "files": files,
         "source": {"adapter": "git", "commit": head, "repository": str(root)}, "capture_scope": "committed_regular_files"}, content_key + ":artifact")
     version = client.call("record", {"type": "software_version", "zone": zone,

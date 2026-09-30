@@ -83,4 +83,31 @@ class AdapterTests(unittest.TestCase):
         self.assertFault('invalid_input', lambda: files_payload(root, ['../outside']))
 
 
+class GitCapturePrivacyTests(unittest.TestCase):
+    def test_committed_sensitive_file_and_removed_secret_are_rejected_before_upload(self):
+        import tempfile
+        from unittest.mock import Mock
+        with tempfile.TemporaryDirectory() as tmp:
+            root=Path(tmp)
+            def git(*args):
+                return subprocess.run(['git','-C',str(root),*args],check=True,capture_output=True).stdout
+            git('init','-q')
+            def commit(name, content):
+                (root/name).write_text(content);git('add',name)
+                git('-c','user.name=Fixture','-c','user.email=fixture@example.invalid','commit','-qm','fixture')
+            commit('.env','APP_MODE=fixture')
+            client=Mock()
+            with self.assertRaises(Fault) as error:capture_git(client,root,'work')
+            self.assertEqual(error.exception.code,'credential_detected');client.call.assert_not_called()
+            git('rm','.env');commit('settings.txt','api_key='+('x'*30))
+            baseline=git('rev-parse','HEAD').decode().strip()
+            with self.assertRaises(Fault):capture_git(client,root,'work')
+            client.call.assert_not_called()
+            commit('settings.txt','mode=fixture')
+            with self.assertRaises(Fault):capture_git(client,root,'work',base=baseline)
+            client.call.assert_not_called()
+            with self.assertRaises(Fault):capture_git(client,root,'work',base='--output=unexpected')
+            self.assertFalse((root/'unexpected').exists());client.call.assert_not_called()
+
+
 if __name__ == '__main__': unittest.main()

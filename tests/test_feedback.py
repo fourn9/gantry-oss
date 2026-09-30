@@ -63,6 +63,18 @@ class FeedbackTests(unittest.TestCase):
         with self.assertRaises(OSError):f.prepare(self.data,self.root/'recipient.json',[self.root/'linked.log'],self.root/'out')
         (self.root/'large.log').write_bytes(b'x'*(128*1024+1))
         with self.assertRaises(Fault):f.prepare(self.data,self.root/'recipient.json',[self.root/'large.log'],self.root/'out')
+    def test_upload_does_not_report_success_for_an_unrelated_receipt(self):
+        self.configure();self.keys();preview=self.preview()
+        f.private_write(self.root/'invite.token',secrets.token_urlsafe(32).encode())
+        response=io.BytesIO(json.dumps({'receipt':'0'*64,'retention_days':30}).encode())
+        response.status=201
+        with patch('gantry.feedback.build_opener') as opener:
+            opener.return_value.open.return_value=response
+            with self.assertRaises(Fault) as error:
+                f.send(self.data,self.root/'preview.json',preview['sha256'],self.root/'sealed',self.root/'invite.token')
+            self.assertEqual(error.exception.code,'upload_failed')
+            opener.return_value.open.assert_called_once()
+        self.assertTrue((self.root/'sealed').is_file())
     def test_real_encrypted_upload_retention_no_download_and_no_key_online(self):
         self.configure();self.keys();token=secrets.token_urlsafe(32);f.private_write(self.root/'invite.token',token.encode())
         key=json.loads((self.root/'recipient.json').read_text())
