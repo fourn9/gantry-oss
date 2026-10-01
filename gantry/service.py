@@ -46,6 +46,7 @@ class Service(ConnectionMixin, ReviewContextMixin, MentorJobsMixin, ChangeReview
     READS |= {'get_development_state', 'list_development_states'}
     READS |= {'related_review_context','check_mentor_job'}
     READS |= {'get_review_team', 'review_automation_status'}
+    READS.add('render_evidence_view')
     READS |= {'get_change_review', 'list_change_reviews'}
     READS |= {'automation_status', 'get_analysis'}
     READS |= {'product_overview', 'project_details', 'session_details', 'get_signal'}

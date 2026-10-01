@@ -16,6 +16,13 @@ register('record_evidence_view', {'state_id': S, 'subject_id': S, 'profile': S,
     'extensions': O, 'execution_id': S, 'change_id': S},
     ['state_id', 'subject_id', 'profile', 'extractor', 'sources', 'fields', 'missing'])
 register('get_evidence_view', {'view_id': S, 'fields': A}, ['view_id'])
+OUTPUT_FIELD = {'type': 'object', 'properties': {'source': S, 'target': S, 'unit': S,
+    'frame': S, 'time_basis': S}, 'required': ['source', 'target'], 'additionalProperties': False}
+OUTPUT_PROFILE = {'type': 'object', 'properties': {'id': S, 'version': I,
+    'fields': {'type': 'array', 'minItems': 1, 'maxItems': 200, 'items': OUTPUT_FIELD}},
+    'required': ['id', 'version', 'fields'], 'additionalProperties': False}
+register('render_evidence_view', {'view_id': S, 'state_id': S, 'profile': OUTPUT_PROFILE},
+    ['view_id', 'state_id', 'profile'])
 register('query_evidence', {'state_id': S, 'subject_id': S, 'profile': S, 'after': S,
     'as_of_seq': {'type': 'integer', 'minimum': 0},
     'limit': {'type': 'integer', 'minimum': 1, 'maximum': 100}}, ['state_id'])
@@ -77,3 +84,13 @@ class EvidenceMixin:
         return {'items': [{k: v[k] for k in ('id', 'subject_id', 'profile', 'created_seq', 'missing')}
                           for v in rows[:limit]], 'as_of_seq': seq,
                 'next': rows[limit-1]['id'] if len(rows) > limit else None}
+
+    def cmd_render_evidence_view(self, s, actor, a, fx, n, con):
+        view = self.cmd_get_evidence_view(s, actor, {'view_id': a['view_id']}, fx, n, con)
+        require(view['state_id'] == a['state_id'], 'stale_basis', 'View describes another development state')
+        for source in view['sources']:
+            artifact = self._dev_artifact(s, source['revision_id'])
+            require(artifact['data']['files'].get(source['path'], {}).get('hash') == source['sha256'],
+                    'stale_basis', 'View source no longer available')
+        from .tool_views import render
+        return render(view, a['profile'])
