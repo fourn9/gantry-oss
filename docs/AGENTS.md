@@ -56,6 +56,7 @@ Official references: [Codex MCP](https://learn.chatgpt.com/docs/extend/mcp?surfa
 | `project_submit` / `submit` | Share a checkpoint and request a meaningful PR-style review |
 | `project_mentor_prepare` / `mentor-prepare` | Supply saved context and an output schema to the user's model |
 | `project_mentor_finish` / `mentor-finish` | Save that model's findings under the delegated reviewer identity |
+| `project_mentor_recover` / `mentor-recover` | Recover an expired review after confirming the previous reviewer stopped; retain its input and saved answer |
 | `project_review` / `review` | Retrieve findings, evidence and current applicability |
 | `project_respond` / `respond` | Link corrected state and explanations back to findings |
 | `project_branch` / `branch` | Restore an isolated candidate from a common saved baseline |
@@ -76,6 +77,12 @@ Default: prepare → the user's current model returns structured findings → fi
 For automatic submitted-milestone review, approve `--mentor codex-subscription --goal ... --done ...`. The existing official CLI adapter checks ChatGPT login, disables inference tools and refuses API-key fallback. Source context uses that explicitly approved user-provider route. Installation and ordinary recording make no model calls; Gantry maintainers pay no inference charges.
 
 The running user agent chooses and performs follow-up work. Gantry does not automatically launch/continue arbitrary Claude or Cursor sessions. Idle/stopped clients, host approval and provider quota can stop continuation; saved state remains available. An uncertain inference/process is never blindly retried. Inspect private operation/review journals before a deliberate new attempt.
+
+Use `mentor-recover` with `submission_id` and a `reason` confirming the old reviewer
+stopped to renew an expired review lease. It does not invoke a model or extend
+connection permissions. Changed evidence requires a fresh submission. See
+[recovery and tool views](runtime-recovery-and-tool-views.md) for team-worker
+recovery, explicit provider retries and collection of interrupted verification.
 
 Test observations are bound to actual input hashes and included in matching reviews. New combinations do not inherit a physical pass. Assumptions stay open questions and block canonical state adoption until resolved through the existing explicit workflow. Investigate agent-resolvable unknowns; bundle genuinely user-owned decisions and continue independent work within scope.
 

@@ -41,6 +41,9 @@ Mentor uses your existing client model through structured prepare/finish tools. 
 
 For the legacy HTTP server, web interface, scoped MCP profiles and advanced multi-user administration, see [administrator setup](docs/ADMIN-AGENTS.md). Existing APIs remain supported.
 
+For stopped-worker recovery, native-preserving tool output profiles and the optional
+CAD screening command, see [recovery and tool views](docs/runtime-recovery-and-tool-views.md).
+
 Run [the synthetic end-to-end example](examples/connected_project.py) after installation. Its default model responses are marked fixtures; `--live` performs two bounded calls under your subscription. It demonstrates software bounds, not physical robot performance.
 
 ## What is included
