@@ -42,6 +42,8 @@ TOOLS.update({
         'Prepare a bounded review task for the current user model. Separate reviewer identity; no paid provider required.'),
     'project_mentor_finish': ('mentor-finish', schema({'submission_id': S, 'output': REVIEW_OUTPUT}, ['submission_id', 'output']),
         'Submit grounded structured findings under the delegated reviewer identity; cannot edit or adopt.'),
+    'project_mentor_recover': ('mentor-recover', schema({'submission_id': S, 'reason': S}, ['submission_id', 'reason']),
+        'After confirming the previous reviewer stopped, renew an expired lease and preserve saved input/output. No new model or tool invocation.'),
     'project_mentor_run': ('mentor-run', schema({'submission_id': S}, ['submission_id']),
         'Use an explicitly enabled user subscription for one submitted review. Never falls back to API billing.')})
 
@@ -51,9 +53,10 @@ def dispatch(project, name, arguments):
     action, spec, _ = TOOLS[name]; validate(arguments, spec)
     args = dict(arguments); key = args.pop('request_id', None)
     if action.startswith('mentor-'):
-        from .project_mentor import prepare, finish, review
+        from .project_mentor import prepare, finish, review, recover
         if action == 'mentor-prepare': return prepare(project, args['submission_id'])
         if action == 'mentor-finish': return finish(project, args['submission_id'], args['output'])
+        if action == 'mentor-recover': return recover(project, args['submission_id'], args['reason'])
         return review(project, args['submission_id'])
     return project.operate(action, args, key)
 

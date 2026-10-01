@@ -14,6 +14,7 @@ class MonthlyTests(unittest.TestCase):
         commands=[]
         class Process:
             returncode=0
+            pid=99999999
             def __init__(self,argv,**kw):
                 commands.append((argv,kw));self.output=Path(argv[argv.index('-o')+1])
             def communicate(self,prompt,timeout):self.output.write_text('{"status":"ready"}')

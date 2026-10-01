@@ -21,6 +21,23 @@ from gantry.service import Service, token_hash
 
 
 class ConnectTests(unittest.TestCase):
+    def test_mcp_review_recovery_preserves_input_and_delegation(self):
+        self.attach(); self.checkpoint()
+        submission = self.project.operate('submit', {'question': 'Review controller'}, 'recover-submit')
+        prepared = dispatch(self.project, 'project_mentor_prepare', {'submission_id': submission['id']})
+        service = self.project.client.service; now = service.clock()
+        service.clock = lambda: now + 901000
+        recovered = dispatch(self.project, 'project_mentor_recover',
+            {'submission_id': submission['id'], 'reason': 'Previous reviewer stopped'})
+        self.assertFalse(recovered['inference_repeated'])
+        again = dispatch(self.project, 'project_mentor_prepare', {'submission_id': submission['id']})
+        self.assertEqual(prepared, again)
+        state = prepared['context']['state_id']
+        output = {'verdict': 'conditional', 'scope': 'Saved source only', 'rationale': 'Needs testing',
+            'evidence': [state], 'unverified': ['Runtime behavior'], 'findings': [], 'prediction': 'Unconfirmed'}
+        result = dispatch(self.project, 'project_mentor_finish', {'submission_id': submission['id'], 'output': output})
+        self.assertEqual(result['status'], 'completed')
+
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory(); self.addCleanup(self.temp.cleanup)
         self.root = Path(self.temp.name).resolve()

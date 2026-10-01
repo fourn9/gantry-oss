@@ -15,6 +15,11 @@ register('claim_mentor_job', {'job_id': S, 'lease_seconds': {'type':'integer','m
 register('check_mentor_job', {'job_id':S,'fence':S}, ['job_id','fence'])
 register('finish_mentor_job', {'job_id':S,'fence':S,'output':O,'provider':O}, ['job_id','fence','output','provider'])
 register('fail_mentor_job', {'job_id':S,'fence':S,'reason':S}, ['job_id','fence','reason'])
+register('recover_mentor_job', {'job_id': S, 'fence': S, 'reason': S,
+    'checkpoint_hash': S, 'confirmed_stopped': {'type': 'boolean', 'enum': [True]},
+    'retry_inference': {'type': 'boolean'},
+    'lease_seconds': {'type': 'integer', 'minimum': 10, 'maximum': 900}},
+    ['job_id', 'fence', 'reason', 'checkpoint_hash', 'confirmed_stopped', 'retry_inference', 'lease_seconds'])
 SPECIALIST = obj({'summary':S,'evidence':A,'unresolved':A})
 DEVELOPER = obj({'edits': {'type':'array','maxItems':100,'items':obj({'path':S,'content':{'type':'string'}})},
                  'summary':S,'hypothesis':S,'rationale':S,'unverified':A})
@@ -142,6 +147,63 @@ class MentorJobsMixin:
             require(d['version']==j['execution_policy_version'],'stale_basis','Execution policy changed')
             if j.get('verification_hash'):require(j['verification_hash'] in d['recipes'].values(),'recipe_not_allowed','Verification permission revoked')
         return {'allowed':True,'job_id':j['id']}
+
+    def cmd_recover_mentor_job(self, s, actor, a, fx, n, con):
+        """Fence an explicitly stopped worker; retain context, reports and prior attempts.
+
+        Local process/receipt reconciliation precedes this command. A new model
+        attempt consumes allowance; returning already saved output does not.
+        No new identity, scope, execution recipe or acceptance is authorized here.
+        """
+        j = self._dev_get(s, 'mentor_jobs', a['job_id'])
+        require(j['principal_id'] == actor['id'] and j.get('fence') == a['fence'],
+                'unauthorized', 'Recovery belongs to the original worker identity and fence')
+        require(j['status'] in {'running', 'failed'}, 'conflict', 'Job is not recoverable')
+        r, t, p, d = self._job_current(s, actor, j)
+        require(p['version'] == j['policy_version'], 'stale_basis', 'Automation policy changed; resubmit')
+        require(len(a['checkpoint_hash']) == 64 and all(c in '0123456789abcdef' for c in a['checkpoint_hash']),
+                'invalid_input', 'Checkpoint SHA-256 required')
+        require(j['context']['context_fingerprint'] == self._review_fingerprint(s, r),
+                'stale_basis', 'Review evidence changed; resubmit instead of reusing an old answer')
+        if j['kind'] == 'developer':
+            require(d['version'] == j['execution_policy_version'], 'stale_basis', 'Execution delegation changed')
+            require(not self._engineering_check(s, r)['input_mismatches'], 'stale_basis', 'Engineering inputs changed')
+            if j.get('verification_hash'):
+                require(j['verification_hash'] in d['recipes'].values(), 'recipe_not_allowed', 'Verification revoked')
+            active = [x for x in s.get('mentor_jobs', {}).values() if x['id'] != j['id']
+                      and x['session_id'] == d['id'] and x['kind'] == 'developer' and x['status'] == 'running']
+            active += [x for x in s.get('dev_executions', {}).values()
+                       if x['session_id'] == d['id'] and x['status'] in {'running', 'cancelling'}]
+            require(len(active) < d['max_parallel'], 'resource_unavailable', 'Execution slots occupied')
+            for x in active:
+                other = x.get('write_scope', s.get('dev_contracts', {}).get(x.get('contract_id'), {}).get('write_scope', []))
+                require(not any(in_scope(path, other) or in_scope(q, j['write_scope'])
+                        for path in j['write_scope'] for q in other), 'conflict', 'Active write scope overlap')
+            reasons = self._automation_execution_reasons(s, actor, d,
+                {'review_submission': r['id'], 'write_scope': j['write_scope']})
+            # Resuming the same reserved execution does not create another run.
+            reasons = [reason for reason in reasons if reason != 'project_execution_budget']
+            require(not reasons, 'execution_blocked', 'Project conditions changed', reasons=reasons)
+        if a['retry_inference']:
+            require(p['used_jobs'] < p['max_jobs'], 'budget_exhausted', 'No inference retry allowance')
+            p = copy.deepcopy(p); p['used_jobs'] += 1
+            self._dev_save(s, fx, 'review_automation', p)
+        if j['kind'] == 'coordinator':
+            require(r['status'] != 'completed', 'conflict', 'Review already completed')
+            require(not r.get('fence') or r['fence'] == j.get('review_fence'),
+                    'conflict', 'Another coordinator owns the review')
+            r.update(status='running', reviewer=actor['id'], fence=uid('fence'),
+                     lease_until=self.clock() + a['lease_seconds'] * 1000)
+            r.pop('error', None)
+            j['review_fence'] = r['fence']
+            self._dev_save(s, fx, 'change_reviews', r)
+        j.setdefault('recoveries', []).append({'at': self.clock(), 'actor_id': actor['id'],
+            'previous_status': j['status'], 'previous_error': j.get('error'),
+            'checkpoint_hash': a['checkpoint_hash'], 'reason': a['reason'],
+            'retry_inference': a['retry_inference']})
+        j.update(status='running', fence=uid('joblease'), lease_until=self.clock() + a['lease_seconds'] * 1000)
+        j.pop('error', None); j.pop('finished_at', None)
+        return self._dev_save(s, fx, 'mentor_jobs', j)
 
     def cmd_fail_mentor_job(self,s,actor,a,fx,n,con):
         j=self._owned_job(s,actor,a);self._dev_session(s,actor,j['session_id'])

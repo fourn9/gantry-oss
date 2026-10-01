@@ -39,6 +39,7 @@ def infer_monthly(context,schema,directory,timeout_seconds=180):
             '-c','approval_policy="never"','--sandbox','read-only','--skip-git-repo-check','--ephemeral',
             '--json','--output-schema',str(schema_path),'-o',str(root/'answer.json'),'-'],
             cwd=root,env=env,stdin=subprocess.PIPE,stdout=events,stderr=errors,text=True,start_new_session=True)
+        persist(marker,{'phase':'started','context':context,'schema':schema,'pid':proc.pid})
         try:proc.communicate(prompt,timeout=timeout_seconds)
         except subprocess.TimeoutExpired:
             stop_process(proc);raise Fault('provider_timeout','Codex timeout; saved invocation will not blindly repeat')

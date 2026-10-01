@@ -7,7 +7,7 @@ A caller may inject a local inference function into review_once for automation.
 import json
 from pathlib import Path
 from contextlib import contextmanager
-from .model import require, uid
+from .model import require, uid, digest
 from .runner import persist
 from .contracts import validate, CONTRACTS
 
@@ -33,12 +33,16 @@ def prepare_review(client, submission_id, journal, lease_seconds=900):
         path = root / 'review.json'
         if path.exists():
             job = json.loads(path.read_text())
+            require(not job.get('pending_recovery'), 'recovery_pending', 'Finish review recovery first')
             require(job['submission_id'] == submission_id, 'conflict', 'Use one journal per submission')
             if job['phase'] == 'prepared':
                 context = ready_context(client, submission_id)
                 require(context['status'] == 'running' and context.get('lease_until', 0) == job['lease_until'] and context['lease_until'] > context['server_time'],
                         'lease_lost', 'Prepare a new attempt in a new journal after lease expiry')
-                job['context'] = context; persist(path, job)
+                require(context['context_fingerprint'] == job['context']['context_fingerprint'],
+                        'stale_basis', 'Review evidence changed; submit a new review')
+                # Keep inference input byte-stable across reconnects. Server
+                # clock/lease metadata is checked above, not rewritten into it.
                 return job
             if job['phase'] != 'claiming': return job
         else:
@@ -57,6 +61,7 @@ def prepare_review(client, submission_id, journal, lease_seconds=900):
 def finish_review(client, journal, output):
     with journal_lock(journal) as root:
         path = root / 'review.json'; job = json.loads(path.read_text())
+        require(not job.get('pending_recovery'), 'recovery_pending', 'Finish review recovery first')
         if job['phase'] == 'completed':
             require(output == job['output'], 'idempotency_mismatch', 'Review already completed with different output')
             return job['result']
@@ -70,6 +75,41 @@ def finish_review(client, journal, output):
         result = client.call('complete_change_review', args, job['claim_key'] + ':complete')
         job.update(phase='completed', result=result); persist(path, job)
         return result
+
+
+def recover_review(client, submission_id, journal, reason):
+    """Renew an expired review lease without discarding saved context/answers."""
+    require(isinstance(reason, str) and reason.strip(), 'invalid_input', 'Confirm the old reviewer stopped')
+    with journal_lock(journal) as root:
+        path = root / 'review.json'; job = json.loads(path.read_text())
+        require(job['submission_id'] == submission_id, 'conflict', 'Journal belongs to another review')
+        if job['phase'] == 'completed': return {'status': 'completed', 'result': job['result']}
+        context = ready_context(client, submission_id)
+        if context['status'] == 'completed' and job['phase'] == 'response_saved':
+            args = {'submission_id': submission_id, 'fence': job['fence'],
+                'context_fingerprint': job['context']['context_fingerprint'], 'output': job['output']}
+            result = client.call('complete_change_review', args, job['claim_key'] + ':complete')
+            job.update(phase='completed', result=result); persist(path, job)
+            return {'status': 'completed', 'result': result}
+        require(context['context_fingerprint'] == job['context']['context_fingerprint'],
+                'stale_basis', 'Saved answer has changed premises; resubmit')
+        require(context['status'] != 'completed', 'conflict', 'Review already completed elsewhere')
+        if not job.get('pending_recovery'):
+            require(context.get('lease_until', 0) <= context['server_time'], 'conflict',
+                    'Lease is still valid; continue the existing prepared review')
+            key = uid('review_recovery')
+            persist(root / 'recoveries' / (key + '.json'), job)
+            job['pending_recovery'] = {'key': key, 'reason': reason,
+                'args': {'submission_id': submission_id, 'lease_seconds': job['lease_seconds'],
+                         'basis': {'reason': reason, 'recovery_of': job['claim_key'], 'checkpoint_hash': digest(job)}}}
+            persist(path, job)
+        pending = job['pending_recovery']
+        lease = client.call('claim_change_review', pending['args'], pending['key'])
+        job.update(fence=lease['fence'], lease_until=lease['lease_until'], claim_key=pending['key'])
+        job.setdefault('recoveries', []).append(pending); job.pop('pending_recovery')
+        persist(path, job)
+        return {'status': 'ready_to_resume', 'phase': job['phase'], 'submission_id': submission_id,
+                'saved_output': 'output' in job, 'inference_repeated': False}
 
 
 def review_once(client, submission_id, journal, infer_fn):

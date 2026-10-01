@@ -7,6 +7,19 @@ from gantry.service import Service, token_hash
 
 
 class ChangeReviewTests(unittest.TestCase):
+    def test_expired_review_recovers_saved_answer_without_new_inference(self):
+        from gantry.review_worker import prepare_review, finish_review, recover_review
+        r = self.setup_review(); self.report(r); journal = self.root / 'review-recovery'
+        first = prepare_review(self.mentor, r['id'], journal, lease_seconds=10)
+        output = self.output(r)
+        now = self.service.clock(); self.service.clock = lambda: now + 11000
+        self.fault('conflict', lambda: finish_review(self.mentor, journal, output))
+        result = recover_review(self.mentor, r['id'], journal, 'Previous client exited')
+        self.assertTrue(result['saved_output']); self.assertFalse(result['inference_repeated'])
+        self.assertEqual(prepare_review(self.mentor, r['id'], journal)['context'], first['context'])
+        self.assertEqual(finish_review(self.mentor, journal, output)['status'], 'completed')
+        self.assertTrue(self.call('replay')['matched'])
+
     setUp = fixtures.ContinuityTests.setUp
     tearDown = fixtures.ContinuityTests.tearDown
     call = fixtures.ContinuityTests.call

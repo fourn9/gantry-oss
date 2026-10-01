@@ -32,6 +32,7 @@ def process_job(client,job_id,journal,infer_fn=infer_monthly,cad_python=None,ver
         except BlockingIOError:return {'status':'busy','job_id':job_id}
         path=root/'job.json'
         j=json.loads(path.read_text()) if path.exists() else {'phase':'new','key':uid('mentor-job')}
+        require(not j.get('pending_recovery'), 'recovery_pending', 'Finish the durable recovery request before working')
         if j['phase']=='done':return j['result']
         if j['phase']=='new':
             persist(path,j)
@@ -70,7 +71,7 @@ def process_job(client,job_id,journal,infer_fn=infer_monthly,cad_python=None,ver
                     ctx['cad_inspection']=inspect_cad(workspace,paths,baseline_root=baseline,python_executable=cad_python)
             j.update(phase='inference',input=ctx);persist(path,j)
         if (j['phase']=='inference' and infer_fn is infer_monthly
-                and not (root/'model'/'inference.json').exists()
+                and not (root/j.get('model_directory','model')/'inference.json').exists()
                 and j['input'].get('review',{}).get('inference_view',{}).get('version',0) < 2):
             # Preserve the old view for auditing. Do not replay an uncertain provider call.
             persist(root/'legacy-inference-input.json',j['input'])
@@ -93,7 +94,7 @@ def process_job(client,job_id,journal,infer_fn=infer_monthly,cad_python=None,ver
             restrict(schema)
             if job['kind']=='coordinator' and any(x['unresolved'] for x in context['specialists'].values()):
                 schema['properties']['verdict']['enum']=['conditional','changes_requested','insufficient_evidence']
-            receipt=infer_fn(j['input'],schema,root/'model')
+            receipt=infer_fn(j['input'],schema,root/j.get('model_directory','model'))
             validate(receipt['output'],schema)
             if j['input'].get('cad_inspection'):receipt['provider']['cad_inspection']=j['input']['cad_inspection']
             j.update(phase='output_saved',receipt=receipt);persist(path,j)
@@ -127,6 +128,7 @@ def process_job(client,job_id,journal,infer_fn=infer_monthly,cad_python=None,ver
                     persist(report_path,{'status':'started','recipe_hash':digest(verification)})
                     with open(root/'verification.stdout','w') as out,open(root/'verification.stderr','w') as err:
                         proc=subprocess.Popen(verification['argv'],cwd=workspace,env=process_env(verification),stdout=out,stderr=err,start_new_session=True)
+                        persist(report_path,{'status':'started','recipe_hash':digest(verification),'pid':proc.pid})
                         try:proc.wait(timeout=verification.get('timeout_seconds',30))
                         except subprocess.TimeoutExpired:stop_process(proc);raise Fault('verification_timeout','Verification stopped at timeout')
                     report={'status':'completed','recipe_hash':digest(verification),'exit_code':proc.returncode,
@@ -134,6 +136,8 @@ def process_job(client,job_id,journal,infer_fn=infer_monthly,cad_python=None,ver
                             'stdout':(root/'verification.stdout').read_text()[-16000:],'stderr':(root/'verification.stderr').read_text()[-16000:]}
                     persist(report_path,report)
                 j['receipt']['provider']['verification']=report
+                if report.get('outcome') == 'interrupted_unknown':
+                    j['receipt']['output']['unverified'].append('Verification interrupted; partial output collected without a pass')
                 fingerprint=report['output_fingerprint']
             else:fingerprint=j['edit_fingerprint']
             j.update(phase='verified',output_fingerprint=fingerprint);persist(path,j)

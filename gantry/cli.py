@@ -35,7 +35,7 @@ def main():
     disconnect.add_argument('root', nargs='?', default='.')
     project = sub.add_parser('project', help='Use scoped project operations with the agent credential')
     project.add_argument('action', choices=['status', 'read', 'edit', 'test', 'checkpoint', 'audit',
-        'submit', 'review', 'respond', 'assumption', 'branch', 'mentor-prepare', 'mentor-finish', 'mentor-run'])
+        'submit', 'review', 'respond', 'assumption', 'branch', 'mentor-prepare', 'mentor-finish', 'mentor-run', 'mentor-recover'])
     project.add_argument('--root', default='.')
     project.add_argument('--input', help='JSON arguments file; - reads stdin')
     project.add_argument('--request-id', help='Stable ID for safe retries')
@@ -119,6 +119,12 @@ def main():
     mentor_daemon.add_argument('--journal', required=True)
     mentor_daemon.add_argument('--iterations', type=int, default=1)
     mentor_daemon.add_argument('--interval', type=int, default=10)
+    recover_mentor = sub.add_parser('recover-mentor-job', help='Recover a stopped worker from its private journal; never blindly rerun a tool')
+    recover_mentor.add_argument('--job-id', required=True)
+    recover_mentor.add_argument('--journal', required=True)
+    recover_mentor.add_argument('--confirm-stopped', required=True, help='Reason confirming the previous worker/processes stopped')
+    recover_mentor.add_argument('--retry-inference', action='store_true', help='Explicit new model attempt; charges existing job allowance')
+    recover_mentor.add_argument('--collect-interrupted-verification', action='store_true', help='Save partial verifier output as unknown; do not rerun it')
     analyst = sub.add_parser('autonomy-worker', help='Continuously analyze Incoming and development milestones')
     analyst.add_argument('--config', required=True)
     analyst.add_argument('--journal', required=True)
@@ -188,7 +194,7 @@ def main():
             else:
                 payload = json.loads(sys.stdin.read() if args.input == '-' else Path(args.input).read_text()) if args.input else {}
                 from .project_mcp import dispatch
-                if args.action not in {'status', 'review', 'mentor-prepare', 'mentor-finish', 'mentor-run'}:
+                if args.action not in {'status', 'review', 'mentor-prepare', 'mentor-finish', 'mentor-run', 'mentor-recover'}:
                     payload['request_id'] = args.request_id or payload.get('request_id') or secrets.token_hex(16)
                 result = dispatch(project, 'project_'+args.action.replace('-', '_'), payload)
         elif args.command == 'feedback':
@@ -268,6 +274,12 @@ def main():
             if args.command == 'mentor-worker':
                 from .mentor_daemon import run_mentor
                 run_mentor(json.loads(Path(args.config).read_text()), args.journal, args.iterations, args.interval); return
+            if args.command == 'recover-mentor-job':
+                from .mentor_recovery import recover_job
+                result = recover_job(client, args.job_id, args.journal, args.confirm_stopped,
+                    retry_inference=args.retry_inference,
+                    collect_interrupted_verification=args.collect_interrupted_verification)
+                print(json.dumps(result, ensure_ascii=False, indent=2)); return
             if args.command == 'autonomy-worker':
                 from .autonomy_worker import run_analyst
                 run_analyst(client, json.loads(Path(args.config).read_text()), args.journal,

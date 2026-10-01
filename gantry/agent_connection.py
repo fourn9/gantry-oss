@@ -9,6 +9,7 @@ READ_TOOLS = set('context reviews events project_details session_details product
 READ_TOOLS.add('render_evidence_view')
 DEVELOP_TOOLS = set('record capture_artifact begin_change checkpoint_change share_change integrate_changes submit_change_review respond_to_change_review create_work claim_work submit_work discuss'.split())
 REVIEW_TOOLS = set('claim_change_review submit_specialist_review complete_change_review propose_review_work reflect_change_review claim_mentor_job check_mentor_job finish_mentor_job fail_mentor_job'.split())
+REVIEW_TOOLS.add('recover_mentor_job')
 PROFILES = {'read-only': READ_TOOLS, 'developer': READ_TOOLS | DEVELOP_TOOLS,
             'reviewer': READ_TOOLS | REVIEW_TOOLS}
 

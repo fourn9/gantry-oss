@@ -65,6 +65,12 @@ def finish(project, submission, output):
     return finish_review(client, journal, output)
 
 
+def recover(project, submission, reason):
+    from .review_worker import recover_review
+    client, journal = setup(project, submission)
+    return recover_review(client, submission, journal, reason)
+
+
 def review(project, submission):
     require(project.context()['connection']['plan']['delegation']['mentor'] == 'codex-subscription',
             'reauthorization_required', 'Automatic subscription inference was not delegated')
