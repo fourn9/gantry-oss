@@ -1,72 +1,57 @@
-# Gantry 2.1.0 — recovery and tool views
+# Gantry v3.0 — persistent organizations and customer Bots
 
-Early public prerelease. This extends the existing project connection and review
-workflow; it does not introduce a new agent organization or a paid model service.
+Package version: **3.0.0**. Current implementation baseline, designated by the
+project owner. The source is published on the main branch; a v3.0.0 release tag
+has not been created. The previous release is preserved in [v2.1.0](releases/v2.1.0.md).
 
-## Added
+## Included
 
-- Recover a stopped Mentor worker using its original private journal and delegated
-  identity. Core checks current inputs, permissions and execution conditions before
-  rotating the lease. Saved model output, applied edits and completed verification
-  can be reused without repeating the work.
-- Resume an expired project review through `gantry project mentor-recover` or
-  `project_mentor_recover` in MCP. The original review context and saved answer
-  remain tied to the same evidence.
-- Render selected evidence fields through explicit, versioned JSON output
-  profiles, retaining source references and conversion provenance. Supported unit
-  conversions do not overwrite native data; missing information stays explicit.
-- Optional CAD screening for hash-pinned STEP files. Each part's bounding box is
-  computed once per pose, with exact checks for unresolved pairs and measurements
-  of calculation counts and time.
+- Permanent organization/Bot identities, versioned role profiles and explicit
+  bindings to development sessions, retaining customer ownership and authority.
+- Evidence-backed individual experience and owner-authorized organization
+  reflections, reused across authorized sessions; contradictions retain history.
+- Hierarchical review, durable questions/objections/handoffs and blocking conditions.
+- Customer-owned Bot workers with private workspaces, environment declarations,
+  runtime fencing, queued PR-driven work and explicit interrupted-work recovery.
+- Customer inference bridge and optional existing subscription adapter. No default
+  provider, publisher-paid model account or automatic service installation.
+- Opt-in launchd/systemd service generation; CLI/API/MCP access to Bot context,
+  assignments and experience.
+- No local review/test count cap or default eight-hour expiry. Explicit owner
+  renewal retains existing connection state and immutable approval history.
 
-## Fixed
+Existing development state, artifacts, verification, human adoption, tool adapters
+and recovery mechanisms are retained. This version does not change a physical
+verification result or formally adopt any design.
 
-- Reconnecting to a review no longer changes its saved model input merely because
-  the server clock or lease metadata changed.
-- Recovery reconciles ambiguous acknowledgements using durable request IDs. Known
-  live processes, changed premises and revoked permissions prevent unsafe reuse.
-- Interrupted verification is collected as an unknown outcome, never inferred to
-  pass or automatically rerun. A new inference attempt requires explicit selection
-  and consumes the existing allowance; no paid API fallback is introduced.
+## Verified boundary
 
-## Validation and limits
+The publication check ran 362 Python tests: 354 passed, 8 skipped,
+and 7 UI tests passed. Fixture inference was explicit; Core, file edits, queue,
+external bridge process, persistence and recovery were real. This version label
+adds no new capability or new claim of model quality/development speed.
 
-The Python suite ran 327 cases: 320 passed and 7 optional-environment cases skipped.
-The UI suite passed all 7 cases. Coverage includes HTTP/service restart, lease
-expiry, stale inputs, lost acknowledgements, process checks, project MCP recovery,
-output mappings and native STEP checks with the optional CAD runtime installed.
-Model responses in these regression tests are fixtures, not live-model evaluation.
+## Remaining development
 
-The built wheel was installed into a clean environment and exercised through the
-synthetic project example: saved failure, review, correction, unchanged passing
-test, new-client resume and matching audit/replay. Static scanning reported no
-high-severity findings; the two existing medium findings remain the allowlisted
-SQL query and the sandbox's temporary mount described in the connection review.
-Secret-scanner candidates were the same five existing negative-test fixtures.
-The checked optional feedback dependencies (PyNaCl 1.6.2, cffi 2.1.1 and pycparser
-3.0) had no known advisories at publication review. These checks are not an
-independent security certification.
+1. Detailed evidence-backed Bot activity (idle/thinking/working/blocked).
+2. General event and scheduled routines beyond the current PR-driven loop.
+3. Optional automatic isolated runtime/VM provisioning; customer-local operation
+   remains supported.
+4. Evidence-based organizational/role optimization with approved authority changes.
+5. Measuring and improving individual Bot learning and experience selection.
 
-Recovery requires the same identity and private journal; it does not launch an
-arbitrary user agent or transfer credentials. Tool profiles are selected JSON
-mappings, not universal CAD/electrical converters. CAD screening covers explicit
-pairs at a declared pose, not continuous motion or physical certification.
-Existing evaluators must explicitly adopt the helper and verify equivalent
-results. No end-to-end development speedup is claimed by this release.
-
-See [usage, contracts and remaining limits](runtime-recovery-and-tool-views.md).
+Live customer-agent/CAD/simulation validation, streamlined onboarding and review of
+legacy advanced automation's explicit round/job limits remain follow-up work.
+The current Bot workspaces are not an OS sandbox or automatically provisioned VM.
 
 ## Upgrade
 
-Back up the ledger, artifacts and private worker journals; stop active workers,
-install the new version, then restart servers/workers. No destructive schema
-migration is required, and previous events and artifacts are retained. New journal
-fields are additive. Recovery neither extends expired credentials nor changes
-feedback consent or formal adoption.
+Back up the ledger, artifacts and worker journals, then stop workers before
+updating. Projections and indexes are additive; old events and artifact bytes are
+preserved. Explicitly configure organization/session bindings for persistent Bots.
+Do not silently federate existing local stores or assume historical session-only
+memories were migrated. Older binaries cannot read the new event tables; rollback
+uses the matching pre-upgrade backup and executable.
 
-If rollback is needed, stop workers and restore the matching pre-upgrade backup
-with its previous executable. Do not mix old workers with newer recovery journals
-or assume an older reader supports events written by a newer version.
-
-The preceding release's connection behavior and qualification limits remain
-documented in [the 2.0.3 connection review](CONNECT-REVIEW.md).
+See [persistent Bot setup and limits](PERSISTENT_BOTS.md),
+[teams](TEAMS.md), and [local validation](../tasks/validation.md).

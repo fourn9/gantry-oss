@@ -7,7 +7,8 @@ import copy
 import re
 
 from .model import require, digest, uid
-from .connection_policy import validate_plan, decode_files, covered, OPERATIONS, clean_bytes
+from .connection_policy import (validate_plan, decode_files, covered, OPERATIONS, clean_bytes,
+                                effective_delegation, REVIEW_COUNT_POLICY, CONNECTION_LIMIT_POLICY, connection_expiry)
 
 
 class ConnectionMixin:
@@ -35,8 +36,8 @@ class ConnectionMixin:
     def cmd_request_connection(self, s, actor, a, fx, n, con):
         self._connection_owner(actor)
         plan = a['plan']; validate_plan(plan)
-        require(type(plan['expires_at']) is int and self.clock() < plan['expires_at'] <= self.clock() + 8*3600000,
-                'invalid_input', 'Connection expiry must be within eight hours')
+        require(plan['expires_at'] is None or self.clock() < plan['expires_at'],
+                'invalid_input', 'Explicit connection expiry must be in the future')
         require(all(re.fullmatch('[a-f0-9]{64}', a[k]) for k in ('token_hash', 'mentor_token_hash')), 'invalid_input', 'Token hashes required')
         obj = {'id': uid('connection'), 'status': 'pending', 'owner': actor['id'],
                'plan': plan, 'plan_hash': digest(plan), 'token_hash': a['token_hash'], 'mentor_token_hash': a['mentor_token_hash'],
@@ -50,7 +51,7 @@ class ConnectionMixin:
         require(obj and obj['owner'] == actor['id'], 'unauthorized', 'Connection owner required')
         require(obj['status'] == 'pending' and obj['plan_hash'] == a['plan_hash'], 'stale_basis', 'Review the pending plan')
         plan = obj['plan']; validate_plan(plan)
-        require(self.clock() < plan['expires_at'], 'unauthorized', 'Connection request expired')
+        require(plan['expires_at'] is None or self.clock() < plan['expires_at'], 'unauthorized', 'Connection request expired')
         require(decode_files(a['files'], plan['paths']) == plan['files'], 'stale_basis', 'Workspace changed after preview')
         cid = obj['id']; zone = 'project-' + cid.removeprefix('connection_')
         principal = 'agent-' + cid.removeprefix('connection_')
@@ -59,11 +60,13 @@ class ConnectionMixin:
             'data': {'owner': actor['id'], 'participation': 'participating'}}], con, cid)
         self._connection_approve_changes(s, actor, [{'id': principal, 'type': 'principal', 'zone': zone,
             'data': {'kind': 'agent', 'permissions': ['read', 'record'] + (['work'] if plan['mode'] == 'work-capable' else []),
-                     'zones': [zone], 'token_hash': obj['token_hash'], 'expires_at': plan['expires_at'],
+                     'zones': [zone], 'token_hash': obj['token_hash'],
+                     **({'expires_at': plan['expires_at']} if plan['expires_at'] is not None else {}),
                      'allowed_commands': OPERATIONS, 'connection_id': cid, 'enabled': True}},
             {'id': mentor, 'type': 'principal', 'zone': zone, 'data': {
                 'kind': 'agent', 'permissions': ['read', 'propose'], 'zones': [zone],
-                'token_hash': obj['mentor_token_hash'], 'expires_at': plan['expires_at'],
+                'token_hash': obj['mentor_token_hash'],
+                **({'expires_at': plan['expires_at']} if plan['expires_at'] is not None else {}),
                 'allowed_commands': ['identity', 'get_change_review', 'claim_change_review', 'complete_change_review',
                     'related_review_context', 'read_artifact_chunk', 'list_artifact_files'], 'enabled': True}}], con, cid)
         step = lambda command, args: self._connection_step(s, actor, command, args, con, cid)
@@ -74,7 +77,7 @@ class ConnectionMixin:
             'unverified': ['Physical behavior and test outcomes are not verified by connecting'],
             'mode': 'execute' if plan['mode'] == 'work-capable' else 'record', 'actors': [actor['id'], principal, mentor],
             'write_scope': plan['write_paths'], 'recipes': {k: digest(v) for k, v in plan['commands'].items()},
-            'max_executions': plan['delegation']['max_tests'], 'timeout_seconds': 300, 'max_parallel': 1})
+            'max_executions': None, 'timeout_seconds': 300, 'max_parallel': 1})
         state = step('initialize_continuity', {'session_id': d['id'], 'version': d['version'],
             'hierarchy': [{'id': zone, 'title': plan['project'], 'kind': 'project', 'paths': plan['paths'],
                            'editable': plan['mode'] == 'work-capable'}],
@@ -98,7 +101,12 @@ class ConnectionMixin:
 
     @staticmethod
     def _connection_public(obj):
-        return {k: copy.deepcopy(v) for k, v in obj.items() if k not in {'token_hash', 'mentor_token_hash'}}
+        result = {k: copy.deepcopy(v) for k, v in obj.items() if k not in {'token_hash', 'mentor_token_hash'}}
+        result['effective_delegation'] = effective_delegation(result['plan']['delegation'])
+        result['review_count_policy'] = REVIEW_COUNT_POLICY
+        result['connection_limit_policy'] = CONNECTION_LIMIT_POLICY
+        result['effective_expires_at'] = connection_expiry(obj)
+        return result
 
     @staticmethod
     def _connection_branch(obj, name='main'):
@@ -109,7 +117,8 @@ class ConnectionMixin:
     def _capability(self, s, actor):
         obj = s.get('agent_connections', {}).get(actor.get('connection_id'))
         require(obj and obj['status'] == 'active' and obj['principal'] == actor['id'], 'unauthorized', 'Active connection required')
-        require(self.clock() < obj['plan']['expires_at'], 'unauthorized', 'Connection expired')
+        expiry = connection_expiry(obj)
+        require(expiry is None or self.clock() < expiry, 'unauthorized', 'Connection expired')
         self._dev_session(s, actor, obj['session_id'])
         return copy.deepcopy(obj)
 
@@ -173,6 +182,32 @@ class ConnectionMixin:
         self._put(s, fx, 'agent_connections', obj['id'], obj)
         return self._connection_public(obj)
 
+    def cmd_remove_connection_limits(self, s, actor, a, fx, n, con):
+        """Explicit owner renewal keeps the existing session/Bot identities and history."""
+        self._connection_owner(actor)
+        obj = copy.deepcopy(s.get('agent_connections', {}).get(a['connection_id']))
+        require(obj and obj['owner'] == actor['id'] and obj['status'] == 'active',
+                'unauthorized', 'Active connection owner required; revoked connections cannot be renewed')
+        changes = []
+        for pid in (obj['principal'], obj['mentor']):
+            old = s['entries'][pid]
+            require(old['data'].get('enabled', True) and not old.get('retracted'),
+                    'unauthorized', 'Disabled credentials cannot be renewed')
+            if 'expires_at' in old['data']:
+                data = copy.deepcopy(old['data']); data.pop('expires_at')
+                changes.append({'id': pid, 'type': 'principal', 'zone': old['zone'],
+                    'expected_revision': old['revision_id'], 'data': data})
+        if changes: self._connection_approve_changes(s, actor, changes, con, obj['id'])
+        d = self._dev_session(s, actor, obj['session_id'])
+        if d['max_executions'] is not None:
+            from .development import POLICY_FIELDS
+            self.cmd_configure_development(s, actor, {'session_id': d['id'], 'version': d['version'],
+                **{key: d[key] for key in POLICY_FIELDS}, 'max_executions': None,
+                'reason': 'Owner removed local connection execution-count limit'}, fx, n, con)
+        obj.update(effective_expires_at=None, limits_removed_by=actor['id'], limits_removed_at=self.clock())
+        self._put(s, fx, 'agent_connections', obj['id'], obj)
+        return self._connection_public(obj)
+
     def cmd_authorize_connection_operation(self, s, actor, a, fx, n, con):
         obj = self._capability(s, actor); plan = obj['plan']; operation = a['operation']
         require(operation in {'read', 'edit', 'test'}, 'reauthorization_required', 'Operation requires new owner approval')
@@ -183,7 +218,6 @@ class ConnectionMixin:
         if operation == 'test':
             require(a.get('command') in plan['commands'] and a.get('command_hash') == digest(plan['commands'][a['command']]),
                     'reauthorization_required', 'Command not approved')
-            require(obj['tests_used'] < plan['delegation']['max_tests'], 'execution_blocked', 'Delegated test limit reached')
             obj['tests_used'] += 1; self._put(s, fx, 'agent_connections', obj['id'], obj)
         branch = self._connection_branch(obj, a.get('branch', 'main'))
         if a.get('from_review'):
@@ -240,7 +274,6 @@ class ConnectionMixin:
     def cmd_connection_submit(self, s, actor, a, fx, n, con):
         obj = self._capability(s, actor); branch = self._connection_branch(obj, a.get('branch', 'main'))
         require(obj['plan']['mode'] == 'work-capable', 'mode_disabled', 'Record-only does not request review')
-        require(obj['reviews_used'] < obj['plan']['delegation']['max_reviews'], 'execution_blocked', 'Delegated review limit reached')
         change = s['dev_changes'][branch['change_id']]
         require(change['checkpoints'], 'invalid_state', 'Checkpoint the milestone before submitting')
         self.cmd_share_change(s, actor, {'change_id': change['id'], 'version': change['version']}, fx, n, con)

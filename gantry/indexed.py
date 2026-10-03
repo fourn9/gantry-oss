@@ -36,6 +36,11 @@ def schema(con):
       CREATE INDEX IF NOT EXISTS evidence_by_state ON records(collection,state_id,id);
       CREATE INDEX IF NOT EXISTS evidence_by_subject ON records(collection,state_id,subject_id,id);
       CREATE INDEX IF NOT EXISTS evidence_by_profile ON records(collection,state_id,profile,id);
+      CREATE INDEX IF NOT EXISTS records_by_subject ON records(collection,subject_id,id);
+      CREATE INDEX IF NOT EXISTS records_job_dispatch ON records(session_id,
+        COALESCE(json_extract(body,'$.value.role'),json_extract(body,'$.role')),
+        COALESCE(json_extract(body,'$.value.principal_id'),json_extract(body,'$.principal_id')),
+        COALESCE(json_extract(body,'$.value.status'),json_extract(body,'$.status')),id) WHERE collection='mentor_jobs';
       CREATE TABLE IF NOT EXISTS artifact_file_index(
         revision_id TEXT NOT NULL, path TEXT NOT NULL, body TEXT NOT NULL,
         PRIMARY KEY(revision_id,path));
@@ -45,7 +50,7 @@ def schema(con):
 def put(con, table, key, value, canonical):
     con.execute('INSERT OR REPLACE INTO records VALUES (?,?,?,?,?,?,?,?)',
         (table, key, canonical(manifests.pack(con,value)), value.get('session_id'), value.get('state_id'),
-         value.get('subject_id'), value.get('profile'), value.get('created_seq')))
+         value.get('subject_id'), value.get('profile') if isinstance(value.get('profile'), str) else None, value.get('created_seq')))
     if table == 'principals':
         con.execute('DELETE FROM credentials WHERE actor=?', (key,))
         if value.get('enabled', True):
@@ -71,3 +76,12 @@ def rebuild(con, state, canonical):
 def load(con, meta):
     return {**{k: Records(con, k) for k in meta['collections']},
             **{k: meta[k] for k in ('head','seq','ledger_id')}}
+
+
+def job_page(con, session_id, role, principal_id, after, limit):
+    # Packed and legacy record encodings; keep physical JSON paths out of Core.
+    return con.execute("SELECT id FROM records WHERE collection='mentor_jobs' AND session_id=? AND id>? "
+        "AND COALESCE(json_extract(body,'$.value.status'),json_extract(body,'$.status')) IN ('pending','running','failed') "
+        "AND COALESCE(json_extract(body,'$.value.role'),json_extract(body,'$.role'))=? "
+        "AND COALESCE(json_extract(body,'$.value.principal_id'),json_extract(body,'$.principal_id'))=? ORDER BY id LIMIT ?",
+        (session_id, after, role, principal_id, limit)).fetchall()

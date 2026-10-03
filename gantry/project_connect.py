@@ -15,7 +15,7 @@ import tomllib
 
 from .model import Fault, canonical, digest, require
 from .service import Service, token_hash
-from .connection_policy import clean_bytes, covered, safe_path
+from .connection_policy import clean_bytes, covered, safe_path, effective_delegation, REVIEW_COUNT_POLICY
 from .project_files import inventory, read_file, write_file
 from .project_sandbox import backend, runtime_roots, execute
 
@@ -82,10 +82,10 @@ def owner_client(meta):
     return LocalClient(service, token)
 
 
-def discover(root, mode='work-capable', paths=None, commands=None, client='generic', ttl=3600, delegation=None, write_paths=None):
+def discover(root, mode='work-capable', paths=None, commands=None, client='generic', ttl=None, delegation=None, write_paths=None):
     root = Path(root).resolve()
     require(root.is_dir(), 'invalid_input', 'Project directory required')
-    require(type(ttl) is int and 60 <= ttl <= 8*3600, 'invalid_input', 'Expiry must be 60–28800 seconds')
+    require(ttl is None or (type(ttl) is int and ttl >= 60), 'invalid_input', 'Optional expiry must be at least 60 seconds')
     if paths:
         for path in paths: safe_path(path, True)
     payload, hashes, omitted = inventory(root, paths)
@@ -103,10 +103,10 @@ def discover(root, mode='work-capable', paths=None, commands=None, client='gener
         'done': ['Save an unadopted candidate with evidence and remaining questions for review'],
         'constraints': ['Do not change existing requirements or operate hardware'],
         'hold': ['Stop for owner-only decisions or when completion cannot be assessed'],
-        'max_reviews': 3, 'max_tests': 10, 'max_branches': 3, 'mentor': 'client'}
+        'max_reviews': None, 'max_tests': None, 'max_branches': 3, 'mentor': 'client'}
     plan = {'project': root.name, 'root': str(root), 'mode': mode, 'paths': sorted(paths or hashes),
         'write_paths': sorted(write_paths if write_paths is not None else (paths or hashes)) if mode == 'work-capable' else [],
-        'commands': chosen, 'expires_at': int(time.time()*1000)+ttl*1000, 'files': hashes,
+        'commands': chosen, 'expires_at': None if ttl is None else int(time.time()*1000)+ttl*1000, 'files': hashes,
         'missing': [x['reason']+':'+x['path'] for x in omitted] + ['unsaved edits', 'history before connection'],
         'detected': detected, 'client': client, 'sandbox': backend(), 'runtime_roots': runtime_roots(), 'delegation': delegation}
     from .connection_policy import validate_plan
@@ -115,10 +115,13 @@ def discover(root, mode='work-capable', paths=None, commands=None, client='gener
 
 
 def preview(plan):
+    from .connection_policy import CONNECTION_LIMIT_POLICY
     return {'project': plan['root'], 'agent': 'New dedicated, revocable project identity',
         'mode': plan['mode'], 'read_paths': plan['paths'], 'write_paths': plan['write_paths'], 'commands': plan['commands'],
-        'delegation': plan['delegation'],
-        'expires_at_utc': time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime(plan['expires_at']/1000)),
+        'delegation': effective_delegation(plan['delegation']), 'review_count_policy': REVIEW_COUNT_POLICY,
+        'connection_limit_policy': CONNECTION_LIMIT_POLICY,
+        'expires_at_utc': None if plan['expires_at'] is None else time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime(plan['expires_at']/1000)),
+        'expiration': 'No automatic expiry' if plan['expires_at'] is None else 'Owner-selected expiry',
         'denied': ['test-command network', 'workspace deletion', 'hardware', 'secrets', 'scope changes', 'formal integration/adoption'],
         'inference': ('Submitted review context is sent to the official Codex CLI under your ChatGPT login; provider limits apply'
                       if plan['delegation']['mentor'] == 'codex-subscription' else
@@ -164,7 +167,7 @@ def install_config(root, meta, client):
     return str(target)
 
 
-def connect(root, *, mode='work-capable', paths=None, commands=None, client='generic', ttl=3600,
+def connect(root, *, mode='work-capable', paths=None, commands=None, client='generic', ttl=None,
             prepare=False, approval=None, confirm=None, delegation=None, write_paths=None):
     root = Path(root).resolve(); meta = private_dir(root/'.gantry')
     with locked(meta/'connect.lock'):
@@ -178,11 +181,12 @@ def connect(root, *, mode='work-capable', paths=None, commands=None, client='gen
         receipt_path = meta/'connection.json'; pending_path = meta/'connect-pending.json'
         if receipt_path.exists():
             project = Project(root); context = project.context()
+            require(ttl is None, 'reauthorization_required', 'TTL only configures new connections; use project unlimit to remove an existing expiry, or reconnect to set a different one')
             require(context['connection']['plan']['mode'] == mode and context['connection']['plan']['client'] == client
                 and (not paths or sorted(paths) == context['connection']['plan']['paths'])
                 and (commands is None or commands == context['connection']['plan']['commands']),
                 'reauthorization_required', 'Disconnect and approve a new plan to change scope')
-            require(delegation is None or delegation == context['connection']['plan']['delegation'],
+            require(delegation is None or effective_delegation(delegation) == context['connection']['effective_delegation'],
                     'reauthorization_required', 'Delegation changed; reconnect with new approval')
             require(write_paths is None or sorted(write_paths) == context['connection']['plan']['write_paths'],
                     'reauthorization_required', 'Write paths changed; reconnect with new approval')
@@ -194,7 +198,8 @@ def connect(root, *, mode='work-capable', paths=None, commands=None, client='gen
                     'conflict', 'A different plan is pending; inspect or cancel it first')
             require(not paths or sorted(paths) == plan['paths'], 'conflict', 'Pending paths differ')
             require(commands is None or commands == plan['commands'], 'conflict', 'Pending commands differ')
-            require(delegation is None or delegation == plan['delegation'], 'conflict', 'Pending delegation differs')
+            require(delegation is None or effective_delegation(delegation) == effective_delegation(plan['delegation']),
+                    'conflict', 'Pending delegation differs')
             require(write_paths is None or sorted(write_paths) == plan['write_paths'], 'conflict', 'Pending write paths differ')
             payload, hashes, _ = inventory(root, plan['paths'])
             require(hashes == plan['files'], 'stale_basis', 'Workspace changed; cancel the pending connection and prepare again')
@@ -204,7 +209,7 @@ def connect(root, *, mode='work-capable', paths=None, commands=None, client='gen
             save(pending_path, pending)
         shown = preview(plan)
         if prepare: return {'status': 'awaiting_owner', 'preview': shown, 'plan_file': str(pending_path), 'token_issued': False}
-        require(plan['expires_at'] > int(time.time()*1000), 'unauthorized', 'Preview expired; cancel and prepare again')
+        require(plan['expires_at'] is None or plan['expires_at'] > int(time.time()*1000), 'unauthorized', 'Preview expired; cancel and prepare again')
         accepted = approval == digest(plan) if approval is not None else bool(confirm and confirm(shown))
         require(accepted, 'approval_required', 'Owner must confirm this exact plan; no capability activated')
         # Do not run repository code to discover or activate a connection.
@@ -262,6 +267,9 @@ class Project:
         a = arguments or {}; key = key or secrets.token_hex(16)
         if action == 'status': return self.context()
         clean_bytes(canonical(a).encode())
+        if action in {'bot', 'messages', 'memories', 'remember', 'message', 'resolve'}:
+            command = 'connection_team_read' if action in {'bot', 'messages', 'memories'} else 'connection_team'
+            return self.client.call(command, {'action': 'context' if action == 'bot' else action, 'arguments': a}, key)
         branch_lock = hashlib.sha256(str(a.get('branch', 'main')).encode()).hexdigest()
         with locked(self.meta/('project-'+branch_lock+'.lock')):
             context = self.context(); plan = context['connection']['plan']

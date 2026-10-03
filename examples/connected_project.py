@@ -24,7 +24,7 @@ def demonstration(root, live=False):
     delegation = {'goal': 'Clamp a simulated actuator request to [0, 10]',
         'done': ['Negative requests return zero, requests above ten return ten, and three returns three'],
         'constraints': ['Only change control.py; do not edit the acceptance tests or operate hardware'],
-        'hold': ['Stop if the saved bounds must change'], 'max_reviews': 2, 'max_tests': 3, 'max_branches': 2,
+        'hold': ['Stop if the saved bounds must change'], 'max_reviews': None, 'max_tests': None, 'max_branches': 2,
         'mentor': 'codex-subscription' if live else 'client'}
     # Harness stands in for the owner's one approval of this synthetic fixture only.
     connection = connect(root, write_paths=['control.py'], commands={'test': {'argv': [str(Path(sys.executable).resolve()), '-B', '-m',

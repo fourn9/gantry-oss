@@ -15,9 +15,24 @@ PRIVATE_SUFFIXES = {'.token', '.pem', '.key', '.p12', '.pfx', '.sqlite', '.sqlit
 MAX_TOTAL = 32 * 1024 * 1024
 MAX_FILE = 16 * 1024 * 1024
 MAX_FILES = 1000  # Match the existing atomic capture_artifact contract.
+REVIEW_COUNT_POLICY = ('Gantry does not cap local project review submissions. Legacy max_reviews values '
+    'are historical only; reviews_used is an audit count. Provider limits and connection expiry still apply.')
+CONNECTION_LIMIT_POLICY = ('Local review and test counts are unlimited; legacy max_reviews/max_tests are historical. '
+    'New connections have no automatic expiry unless the owner chooses --ttl. Existing explicit expiry remains '
+    'until the owner removes it with project unlimit. Counts remain audit records; command timeouts, scopes, '
+    'revocation, branch limits and provider limits still apply.')
 OPERATIONS = ['identity', 'connection_context', 'authorize_connection_operation',
     'complete_connection_operation', 'connection_checkpoint', 'connection_submit', 'connection_review',
-    'connection_respond', 'connection_assumption', 'connection_branch']
+    'connection_respond', 'connection_assumption', 'connection_branch', 'connection_team', 'connection_team_read']
+
+
+def effective_delegation(delegation):
+    """Expose current behavior without rewriting an approved historical plan."""
+    return {**delegation, 'max_reviews': None, 'max_tests': None}
+
+
+def connection_expiry(connection):
+    return connection.get('effective_expires_at', connection['plan']['expires_at'])
 
 
 def safe_path(value, directory=False):
@@ -65,6 +80,8 @@ def validate_plan(plan):
             'files', 'missing', 'detected', 'client', 'sandbox', 'runtime_roots', 'delegation'},
             'invalid_input', 'Unexpected connection plan fields')
     require(plan['mode'] in {'record-only', 'work-capable'}, 'invalid_input', 'Invalid connection mode')
+    require(plan['expires_at'] is None or (type(plan['expires_at']) is int and plan['expires_at'] > 0),
+            'invalid_input', 'expires_at must be null or an epoch millisecond integer')
     require(isinstance(plan['paths'], list) and 0 < len(plan['paths']) <= 2000,
             'invalid_input', 'Explicit paths required')
     for path in plan['paths']: safe_path(path, True)
@@ -93,7 +110,15 @@ def validate_plan(plan):
     require(isinstance(delegation['goal'], str) and delegation['goal'].strip() and
             all(isinstance(delegation[k], list) and delegation[k] and all(isinstance(v, str) and v for v in delegation[k])
                 for k in ('done', 'constraints', 'hold')), 'invalid_input', 'Goal, completion and hold conditions required')
-    for k in ('max_reviews', 'max_tests', 'max_branches'):
-        require(type(delegation[k]) is int and 1 <= delegation[k] <= 20, 'invalid_input', 'Exploration limits must be 1–20')
+    # Retain the old field for stored plans/approval hashes. It no longer gates
+    # review submission; null is the explicit value in newly prepared plans.
+    old_limit = delegation['max_reviews']
+    require(old_limit is None or (type(old_limit) is int and 1 <= old_limit <= 20),
+            'invalid_input', 'max_reviews must be null or a legacy value from 1–20')
+    old_tests = delegation['max_tests']
+    require(old_tests is None or (type(old_tests) is int and 1 <= old_tests <= 20),
+            'invalid_input', 'max_tests must be null or a legacy value from 1–20')
+    require(type(delegation['max_branches']) is int and 1 <= delegation['max_branches'] <= 20,
+            'invalid_input', 'Branch limit must be 1–20')
     require(delegation['mentor'] in {'client', 'codex-subscription'}, 'invalid_input', 'Unsupported Mentor connection')
     clean_bytes(str(plan).encode())

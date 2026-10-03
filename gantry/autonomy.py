@@ -401,6 +401,10 @@ class AutonomyMixin:
 
     def _automation_execution_reasons(self,s,actor,d,c):
         reasons=[]; pid=d.get('automation_project')
+        if c.get('review_submission'):
+            review = s.get('change_reviews', {}).get(c['review_submission'], {})
+            if s.get('dev_changes', {}).get(review.get('change_id'), {}).get('blocking_messages'):
+                reasons.append('team_communication_pending')
         if pid:
             policy=s.get('automation_policies',{}).get(pid,{})
             if not c.get('review_submission') and any(m['session_id']==d['id'] and m['generation']==d['generation'] and m['status']=='pending'

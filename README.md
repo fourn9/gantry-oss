@@ -1,10 +1,10 @@
-# Gantry
+# Gantry v3.0
 
 An agent-friendly development ledger for robotics hardware and software.
 
 Gantry stores versioned development states, artifacts, changes, evidence and decisions so people and agents can continue from a shared state. It connects to tools you already use through a local CLI, HTTP API and MCP. Mentor reviews a submitted change against recorded context and proposes follow-up work; Core checks permission, versions, dependencies and execution conditions.
 
-**Status: early public release.** Local operation is the supported starting point. Human adoption, agent proposals and execution results remain separate. Gantry does not certify a design's physical safety or operate hardware by default.
+**Version: 3.0.0.** Local operation is the supported starting point. Human adoption, agent proposals and execution results remain separate. Gantry does not certify a design's physical safety or operate hardware by default.
 
 ## Connect a project
 
@@ -38,6 +38,18 @@ No server or manual principal/proposal sequence is required for this local route
 Read the saved goal and state → edit within scope → checkpoint unfinished work → submit a meaningful milestone → review grounded Mentor findings → correct/test → checkpoint and respond. Agents do not need another owner decision for these delegated steps. Independent candidates can start from the same state in separate workspaces. Sharing and a successful test do not formally adopt a design.
 
 Mentor uses your existing client model through structured prepare/finish tools. This path does not automatically launch another agent and is not an independent-review claim. Optionally choose `--mentor codex-subscription` with `--goal` and `--done` to automatically review submissions using the installed official Codex CLI and your ChatGPT login. The approval plan covers that source-sharing inference route. No API-key fallback or publisher-funded inference account is included; provider limits still apply.
+
+Local project reviews and test executions have no Gantry count cap. New connections
+have no automatic expiry; an optional `--ttl SECONDS` has no eight-hour ceiling.
+Existing finite credentials keep their approved expiry until the owner runs
+`gantry project unlimit --root /path/to/project`. This preserves the session, Bot
+identities, state and history. Scope, revocation, command timeouts, branch limits
+and provider limits still apply.
+
+Role profiles and evidence-backed experience can follow the customer agent across
+work contexts. Hierarchical review teams reuse the same queue and identity checks;
+unresolved team questions prevent a technical OK. See [teams and personal Bots](docs/TEAMS.md)
+for local setup, the advanced team API and current limits.
 
 For the legacy HTTP server, web interface, scoped MCP profiles and advanced multi-user administration, see [administrator setup](docs/ADMIN-AGENTS.md). Existing APIs remain supported.
 
@@ -86,3 +98,7 @@ Core tests use the standard library. Optional NumPy and CAD tests skip when depe
 ## License
 
 MIT. The published source, including Core and Mentor orchestration, may be used, modified and redistributed under [LICENSE](LICENSE). Third-party tools and models have their own licenses and terms.
+
+Persistent organizational and personal Bots, customer-owned workspaces, automatic
+PR-triggered workers and opt-in user services: [Persistent Bots](docs/PERSISTENT_BOTS.md).
+No inference provider is enabled by default; each customer supplies its own agent.

@@ -23,7 +23,7 @@ def _stopped(receipt):
 
 
 def recover_job(client, job_id, journal, reason, *, retry_inference=False,
-                collect_interrupted_verification=False):
+                collect_interrupted_verification=False, runtime_fence=None):
     """Prepare recovery only. The normal worker performs subsequent work.
 
     Provider retries use a new directory and allowance, never overwrite an
@@ -84,7 +84,8 @@ def recover_job(client, job_id, journal, reason, *, retry_inference=False,
                 'collect_interrupted_verification': interrupted,
                 'args': {'job_id': job_id, 'fence': j['job']['fence'], 'reason': reason,
                     'checkpoint_hash': digest(j), 'confirmed_stopped': True,
-                    'retry_inference': retry_inference, 'lease_seconds': 900}}
+                    'retry_inference': retry_inference, 'lease_seconds': 900,
+                    **({'runtime_fence': runtime_fence} if runtime_fence else {})}}
             if interrupted:
                 # Never rerun a potentially side-effecting verifier. Preserve
                 # partial files and explicitly report the missing outcome.

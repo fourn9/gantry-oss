@@ -11,7 +11,17 @@ gantry connect . --client claude \
   --hold "An actuator requirement needs changing"
 ```
 
-Substitute `codex`, `cursor`, or `generic`. Read the permission plan and answer one `y/N` prompt. Default lifetime is one hour, maximum eight hours. The displayed limits are three reviews, ten test attempts and three alternative branches. These are exploration limits, not engineering acceptance criteria.
+Substitute `codex`, `cursor`, or `generic`. Read the permission plan and answer one `y/N` prompt. Connections have no automatic expiry by default. An optional `--ttl SECONDS` for a new connection has no eight-hour ceiling (minimum 60 seconds). Gantry imposes no review-count or test-count limit on local project connections. The default three alternative branches, command timeouts, scope restrictions and model-provider usage limits remain. These are operational controls, not engineering acceptance criteria.
+
+Existing connections also have no review-count or test-count limit after upgrading and reloading their MCP process. Their original permission plans and approval hashes remain intact, including historical numeric `max_reviews` and `max_tests`. Use `connection.effective_delegation`, `effective_expires_at` and `connection_limit_policy` for current behavior; new plans use `max_reviews: null`, `max_tests: null`, and `expires_at: null`. `reviews_used` and `tests_used` continue counting for audit, and replaying the same request ID does not count twice.
+
+To remove an existing expiry, including an already expired but non-revoked connection, the local owner runs:
+
+```sh
+gantry project unlimit --root /path/to/project --request-id remove-old-limits
+```
+
+This records the owner decision, renews the same developer/reviewer identities without an expiry and removes the linked development execution-count limit. It preserves the connection, session, Bot IDs, states, counters, original plan/hash and history. It cannot revive revoked/disabled credentials or change file/command permissions. It is deliberately not an agent MCP tool. If an old linked execution policy changes, active workers must reconcile that version change through the existing recovery path. No owner renewal is needed solely for the test/review-count removal. A previously rejected model answer still needs separate recovery.
 
 The simple `gantry connect .` also works. Its generic goal is modest: save an unadopted candidate with evidence and remaining questions. Supply a meaningful goal and completion conditions for useful autonomous continuation. **Work-capable is the default**; record-only must be selected explicitly.
 
@@ -29,7 +39,7 @@ An agent can run `gantry connect . --prepare` without activating a token. The ow
 
 Activation saves the existing propose/submit/endorse/human approval/commit events, session membership, baseline and continuity state in one SQLite transaction. Failure rolls back activation and leaves the request pending. A retry uses the same keys. A client-config conflict leaves an explicit connected-but-client-setup-pending state: fix the conflicting entry and rerun without a second Gantry approval. Existing client entries are not silently replaced.
 
-If the workspace or requested scope changes after preview, cancel with `gantry disconnect .` and review a new plan. Expiry never extends silently. A lost owner credential requires a private backup. Disconnect revokes developer and Mentor credentials before removing local token files; history remains.
+If the workspace or requested scope changes after preview, cancel with `gantry disconnect .` and review a new plan. An explicit expiry never extends silently; `--ttl` cannot silently change an existing connection. Use `project unlimit` to remove it, or reconnect for a different finite expiry. A lost owner credential requires a private backup. Disconnect revokes developer and Mentor credentials before removing local token files; history remains.
 
 ## Client setup
 
@@ -93,3 +103,19 @@ The capability scopes this project's Core calls and Gantry bridge. File operatio
 These controls **do not sandbox a separately operated agent, shell or CAD app**. A process with full access to the same OS account can read/modify local files, including the ledger. Trust the host and installed runtimes; use host controls or a dedicated OS/VM account for stronger separation. Never give agents the owner token. Secret detection is best-effort. Connect supports 1,000 files / 32 MiB total / 16 MiB per file; larger assemblies use the existing chunked artifact adapters.
 
 Internal approvals and HTTP/MCP administration: [administrator guide](ADMIN-AGENTS.md).
+
+## Persistent Bot assignments
+
+When your session role is explicitly bound to a permanent Bot, use `get_bot_context`
+for the exact input state. It includes the organization/Bot versions, session scope,
+current progress and authorized persistent experience. Use `list_persistent_memories`
+to page beyond the preview; treat every lesson as evidence to recheck, including
+contradictions. The Bot profile does not expand your file/tool permissions.
+
+`get_persistent_bot` and `bot_inbox` expose your authorized runtime/assignments.
+A runtime-configured job requires its current `runtime_fence` on `claim_mentor_job`.
+Prefer the customer `bot-worker` to manage heartbeat, workspace, model receipt and
+return. Keep interrupted jobs held until explicit recovery; do not impersonate a
+Bot by copying its name or inventing a fence. Owner setup and service activation
+are described in [PERSISTENT_BOTS.md](PERSISTENT_BOTS.md). No default paid model or
+automatic external telemetry is added.

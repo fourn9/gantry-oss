@@ -59,6 +59,8 @@ DEVELOPMENT_TABLES += ("evidence_views", "validation_maps", "validation_plans")
 DEVELOPMENT_TABLES += ("review_teams", "change_reviews", "review_heads", "review_responses", "review_lessons")
 DEVELOPMENT_TABLES += ("review_automation", "mentor_jobs")
 DEVELOPMENT_TABLES += ('agent_connections', 'connection_operations')
+DEVELOPMENT_TABLES += ('team_proposals', 'team_messages', 'bot_memories')
+DEVELOPMENT_TABLES += ('organizations', 'persistent_bots', 'bot_bindings', 'bot_runtimes', 'organization_memories')
 MANAGED = {"goal", "requirement", "design_document", "subsystem", "part_spec", "bom",
            "validation_plan", "unit", "zone", "interface", "policy", "principal", "relation"}
 RECORDED = {"hardware_rev", "software_version", "checkpoint", "calibration", "configuration",

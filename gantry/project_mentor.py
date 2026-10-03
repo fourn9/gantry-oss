@@ -4,7 +4,7 @@ import base64
 import json
 
 from .model import require
-from .connection_policy import clean_bytes
+from .connection_policy import clean_bytes, REVIEW_COUNT_POLICY, CONNECTION_LIMIT_POLICY
 from .project_connect import LocalClient, private_dir
 from .review_worker import prepare_review, finish_review
 
@@ -39,6 +39,8 @@ def prepare(project, submission):
         previews[name] = text; remaining -= info['size']
     context['saved_file_previews'] = previews; context['file_bodies_not_acquired'] = missing
     context['capture_limitations'] = ['CAD topology and physical behavior were not automatically inspected']
+    context['review_count_policy'] = REVIEW_COUNT_POLICY
+    context['connection_limit_policy'] = CONNECTION_LIMIT_POLICY
     evidence = {context['state_id'], context['base_state']}
     evidence.update(v['id'] for v in context.get('connection_evidence', {}).get('test_observations', []))
     evidence.update(v['revision_id'] for v in context.get('connection_evidence', {}).get('assumptions', []))

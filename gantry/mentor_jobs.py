@@ -11,13 +11,13 @@ POLICY = {'session_id': S, 'version': {'type':'integer','minimum':0}, 'enabled':
 register('configure_review_automation', POLICY, list(POLICY))
 register('get_review_team', {'session_id': S}, ['session_id'])
 register('review_automation_status', {'session_id': S}, ['session_id'])
-register('claim_mentor_job', {'job_id': S, 'lease_seconds': {'type':'integer','minimum':10,'maximum':1800}, 'verification_hash':S}, ['job_id','lease_seconds'])
+register('claim_mentor_job', {'job_id': S, 'lease_seconds': {'type':'integer','minimum':10,'maximum':1800}, 'verification_hash':S, 'runtime_fence':S}, ['job_id','lease_seconds'])
 register('check_mentor_job', {'job_id':S,'fence':S}, ['job_id','fence'])
 register('finish_mentor_job', {'job_id':S,'fence':S,'output':O,'provider':O}, ['job_id','fence','output','provider'])
 register('fail_mentor_job', {'job_id':S,'fence':S,'reason':S}, ['job_id','fence','reason'])
 register('recover_mentor_job', {'job_id': S, 'fence': S, 'reason': S,
     'checkpoint_hash': S, 'confirmed_stopped': {'type': 'boolean', 'enum': [True]},
-    'retry_inference': {'type': 'boolean'},
+    'retry_inference': {'type': 'boolean'}, 'runtime_fence': S,
     'lease_seconds': {'type': 'integer', 'minimum': 10, 'maximum': 900}},
     ['job_id', 'fence', 'reason', 'checkpoint_hash', 'confirmed_stopped', 'retry_inference', 'lease_seconds'])
 SPECIALIST = obj({'summary':S,'evidence':A,'unresolved':A})
@@ -69,6 +69,7 @@ class MentorJobsMixin:
         jobs=[]
         for row in rows[:500]:
             j=self._dev_get(s,'mentor_jobs',row[0]);j.pop('fence',None);j.pop('review_fence',None);j.pop('context',None)
+            if j.get('bot_execution'): j['bot_execution'].pop('runtime_fence', None)
             now=self.clock()
             j['timing_ms']={'queue':max(0,j.get('started_at',now)-j['created_at']),
                 'execution':max(0,j.get('finished_at',now)-j['started_at']) if 'started_at' in j else None,
@@ -86,6 +87,7 @@ class MentorJobsMixin:
         require(d['mode']!='record','mode_disabled','Record-only session')
         if j['kind']!='reflection': self._review_current(s,r,t)
         if j['kind']=='developer':
+            self._require_team_resolved(s,r)
             self._member(t,actor,'user');self.allowed(actor,'work');self.allowed(actor,'record')
             require(d['mode']=='execute' and p['developer_principal']==actor['id'],'mode_disabled','Developer execution not delegated')
             require(s['dev_changes'][r['change_id']]['assignee']==actor['id'],'unauthorized','Wrong change assignee')
@@ -94,11 +96,12 @@ class MentorJobsMixin:
 
     def cmd_claim_mentor_job(self,s,actor,a,fx,n,con):
         j=self._dev_get(s,'mentor_jobs',a['job_id']);r,t,p,d=self._job_current(s,actor,j)
+        self._persistent_job_check(s, actor, j, t, con, claim=a)
         require(j['status']=='pending','conflict','Job is already claimed or terminal; uncertain jobs are not automatically rerun')
         require(p['used_jobs']<p['max_jobs'],'budget_exhausted','Subscription job limit reached')
         if j['kind']=='developer':
             require(not self._engineering_check(s,r)['input_mismatches'], 'stale_basis', 'Engineering input bindings need reconciliation')
-            require(d['used_executions']<d['max_executions'],'budget_exhausted','Execution limit reached')
+            require(d['max_executions'] is None or d['used_executions']<d['max_executions'],'budget_exhausted','Execution limit reached')
             active=[x for x in s.get('mentor_jobs',{}).values() if x['session_id']==d['id'] and x['kind']=='developer' and x['status']=='running']
             active += [x for x in s.get('dev_executions',{}).values() if x['session_id']==d['id'] and x['status'] in {'running','cancelling'}]
             require(len(active)<d['max_parallel'],'resource_unavailable','Execution slots occupied')
@@ -122,6 +125,12 @@ class MentorJobsMixin:
         context=self.cmd_get_change_review(s,actor,{'submission_id':r['id']},fx,n,con)
         context['change']=self._dev_get(s,'dev_changes',r['change_id'])
         context['write_scope']=d['write_scope']
+        role = j['role']
+        if j['kind'] == 'developer':
+            roles = [m['role'] for m in t['members'] if m['side'] == 'user' and m['principal_id'] == actor['id']]
+            require(len(roles) == 1, 'invalid_input', 'Developer principal must have one explicit role')
+            role = roles[0]
+        context['bot_context'] = self._bot_context(s, actor, t, role, r['state_id'], con)
         if hasattr(self,'cmd_related_review_context'):
             context['related']=self.cmd_related_review_context(s,actor,{'submission_id':r['id']},fx,n,con)
         if j['kind']=='reflection':
@@ -142,6 +151,7 @@ class MentorJobsMixin:
 
     def cmd_check_mentor_job(self,s,actor,a,fx,n,con):
         j=self._owned_job(s,actor,a);r,t,p,d=self._job_current(s,actor,j)
+        self._persistent_job_check(s, actor, j, t, con)
         require(self.clock()<j['lease_until'] and p['version']==j['policy_version'],'stale_basis','Job lease/policy changed')
         if j['kind']=='developer':
             require(d['version']==j['execution_policy_version'],'stale_basis','Execution policy changed')
@@ -184,6 +194,13 @@ class MentorJobsMixin:
             # Resuming the same reserved execution does not create another run.
             reasons = [reason for reason in reasons if reason != 'project_execution_budget']
             require(not reasons, 'execution_blocked', 'Project conditions changed', reasons=reasons)
+        # A recovered process explicitly acquires the current runtime fence. Its
+        # original onboarding/version must still match; no stale output is accepted.
+        if j.get('bot_execution'):
+            previous = copy.deepcopy(j['bot_execution'])
+            self._persistent_job_check(s, actor, j, t, con, claim=a)
+            require(all(v == j['bot_execution'].get(k) for k, v in previous.items() if k != 'runtime_fence'),
+                    'stale_basis', 'Bot configuration changed; resubmit')
         if a['retry_inference']:
             require(p['used_jobs'] < p['max_jobs'], 'budget_exhausted', 'No inference retry allowance')
             p = copy.deepcopy(p); p['used_jobs'] += 1
@@ -227,6 +244,9 @@ class MentorJobsMixin:
             schema=obj({'snapshot':S,'summary':S,'hypothesis':S,'rationale':S,'unverified':A,'capture':O})
         validate(output,schema)
         if j['kind']=='specialist':
+            children = {m['role'] for m in t['members'] if m.get('parent_role') == j['role']} & set(r['required_roles'])
+            require(all(j['context']['specialists'].get(role) == r['specialists'].get(role) for role in children),
+                    'stale_basis', 'Subordinate report changed; review current reports in a new submission')
             result=self.cmd_submit_specialist_review(s,actor,{'submission_id':r['id'],'role':j['role'],**output},fx,n,con)
         elif j['kind']=='coordinator':
             result=self.cmd_complete_change_review(s,actor,{'submission_id':r['id'],'fence':j['review_fence'],
@@ -260,4 +280,5 @@ class MentorJobsMixin:
             result=self.cmd_reflect_change_review(s,actor,{'submission_id':r['id'],'response_id':j['response_id'],**output},fx,n,con)
         j.update(status='completed',output=output,provider=a['provider'],result=result,finished_at=self.clock())
         self._dev_save(s,fx,'mentor_jobs',j)
+        self._remember_bot_job(s, actor, j, t, result, fx)
         return {'job_id':j['id'],'status':'completed','result':result}

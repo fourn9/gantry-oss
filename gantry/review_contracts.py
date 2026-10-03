@@ -5,8 +5,12 @@ def obj(fields, required=None):
     return {'type': 'object', 'properties': fields,
             'required': list(fields) if required is None else required, 'additionalProperties': False}
 
+TEXT = {'type': 'string', 'minLength': 1, 'maxLength': 4000}
+NOTES = {'type': 'array', 'maxItems': 20, 'items': TEXT}
+BOT_PROFILE = obj({'mission': TEXT, 'responsibilities': NOTES, 'focus_paths': NOTES,
+    'workflow': NOTES, 'report_when': NOTES, 'style': TEXT, 'onboarding': NOTES})
 MEMBER = obj({'principal_id': S, 'role': S, 'parent_role': S,
-              'side': {'enum': ['user', 'gantry']}}, ['principal_id', 'role', 'side'])
+              'side': {'enum': ['user', 'gantry']}, 'profile': BOT_PROFILE}, ['principal_id', 'role', 'side'])
 register('configure_review_team', {'session_id': S, 'version': {'type': 'integer', 'minimum': 0},
     'coordinator': S, 'required_roles': A, 'members': {'type': 'array', 'minItems': 1, 'maxItems': 32, 'items': MEMBER}},
     ['session_id', 'version', 'coordinator', 'required_roles', 'members'])

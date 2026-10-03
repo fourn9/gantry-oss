@@ -7,6 +7,7 @@ from .contracts import validate, S, A
 from .model import Fault, canonical, require
 from .project_connect import Project
 from .review_contracts import REVIEW_OUTPUT
+from .bots import MEMORY, PAGE
 
 
 def schema(properties, required=()):
@@ -27,6 +28,19 @@ for action in ('read', 'edit', 'test', 'checkpoint'):
 for action in ('edit', 'test'):
     TOOLS['project_'+action][1]['properties']['from_review'] = S
 TOOLS.update({
+    'project_bot': ('bot', schema({}), 'Get personal role onboarding, pinned state, hierarchy and evidence-backed experience. No new permissions.'),
+    'project_messages': ('messages', schema({'change_id': S, **PAGE}), 'Read durable team communication. Blocking messages remain open until explicitly resolved.'),
+    'project_memories': ('memories', schema(PAGE), 'Read this role and team experience, with provenance and uncertainty.'),
+    'project_remember': ('remember', schema({**{k: v for k, v in MEMORY.items() if k not in {'session_id', 'role', 'state_id'}}, 'request_id': S},
+        ['visibility', 'observation', 'applicability', 'limitations', 'evidence', 'paths', 'assessment', 'request_id']),
+        'Record an evidence-backed personal/team lesson for later work. No model training, authority changes or adoption.'),
+    'project_message': ('message', schema({'submission_id': S, 'to_role': S,
+        'kind': {'enum': ['question', 'answer', 'objection', 'dependency', 'handoff', 'report']}, 'body': S,
+        'evidence': A, 'blocking': {'type': 'boolean'}, 'reply_to': S, 'request_id': S},
+        ['submission_id', 'to_role', 'kind', 'body', 'evidence', 'blocking', 'request_id']),
+        'Send a saved role-to-role question, report or handoff linked to a submission. Does not launch arbitrary commands.'),
+    'project_resolve': ('resolve', schema({'message_id': S, 'reason': S, 'evidence': A, 'request_id': S},
+        ['message_id', 'reason', 'evidence', 'request_id']), 'Resolve your own message with a reason and evidence; answering alone does not clear a blocker.'),
     'project_submit': ('submit', schema({'question': S, 'branch': S, 'request_id': S}, ['question', 'request_id']),
         'Share a saved milestone and request Mentor review against the delegated goal. No formal adoption.'),
     'project_review': ('review', schema({'submission_id': S}, ['submission_id']), 'Get grounded findings and their applicable input state.'),
@@ -86,7 +100,7 @@ def run(root):
             elif method == 'tools/list':
                 context = project.context(); work = context['connection']['plan']['mode'] == 'work-capable'
                 result = {'tools': [{'name': name, 'description': desc, 'inputSchema': spec,
-                    'annotations': {'readOnlyHint': action in {'read', 'status'}}}
+                    'annotations': {'readOnlyHint': action in {'read', 'status', 'bot', 'messages', 'memories'}}}
                     for name, (action, spec, desc) in TOOLS.items() if work or action in {'read', 'status', 'checkpoint', 'assumption'}]}
             elif method == 'tools/call':
                 try:

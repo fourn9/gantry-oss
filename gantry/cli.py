@@ -23,7 +23,7 @@ def main():
     connect.add_argument('--path', action='append', help='Relative file or directory/ scope; default is discovered files only')
     connect.add_argument('--write-path', action='append', help='Writable subset of --path; use to keep acceptance tests read-only')
     connect.add_argument('--test-command', action='append', help='NAME=JSON_ARGV; explicitly replaces detected commands')
-    connect.add_argument('--ttl', type=int, default=3600, help='Capability lifetime in seconds, at most eight hours')
+    connect.add_argument('--ttl', type=int, help='Optional lifetime in seconds for a new connection; no automatic expiry by default')
     connect.add_argument('--prepare', action='store_true', help='Only save and display a plan; no token activated')
     connect.add_argument('--approve', help='Exact plan hash, for an owner who already reviewed a prepared plan')
     connect.add_argument('--goal', help='Delegated development goal')
@@ -35,7 +35,8 @@ def main():
     disconnect.add_argument('root', nargs='?', default='.')
     project = sub.add_parser('project', help='Use scoped project operations with the agent credential')
     project.add_argument('action', choices=['status', 'read', 'edit', 'test', 'checkpoint', 'audit',
-        'submit', 'review', 'respond', 'assumption', 'branch', 'mentor-prepare', 'mentor-finish', 'mentor-run', 'mentor-recover'])
+        'submit', 'review', 'respond', 'assumption', 'branch', 'mentor-prepare', 'mentor-finish', 'mentor-run', 'mentor-recover',
+        'team', 'bot', 'messages', 'memories', 'remember', 'message', 'resolve', 'unlimit'])
     project.add_argument('--root', default='.')
     project.add_argument('--input', help='JSON arguments file; - reads stdin')
     project.add_argument('--request-id', help='Stable ID for safe retries')
@@ -119,6 +120,22 @@ def main():
     mentor_daemon.add_argument('--journal', required=True)
     mentor_daemon.add_argument('--iterations', type=int, default=1)
     mentor_daemon.add_argument('--interval', type=int, default=10)
+    bot_service = sub.add_parser('bot-service', help='Generate an opt-in user service; does not install/start it')
+    bot_service.add_argument('--config', required=True)
+    bot_service.add_argument('--journal', required=True)
+    bot_service.add_argument('--executable', required=True)
+    bot_service.add_argument('--platform', required=True, choices=['launchd', 'systemd'])
+    bot_service.add_argument('--output', required=True)
+    bot_worker = sub.add_parser('bot-worker', help='Run one persistent Bot using an explicitly configured customer agent')
+    bot_worker.add_argument('--config', required=True)
+    bot_worker.add_argument('--journal', required=True)
+    bot_worker.add_argument('--iterations', type=int, default=0)
+    bot_worker.add_argument('--interval', type=int, default=10)
+    bot_worker.add_argument('--manifest', action='store_true', help='Print the public environment manifest for owner approval; do not execute')
+    bot_worker.add_argument('--recover-job', help='Explicitly recover and finish one interrupted job')
+    bot_worker.add_argument('--confirm-stopped', help='Reason confirming old processes have stopped')
+    bot_worker.add_argument('--retry-inference', action='store_true')
+    bot_worker.add_argument('--collect-interrupted-verification', action='store_true')
     recover_mentor = sub.add_parser('recover-mentor-job', help='Recover a stopped worker from its private journal; never blindly rerun a tool')
     recover_mentor.add_argument('--job-id', required=True)
     recover_mentor.add_argument('--journal', required=True)
@@ -174,8 +191,8 @@ def main():
                 require(args.goal and args.done, 'invalid_input', 'Provide --goal and at least one --done')
                 delegation = {'goal': args.goal, 'done': args.done,
                     'constraints': args.constraint or ['No changed requirements or hardware operation'],
-                    'hold': args.hold or ['An owner-only decision is necessary'], 'max_reviews': 3,
-                    'max_tests': 10, 'max_branches': 3, 'mentor': args.mentor}
+                    'hold': args.hold or ['An owner-only decision is necessary'], 'max_reviews': None,
+                    'max_tests': None, 'max_branches': 3, 'mentor': args.mentor}
             result = connect_project(args.root, mode=args.mode, paths=args.path, commands=commands,
                 client=args.client, ttl=args.ttl, prepare=args.prepare, approval=args.approve, confirm=confirm,
                 delegation=delegation, write_paths=args.write_path)
@@ -188,13 +205,23 @@ def main():
         elif args.command == 'project':
             from .project_connect import Project, owner_client
             project = Project(args.root)
-            if args.action == 'audit':
+            if args.action == 'unlimit':
+                result = owner_client(project.meta).call('remove_connection_limits',
+                    {'connection_id': project.receipt['connection_id']}, args.request_id or secrets.token_hex(16))
+            elif args.action == 'team':
+                from .model import require
+                require(args.input, 'invalid_input', 'Provide owner-reviewed {version, profiles} JSON with --input')
+                payload = json.loads(sys.stdin.read() if args.input == '-' else Path(args.input).read_text())
+                require(set(payload) == {'version', 'profiles'}, 'invalid_input', 'Expected version and profiles')
+                result = owner_client(project.meta).call('configure_connection_team',
+                    {**payload, 'connection_id': project.receipt['connection_id']}, args.request_id or secrets.token_hex(16))
+            elif args.action == 'audit':
                 result = owner_client(project.meta).call('inspect_connection', {'connection_id': project.receipt['connection_id']})
                 result['history'] = owner_client(project.meta).call('history', {'limit': 500})
             else:
                 payload = json.loads(sys.stdin.read() if args.input == '-' else Path(args.input).read_text()) if args.input else {}
                 from .project_mcp import dispatch
-                if args.action not in {'status', 'review', 'mentor-prepare', 'mentor-finish', 'mentor-run', 'mentor-recover'}:
+                if args.action not in {'status', 'review', 'bot', 'messages', 'memories', 'mentor-prepare', 'mentor-finish', 'mentor-run', 'mentor-recover'}:
                     payload['request_id'] = args.request_id or payload.get('request_id') or secrets.token_hex(16)
                 result = dispatch(project, 'project_'+args.action.replace('-', '_'), payload)
         elif args.command == 'feedback':
@@ -235,6 +262,23 @@ def main():
                     os.chmod(args.output,0o600); json.dump(metrics.report(),f,indent=2)
                 result={'preview_file':str(Path(args.output).absolute()),'sent':False,
                         'next':'Inspect this report and share voluntarily through your chosen channel.'}
+        elif args.command == 'bot-service':
+            from .bot_worker import service_manifest
+            content = service_manifest(args.config, args.journal, args.executable, args.platform)
+            with open(args.output, 'x') as f:
+                os.chmod(args.output, 0o600); f.write(content)
+            result = {'service_file': str(Path(args.output).absolute()), 'installed': False, 'started': False}
+        elif args.command == 'bot-worker':
+            from .bot_worker import run_bot, BotWorker, configured_client, environment_manifest
+            config = json.loads(Path(args.config).read_text())
+            if args.manifest:
+                result = environment_manifest(config)
+            elif args.recover_job:
+                with BotWorker(configured_client(config), config, args.journal) as worker:
+                    result = worker.recover(args.recover_job, args.confirm_stopped,
+                        args.retry_inference, args.collect_interrupted_verification)
+            else:
+                run_bot(config, args.journal, args.iterations, args.interval); return
         elif args.command == "init":
             result = Service(args.data).bootstrap(args.actor, args.consent_seconds)
             path = Path(args.data).resolve() / "admin.token"

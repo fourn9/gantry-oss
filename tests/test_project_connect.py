@@ -151,7 +151,7 @@ class ConnectTests(unittest.TestCase):
         with self.assertRaises(Fault): self.project.operate('read', {'path': 'control.py'}, 'hardlink')
 
     def test_expiry_and_changed_plan_fail_closed(self):
-        self.attach()
+        self.attach(ttl=60)
         self.project.operate('read', {'path': 'control.py'}, 'cached-read')
         with self.assertRaises(Fault): connect(self.root, paths=['control.py'], confirm=lambda _: True)
         self.project.client.service.clock = lambda: 10**16

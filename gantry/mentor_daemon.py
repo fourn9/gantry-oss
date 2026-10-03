@@ -24,7 +24,7 @@ def tree_fingerprint(root):
     return digest(files)
 
 
-def process_job(client,job_id,journal,infer_fn=infer_monthly,cad_python=None,verification=None):
+def process_job(client,job_id,journal,infer_fn=infer_monthly,cad_python=None,verification=None,runtime_fence=None):
     root=Path(journal)/digest(job_id);root.mkdir(parents=True,exist_ok=True,mode=0o700)
     import fcntl
     with open(root/'lock','a') as lock:
@@ -36,7 +36,7 @@ def process_job(client,job_id,journal,infer_fn=infer_monthly,cad_python=None,ver
         if j['phase']=='done':return j['result']
         if j['phase']=='new':
             persist(path,j)
-            job=client.call('claim_mentor_job',{'job_id':job_id,'lease_seconds':900, **({'verification_hash':digest(verification)} if verification else {})},j['key']+':claim')
+            job=client.call('claim_mentor_job',{'job_id':job_id,'lease_seconds':900, **({'verification_hash':digest(verification)} if verification else {}), **({'runtime_fence':runtime_fence} if runtime_fence else {})},j['key']+':claim')
             j.update(phase='claimed',job=job);persist(path,j)
         job=j['job']; context=job['context']
         if j['phase'] in {'claimed','inference','output_saved','edits_applied','verified'}:
@@ -99,6 +99,7 @@ def process_job(client,job_id,journal,infer_fn=infer_monthly,cad_python=None,ver
             if j['input'].get('cad_inspection'):receipt['provider']['cad_inspection']=j['input']['cad_inspection']
             j.update(phase='output_saved',receipt=receipt);persist(path,j)
         if j['phase']=='output_saved':
+            client.call('check_mentor_job',{'job_id':job_id,'fence':job['fence']})
             output=j['receipt']['output']
             if job['kind']=='developer':
                 workspace=root/'workspace';seen=set()

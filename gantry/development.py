@@ -239,7 +239,7 @@ class DevelopmentMixin:
             elif other.get('submission'):
                 try: self._dev_artifact(s, other['submission']['snapshot'])
                 except Fault: reasons.append('evidence_invalid')
-        if d['used_executions'] >= d['max_executions']: reasons.append('budget_exhausted')
+        if d['max_executions'] is not None and d['used_executions'] >= d['max_executions']: reasons.append('budget_exhausted')
         active = [e for e in s.get('dev_executions', {}).values() if e['session_id'] == d['id'] and e['origin'] == 'delegated' and e['status'] in ACTIVE]
         agent_jobs=[j for j in s.get('mentor_jobs',{}).values() if j['session_id']==d['id'] and j['kind']=='developer' and j['status']=='running']
         if len(active)+len(agent_jobs) >= d['max_parallel']: reasons.append('resource_unavailable')

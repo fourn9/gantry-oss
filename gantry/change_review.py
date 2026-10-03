@@ -22,11 +22,22 @@ class ChangeReviewMixin:
                 'conflict', 'Wait for active executions before changing review delegation')
         old = s.get('review_teams', {}).get(d['id'], {})
         require(a['version'] == old.get('version', 0), 'stale_basis', 'Team changed')
+        self._validate_review_team(s, d, a)
+        d['generation'] += 1; d['version'] += 1
+        self._dev_save(s, fx, 'dev_sessions', d)
+        return self._dev_save(s, fx, 'review_teams', dict(id=d['id'], session_id=d['id'],
+            version=a['version'] + 1, owner=actor['id'], coordinator=a['coordinator'],
+            members=copy.deepcopy(a['members']), required_roles=sorted(set(a['required_roles'])), trigger='explicit_pr_submission', updated_at=self.clock()))
+
+    def _validate_review_team(self, s, d, a):
         roles = {m['role']: m for m in a['members']}
         require(len(roles) == len(a['members']), 'invalid_input', 'Roles must be unique')
         require(a['coordinator'] in roles and roles[a['coordinator']]['side'] == 'gantry',
                 'invalid_input', 'Coordinator must be a Gantry role')
+        require(not roles[a['coordinator']].get('parent_role'), 'invalid_input', 'Coordinator must be the root')
+        require(a['coordinator'] not in a['required_roles'], 'invalid_input', 'Coordinator is not its own specialist')
         for member in roles.values():
+            self._dev_paths(member.get('profile', {}).get('focus_paths', []), True)
             p = s['principals'].get(member['principal_id'])
             require(p and p.get('enabled', True), 'invalid_input', 'Unknown or disabled principal')
             require(p['id'] in d['actors'] or p['id'] == d['owner'],
@@ -46,11 +57,6 @@ class ChangeReviewMixin:
         user_ids = {m['principal_id'] for m in roles.values() if m['side'] == 'user'}
         mentor_ids = {m['principal_id'] for m in roles.values() if m['side'] == 'gantry'}
         require(not user_ids & mentor_ids, 'invalid_input', 'Developer and Mentor identities must be separate')
-        d['generation'] += 1; d['version'] += 1
-        self._dev_save(s, fx, 'dev_sessions', d)
-        return self._dev_save(s, fx, 'review_teams', dict(id=d['id'], session_id=d['id'],
-            version=a['version'] + 1, owner=actor['id'], coordinator=a['coordinator'],
-            members=copy.deepcopy(a['members']), required_roles=sorted(set(a['required_roles'])), trigger='explicit_pr_submission', updated_at=self.clock()))
 
     def _review_access(self, s, actor, submission_id):
         r = self._dev_get(s, 'change_reviews', submission_id)
@@ -88,11 +94,17 @@ class ChangeReviewMixin:
         roles = {m['role'] for m in team['members'] if m['side'] == 'gantry'}
         require(set(a['required_roles']) <= roles and a['acceptance'], 'invalid_input', 'Review conditions or roles invalid')
         self._continuity_state(s, actor, change['head'])
+        required = set(a['required_roles']) | set(team['required_roles'])
+        parents = {m['role']: m.get('parent_role') for m in team['members']}
+        for role in list(required):
+            parent = parents.get(role)
+            while parent and parent != team['coordinator']:
+                required.add(parent); parent = parents.get(parent)
         r = dict(id=uid('review'), session_id=change['session_id'], state_id=change['head'],
             base_state=change['base_state'], change_id=change['id'], team_version=team['version'],
             submitted_by=actor['id'], question=a['question'], stage=a['stage'], acceptance=a['acceptance'],
             dependency_hashes=copy.deepcopy(change['dependency_hashes']),
-            required_roles=sorted(set(a['required_roles']) | set(team['required_roles'])), status='pending', specialists={},
+            required_roles=sorted(required - {team['coordinator']}), status='pending', specialists={},
             created_at=self.clock(), created_seq=s['seq'] + 1)
         self._dev_save(s, fx, 'change_reviews', r)
         self._dev_save(s, fx, 'review_heads', dict(id=change['id'], session_id=change['session_id'], submission_id=r['id']))
@@ -137,6 +149,10 @@ class ChangeReviewMixin:
         result['development'] = self.cmd_get_development_state(s, actor, {'state_id': r['state_id']}, fx, n, con)
         result['baseline'] = self._continuity_state(s, actor, r['base_state'])
         result['team'] = team
+        own_roles = [m['role'] for m in team['members'] if m['principal_id'] == actor['id']]
+        if len(own_roles) == 1:
+            result['bot_context'] = self._bot_context(s, actor, team, own_roles[0], r['state_id'], con)
+        result['team_discussion'] = self._team_discussion(s, r['change_id'], con)
         before = self._manifest(s, result['baseline']['snapshot'])
         after = result['development']['manifest']
         changed = self._changed(s, result['baseline']['snapshot'], result['development']['state']['snapshot'])
@@ -183,8 +199,11 @@ class ChangeReviewMixin:
             try: self._dev_artifact(s, execution.get('output_snapshot'))
             except Fault: valid = False
             evaluations.append([evaluation['id'], evaluation, valid])
-        return digest([r['state_id'], r['team_version'], r['specialists'], sorted(evaluations),
-                       s['dev_states'][r['state_id']]['context']])
+        change = s['dev_changes'][r['change_id']]
+        basis = [r['state_id'], r['team_version'], r['specialists'], sorted(evaluations),
+                 s['dev_states'][r['state_id']]['context']]
+        if change.get('discussion_version'): basis.append(change['discussion_version'])
+        return digest(basis)
 
     def _response_evidence(self, s, response):
         if not response.get('execution_id'): return 'not_linked'
@@ -232,6 +251,13 @@ class ChangeReviewMixin:
         self._review_current(s, r, team)
         require(r['status'] != 'completed', 'conflict', 'Review already completed')
         self._review_evidence(s, r, a['evidence'], actor, con)
+        children = {m['role'] for m in team['members'] if m.get('parent_role') == a['role']} & set(r['required_roles'])
+        require(children <= set(r['specialists']), 'review_pending', 'Waiting for subordinate reports')
+        # A replaced report invalidates summaries that depended on it.
+        parents = {m['role']: m.get('parent_role') for m in team['members']}
+        parent = parents.get(a['role'])
+        while parent:
+            r['specialists'].pop(parent, None); parent = parents.get(parent)
         r['specialists'][a['role']] = dict(summary=a['summary'], evidence=a['evidence'],
             unresolved=a['unresolved'], principal_id=actor['id'], at=self.clock())
         self._dev_save(s, fx, 'change_reviews', r)
@@ -258,6 +284,7 @@ class ChangeReviewMixin:
                 r['fence'] == a['fence'] and r['lease_until'] > self.clock(), 'conflict', 'Review lease expired or replaced')
         require(set(r['required_roles']) <= set(r['specialists']), 'review_pending', 'Required specialist review missing')
         output = copy.deepcopy(a['output']); self._review_evidence(s, r, output['evidence'], actor, con)
+        if output['verdict'] == 'ok': self._require_team_resolved(s, r)
         ids = [f['id'] for f in output['findings']]
         require(len(ids) == len(set(ids)), 'invalid_input', 'Duplicate finding ID')
         for f in output['findings']:
@@ -325,8 +352,10 @@ class ChangeReviewMixin:
         response = self._dev_get(s, 'review_responses', a['response_id'])
         require(response['submission_id'] == r['id'], 'invalid_input', 'Response belongs to another review')
         self._continuity_state(s, actor, response['state_id'])
-        return self._dev_save(s, fx, 'review_lessons', dict(id=uid('lesson'), session_id=r['session_id'],
+        lesson = self._dev_save(s, fx, 'review_lessons', dict(id=uid('lesson'), session_id=r['session_id'],
             submission_id=r['id'], response_id=response['id'], state_id=response['state_id'],
             prediction=r['output']['prediction'], assessment=a['assessment'], observation=a['observation'],
             applicability=a['applicability'], limitations=a['limitations'], principal_id=actor['id'],
             status='hypothesis', at=self.clock(), created_seq=s['seq'] + 1))
+        self._remember_reflection(s, actor, team, lesson, fx)
+        return lesson

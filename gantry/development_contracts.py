@@ -6,7 +6,7 @@ CAPTURE = {'type': 'object', 'properties': {'scope': S, 'missing': A},
            'required': ['scope', 'missing'], 'additionalProperties': False}
 REF = {'session_id': S}
 POLICY = {'mode': MODE, 'actors': A, 'write_scope': A, 'recipes': O,
-          'max_executions': {'type': 'integer', 'minimum': 0},
+          'max_executions': {'type': ['integer', 'null'], 'minimum': 0},
           'timeout_seconds': {'type': 'integer', 'minimum': 1, 'maximum': 7200},
           'max_parallel': {'type': 'integer', 'minimum': 1, 'maximum': 16}}
 register('connect_development', {'title': S, 'zone': S, 'snapshot': S, 'requirements': A,

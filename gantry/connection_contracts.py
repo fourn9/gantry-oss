@@ -4,6 +4,7 @@ FILES = {'type': 'object', 'additionalProperties': {'type': 'string'}}
 register('request_connection', {'plan': O, 'token_hash': S, 'mentor_token_hash': S}, ['plan', 'token_hash', 'mentor_token_hash'])
 register('approve_connection', {'connection_id': S, 'plan_hash': S, 'files': FILES}, ['connection_id', 'plan_hash', 'files'])
 register('inspect_connection disconnect_connection', {'connection_id': S}, ['connection_id'])
+register('remove_connection_limits', {'connection_id': S}, ['connection_id'])
 register('connection_context', {})
 register('authorize_connection_operation', {'operation': S, 'path': S, 'command': S, 'command_hash': S,
     'input_hash': S, 'branch': S, 'from_review': S}, ['operation', 'input_hash'])
