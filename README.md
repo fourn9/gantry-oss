@@ -4,6 +4,13 @@ An agent-friendly development ledger for robotics hardware and software.
 
 Gantry stores versioned development states, artifacts, changes, evidence and decisions so people and agents can continue from a shared state. It connects to tools you already use through a local CLI, HTTP API and MCP. Mentor reviews a submitted change against recorded context and proposes follow-up work; Core checks permission, versions, dependencies and execution conditions.
 
+Gantry has two product areas:
+
+- **Gantry Ledger** keeps the shared development state and the history of changes, evidence, discussions, verification and human decisions. Reviewing a submitted change is an operation in Ledger.
+- **Gantry Crew** gives customer-owned agents persistent roles, scopes and experience so they can receive work, collaborate and hand off results through Ledger.
+
+The product names describe responsibilities; they do not change existing CLI commands, API names or stored event types.
+
 **Version: 3.0.0.** Local operation is the supported starting point. Human adoption, agent proposals and execution results remain separate. Gantry does not certify a design's physical safety or operate hardware by default.
 
 ## Connect a project
