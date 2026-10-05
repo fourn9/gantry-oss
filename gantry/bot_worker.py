@@ -15,15 +15,15 @@ from .client import Client
 from .contracts import validate
 from .model import Fault, require, uid, digest, canonical
 from .monthly_codex import infer_monthly
-from .mentor_daemon import process_job
 from .runner import persist, process_env, stop_process
 
 
 def environment_manifest(config):
     """Commit public local configuration, not credentials, in the runtime declaration."""
+    fields = ('backend', 'command', 'executable_hash', 'cad_python', 'verification', 'environment_definition')
+    if 'workflow' in config: fields += ('workflow',)
     return {'name': config['name'], 'backend': config['backend'], 'tools': config.get('tools', []),
-            'definition': digest({k: config.get(k) for k in
-                ('backend', 'command', 'executable_hash', 'cad_python', 'verification', 'environment_definition')})}
+            'definition': digest({k: config.get(k) for k in fields})}
 
 
 def infer_command(config, context, schema, directory):
@@ -65,6 +65,8 @@ def infer_command(config, context, schema, directory):
 
 class BotWorker:
     def __init__(self, client, config, journal, infer_fn=None):
+        require(config.get('workflow') in (None, 'bot_development', 'legacy_review'),
+                'invalid_input', 'Unknown Bot runtime workflow')
         self.client, self.config = client, config
         self.bot_id = config['bot_id']
         self.root = Path(journal) / digest(self.bot_id)
@@ -111,13 +113,21 @@ class BotWorker:
         while True:
             page = self.client.call('bot_inbox', {'bot_id': self.bot_id, **({'after': after} if after else {})})
             for job in page['jobs']:
+                workflow = job.get('workflow', 'legacy_review')
+                if self.config.get('workflow') and workflow != self.config['workflow']:
+                    continue
                 if job['status'] != 'pending':
                     results.append({'job_id': job['id'], 'status': 'held', 'reason': 'explicit_recovery_required'})
                     continue
                 require(not self.lost.is_set(), 'runtime_offline', 'Runtime heartbeat lost')
                 try:
-                    result = process_job(self.client, job['id'], self.root/'jobs', self.infer,
-                        self.config.get('cad_python'), self.config.get('verification'), self.runtime['fence'])
+                    if workflow == 'bot_development':
+                        from .bot_execution import process_bot_task
+                        result = process_bot_task(self.client, job, self.root/'jobs', self.infer, self.runtime['fence'])
+                    else:
+                        from .mentor_daemon import process_job
+                        result = process_job(self.client, job['id'], self.root/'jobs', self.infer,
+                            self.config.get('cad_python'), self.config.get('verification'), self.runtime['fence'])
                 except (Fault, OSError, ValueError) as exc:
                     result = {'job_id': job['id'], 'status': 'held',
                               'reason': exc.code if isinstance(exc, Fault) else type(exc).__name__}
@@ -128,8 +138,17 @@ class BotWorker:
         return results
 
     def recover(self, job_id, reason, retry_inference=False, collect_interrupted_verification=False):
-        from .mentor_recovery import recover_job
         require(self.runtime and not self.lost.is_set(), 'runtime_offline', 'Runtime is offline')
+        workflow = 'bot_development' if job_id.startswith('btask_') else 'legacy_review'
+        require(not self.config.get('workflow') or self.config['workflow'] == workflow,
+                'scope_denied', 'Recovery belongs to another workflow; use its original worker and journal')
+        if workflow == 'bot_development':
+            require(not retry_inference and not collect_interrupted_verification,
+                    'invalid_input', 'Legacy recovery overrides do not apply to independent Bot tasks')
+            from .bot_execution import recover_bot_task
+            return recover_bot_task(self.client, job_id, self.root/'jobs', self.runtime['fence'], self.infer, reason)
+        from .mentor_recovery import recover_job
+        from .mentor_daemon import process_job
         result = recover_job(self.client, job_id, self.root/'jobs', reason,
             retry_inference=retry_inference, collect_interrupted_verification=collect_interrupted_verification,
             runtime_fence=self.runtime['fence'])
@@ -176,10 +195,13 @@ def run_bot(config, journal, iterations=0, interval=10):
     finally: signal.signal(signal.SIGTERM, previous)
 
 
-def service_manifest(config_path, journal, executable, platform):
+def service_manifest(config_path, journal, executable, platform, workflow=None):
     """Generate an opt-in user service; never install or launch it behind the owner."""
     config = Path(config_path).expanduser().resolve()
     require(config.is_file(), 'not_found', 'Worker configuration file required')
+    if workflow:
+        require(json.loads(config.read_text()).get('workflow') == workflow,
+                'scope_denied', 'Set the explicit workflow in the saved config before creating a service')
     command = Path(executable).expanduser().absolute()
     require(command.is_file(), 'not_found', 'Installed Gantry executable required')
     root = Path(journal).expanduser().resolve()

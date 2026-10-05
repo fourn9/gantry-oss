@@ -21,6 +21,11 @@ feedback = ["PyNaCl>=1.6.2,<2"]
 
 [project.scripts]
 gantry = "gantry.cli:main"
+gantry-ledger = "gantry.cli:review_main"
+gantry-crew = "gantry.cli:bots_main"
+# Compatibility aliases for the names used before product branding was fixed.
+gantry-review = "gantry.cli:review_main"
+gantry-bots = "gantry.cli:bots_main"
 
 [tool.setuptools.packages.find]
 include = ["gantry*"]

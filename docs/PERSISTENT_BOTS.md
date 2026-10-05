@@ -1,5 +1,10 @@
 # Persistent organizations and Bots
 
+This page documents the v3.0.0 review-driven Bot route, which remains supported.
+The source now also provides [independent Bot development](BOT_DEVELOPMENT.md) with
+separate bindings/tasks and no Mentor dependency. Identities, memories and runtime
+fencing are shared primitives; old review jobs are not relabeled or rerouted.
+
 Gantry stores a Bot identity independently of a chat, model process or development
 session. The owner binds that identity to existing delegated session roles. A
 customer-owned worker receives queued assignments, restores exact source state,

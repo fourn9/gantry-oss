@@ -1,5 +1,22 @@
 # Organization and personal Bot foundations
 
+## Current follow-up: independent services
+
+Reuse the following historical foundations, but remove Mentor as a dependency of
+Bot development. Add separate service CLI/MCP profiles, owner-approved development
+bindings and a dedicated task/report queue. Managers delegate through fenced task
+reports, receive child results and select the next work. Workers restore exact
+states, capture changes, save experience and reconcile interruptions. Reuse Core
+authorization, immutable states, integration checks and adoption boundaries.
+
+Storage changes are additive. Legacy Mentor jobs retain their handlers; no old
+permissions or task histories are reinterpreted. Verify independent operation with
+real file edits and customer-bridge subprocesses using labeled synthetic inference,
+then run the existing regressions. Live model quality and development speed are not
+established by these tests. See `docs/BOT_DEVELOPMENT.md` and `tasks/validation.md`.
+
+## Historical v3.0.0 implementation plan
+
 Extend the existing authenticated review team and durable job queue. A Bot is a
 versioned role with project context and evidence-backed experience; the customer's
 agent supplies inference. This change does not train model weights, grant new

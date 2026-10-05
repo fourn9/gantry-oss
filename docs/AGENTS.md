@@ -1,5 +1,10 @@
 # Connect and work with your agent
 
+This guide describes the customer-led review service (`gantry-ledger`, with the
+existing `gantry` commands retained). To delegate development to a Bot organization
+without Mentor, use [the independent Bot service](BOT_DEVELOPMENT.md) and its
+`gantry-crew` entry point. Existing project connections are not converted silently.
+
 Install Gantry in a Python 3.11+ environment. Keep that environment installed while a client uses its generated MCP command.
 
 ```sh

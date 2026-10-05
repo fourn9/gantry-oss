@@ -25,3 +25,16 @@
 - [x] Expose CLI/MCP onboarding, queue, restart and memory paths.
 - [x] Test isolation, revocation, concurrency, interruption and fresh-context continuation.
 - [x] Document setup, architecture, evidence and limits; run regressions.
+
+## Two independent services
+
+- [x] Record the product decision, customer workflows and responsibility boundaries in `docs/SERVICE_SPLIT.md`.
+- [x] Identify current Mentor-job and review-team coupling; distinguish target architecture from v3.0.0 behavior.
+- [x] Provide independently usable review-service and Bot-service CLI/MCP entry points and onboarding.
+- [x] Separate Bot planning, assignments, peer discussion and candidate integration from Mentor review policy.
+- [x] Preserve Core state/scope checks and persistent runtime fences; record workflow and responsible Bot explicitly.
+- [x] Implement and verify additive storage, restore and replay without reinterpreting old jobs or extending authority.
+- [x] Verify independent execution, saved milestone handoff, interruption and lost-acknowledgement recovery.
+- [x] Enforce workflow isolation during recovery, generated background services and MCP onboarding; preserve the legacy compatibility entry point.
+- [ ] Optional automatic ownership transfer of in-flight jobs across services (not required to run either service independently).
+- [ ] Validate a customer model and native tool bridge on a real engineering task; measure quality and time separately from fixture tests.

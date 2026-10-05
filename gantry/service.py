@@ -34,9 +34,10 @@ from .review_context import ReviewContextMixin
 from .connections import ConnectionMixin
 from .bots import BotMixin
 from .persistent_bots import PersistentBotMixin
+from .bot_development import BotDevelopmentMixin
 
 
-class Service(ConnectionMixin, PersistentBotMixin, BotMixin, ReviewContextMixin, MentorJobsMixin, ChangeReviewMixin, ValidationMixin, EvidenceMixin, AutonomyMixin, ProductMixin, ContinuityMixin, DevelopmentMixin):
+class Service(ConnectionMixin, BotDevelopmentMixin, PersistentBotMixin, BotMixin, ReviewContextMixin, MentorJobsMixin, ChangeReviewMixin, ValidationMixin, EvidenceMixin, AutonomyMixin, ProductMixin, ContinuityMixin, DevelopmentMixin):
     READS = {"state", "design", "diff", "history", "impact", "open", "reviews", "why",
              "outcomes", "operations", "restore_artifact", "read_artifact_chunk", "verify", "work", "context", "events", "export", "identity", "review_context", "development_state", "mentor_context", "check_execution"}
 
@@ -50,6 +51,7 @@ class Service(ConnectionMixin, PersistentBotMixin, BotMixin, ReviewContextMixin,
     READS |= {'get_review_team', 'review_automation_status'}
     READS |= {'get_persistent_bot', 'list_organization_bots', 'list_persistent_memories', 'bot_inbox'}
     READS.add('render_evidence_view')
+    READS |= {'get_bot_project', 'get_bot_task', 'list_bot_tasks', 'check_bot_task'}
     READS |= {'get_change_review', 'list_change_reviews'}
     READS |= {'automation_status', 'get_analysis'}
     READS |= {'product_overview', 'project_details', 'session_details', 'get_signal'}

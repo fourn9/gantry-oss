@@ -9,9 +9,14 @@ Gantry has two product areas:
 - **Gantry Ledger** keeps the shared development state and the history of changes, evidence, discussions, verification and human decisions. Reviewing a submitted change is an operation in Ledger.
 - **Gantry Crew** gives customer-owned agents persistent roles, scopes and experience so they can receive work, collaborate and hand off results through Ledger.
 
-The product names describe responsibilities; they do not change existing CLI commands, API names or stored event types.
-
 **Version: 3.0.0.** Local operation is the supported starting point. Human adoption, agent proposals and execution results remain separate. Gantry does not certify a design's physical safety or operate hardware by default.
+
+**Two service entry points:** `gantry-ledger` for customer-led development
+and review, and `gantry-crew` for delegated Bot development.
+The new Bot queue operates without Mentor; existing v3.0.0 workflows remain
+compatible. The earlier `gantry-review` and `gantry-bots` command names remain
+compatibility aliases. See [setup and verified limits](docs/BOT_DEVELOPMENT.md)
+and the [product boundary](docs/SERVICE_SPLIT.md). The local review workflow follows.
 
 ## Connect a project
 
