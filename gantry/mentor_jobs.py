@@ -33,6 +33,8 @@ class MentorJobsMixin:
 
     def cmd_configure_review_automation(self,s,actor,a,fx,n,con):
         d=self._dev_session(s,actor,a['session_id']);self._dev_human(actor,d)
+        require(not a['enabled'] or not s.get('bot_projects', {}).get(d['id'], {}).get('enabled'),
+                'conflict', 'Bot development owns this session; use a separate session for automatic Mentor review')
         team=self._review_team(s,actor,d['id'])
         old=s.get('review_automation',{}).get(d['id'],{})
         require(a['version']==old.get('version',0),'stale_basis','Automation policy changed')

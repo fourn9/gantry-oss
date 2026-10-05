@@ -1,4 +1,103 @@
-# Local Bot and connection validation
+# Independent services: validation on 2026-10-04
+
+Verified for this source revision after v3.0.0. No paid
+model calls, customer-data uploads, physical operation or service installation
+were performed. The wheel was installed only into a temporary verification venv.
+
+## Current verification
+
+- Reconfirmed on 2026-10-04 with Python 3.12.14 in the clean verification
+  environment: 392 tests, 382 passed, 10 optional-environment skips, no errors;
+  UI tests: 7 passed. The earlier run below used a different optional-dependency
+  environment. macOS system Python 3.9 is unsupported (the package requires
+  Python 3.11+) and was not used as the acceptance runtime.
+- Re-ran the customer-bridge example in a fresh isolated ledger: both edited
+  files restored correctly, Mentor jobs remained zero, replay matched and the
+  hash chain verified. The result remained unadopted and physically unverified.
+- Reconfirmed all 180 API contracts against the registered inputs and all 67
+  Python source files against the previously built verification wheel. This
+  confirmation did not publish a release or replace any live ledger/worker.
+
+- Publication branch check on 2026-10-05: 392 Python tests passed with 8 optional
+  skips; 7 UI tests passed. A clean Python 3.12 environment built and installed
+  the wheel, and both `gantry-ledger --help` and `gantry-crew --help` exposed
+  their separate commands. This check used synthetic inference and no robot.
+
+## Earlier verification in the same source revision
+
+- Full Python suite: 392 tests, 385 passed, 7 skipped; 65.326 seconds.
+- Independent Bot scenarios rechecked: 30 passed; 2.847 seconds.
+- Seven skips are optional feedback-extra tests (six) and the separately configured
+  native CAD interpreter test (one); independent service tests have no skips.
+- UI suite: 7 passed (`node --test tests/test_review_web.mjs`).
+- API reference: 180 registered operations; schemas checked against the command set.
+- Wheel build and clean-venv installation passed; both `gantry-ledger --help` and
+  `gantry-crew --help` expose their separate commands. Package version remains 3.0.0
+  until a release is explicitly prepared.
+- `examples/bot_development_loop.py`: actual customer bridge subprocesses edited
+  two files, returned reports, woke the integration Bot, integrated the candidate,
+  restored both outputs, and verified replay. Mentor jobs: zero. Result remained
+  unadopted, unverified and of unknown physical compatibility.
+- Migration check using the actual previous commit `b744d47`: 27 historical events
+  and two legacy Mentor jobs survived opening in the new implementation; verify
+  and replay passed. The export was unchanged on opening; all historical events
+  and artifact bytes remained equal after replay's own audit event was appended.
+
+## New path evidence
+
+`tests/test_bot_development.py` has 30 focused scenarios. They use non-admin scoped
+principals and real Core/storage/worker operations, with explicitly synthetic
+reasoning:
+
+- Integration leader, department manager and workers delegate and return reports
+  without creating a review team or invoking Mentor. Independent file changes can
+  run concurrently and become a candidate with exact saved content.
+- Actual installed bridge subprocesses consume structured context and return
+  edits/results through the default worker. A separate test executes a local tool
+  against the restored workspace; missing intermediate capture stays explicit.
+- Peer blockers, failed child reports, manager resumption and next-task experience
+  are saved. A fresh context restores an interrupted intermediate checkpoint.
+- Claims are scoped, atomic and idempotent. Hierarchy, task scope, changed baseline,
+  organization revocation and stale discussion are enforced. Narrower integration
+  tasks cannot use their Bot's broader binding to accept other changes.
+- A mixed edit/integration report cannot silently replace its saved edit; it must
+  hand off to a separate integration task with fixed inputs.
+- Recovery reuses saved answers and reconciles lost claim, checkpoint and finish
+  acknowledgements without repeated effects. Uncertain provider outcomes stay held.
+- Normal dispatch and explicit recovery respect the same workflow boundary in both
+  directions. Independent Bot recovery cannot invoke the legacy Mentor handler.
+  Legacy-only recovery cannot invoke the Bot handler. Unsupported legacy retry
+  flags are rejected before attempting independent task recovery.
+- Service-specific MCP configuration has the correct default profile. Explicit
+  legacy runtime configuration is not silently reinterpreted by `gantry-crew`;
+  invalid workflows fail closed. Generated background services require the saved
+  Bot workflow explicitly, even when using the generic executable.
+- Additive backup/import/replay preserves events, tasks and native content. Legacy
+  review functionality is covered by the remaining regression suite.
+- A 10,000-file restore inventory stays available in the private saved context,
+  with bounded model previews, explicit omissions and a canonical-content hash.
+  Large file inventories do not have to be repeated in every inference input.
+- Thirty remembered tasks with 2,001 source files each retain their full records
+  while the inference input stays below 160 KB. Dependency hashes are prioritized;
+  counts, truncation markers and exact record references disclose the preview.
+  Observations and limitations survive unchanged. This addresses growth in past
+  task inventories in addition to the current restore inventory.
+
+## Limits
+
+These tests establish mechanics, not live-model planning quality, engineering
+correctness or development speed. A trusted customer bridge is not an OS sandbox.
+Native CAD/firmware integrations still need customer-specific validation. Sharing,
+integration and work completion never imply formal adoption. Automatic ownership
+transfer of an in-flight job between the services is not implemented: reconcile
+the old task and explicitly initialize/assign the next one from saved state.
+
+See [independent Bot setup](../docs/BOT_DEVELOPMENT.md) and
+[service boundaries](../docs/SERVICE_SPLIT.md).
+
+---
+
+# Historical v3.0.0 Bot and connection validation
 
 Status: implemented and publication-checked. No paid inference, automatic service
 installation, physical robot operation or customer-data upload was performed.

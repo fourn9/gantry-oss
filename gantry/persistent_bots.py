@@ -59,6 +59,11 @@ class PersistentBotMixin:
     def _binding_access(self, s, actor, binding):
         try:
             d = self._dev_session(s, actor, binding['session_id'])
+            if binding.get('workflow') == 'bot_development':
+                p = self._dev_get(s, 'bot_projects', d['id'])
+                return (binding['enabled'] and p['enabled'] and
+                        (actor['id'] == binding['principal_id'] or
+                         (actor['kind'] == 'human' and actor['id'] == p['owner'])))
             team = self._review_team(s, actor, d['id'])
             member = self._bot_role(s, actor, team, binding['role'], owner_read=True)
             return binding['enabled'] and member['principal_id'] == binding['principal_id']
@@ -265,6 +270,16 @@ class PersistentBotMixin:
         limit = a.get('limit', 30); jobs = []
         for binding in self._bot_bindings(s, bot['id'], con):
             if not self._binding_access(s, actor, binding): continue
+            if binding.get('workflow') == 'bot_development':
+                p = s.get('bot_projects', {}).get(binding['session_id'], {})
+                if not p.get('enabled'): continue
+                rows = con.execute("SELECT id FROM records WHERE collection='bot_tasks' AND subject_id=? AND session_id=? AND id>? "
+                    "AND COALESCE(json_extract(body,'$.value.status'),json_extract(body,'$.status')) IN ('pending','running','held') "
+                    "ORDER BY id LIMIT ?", (bot['id'], binding['session_id'], a.get('after', ''), limit + 1))
+                for row in rows:
+                    task = self._dev_get(s, 'bot_tasks', row[0])
+                    jobs.append({k: task[k] for k in ('id', 'session_id', 'kind', 'status', 'version', 'attempt', 'principal_id', 'workflow')})
+                continue
             team = self._review_team(s, actor, binding['session_id'])
             member = next(m for m in team['members'] if m['role'] == binding['role'])
             kind_role = ('developer' if member['side'] == 'user' else binding['role'])
@@ -277,7 +292,7 @@ class PersistentBotMixin:
         jobs.sort(key=lambda j: j['id'])
         return {'bot_id': bot['id'], 'jobs': jobs[:limit],
                 'next_cursor': jobs[limit-1]['id'] if len(jobs) > limit else None,
-                'wake_source': 'durable submission, dependent report, correction and reflection jobs',
+                'wake_source': 'Explicitly bound workflow: Bot assignments/reports or legacy review jobs',
                 'automatic_retry': False}
 
     def _persistent_job_check(self, s, actor, job, team, con, claim=None):

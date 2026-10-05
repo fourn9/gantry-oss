@@ -44,6 +44,8 @@ def schema(con):
       CREATE TABLE IF NOT EXISTS artifact_file_index(
         revision_id TEXT NOT NULL, path TEXT NOT NULL, body TEXT NOT NULL,
         PRIMARY KEY(revision_id,path));
+      CREATE INDEX IF NOT EXISTS bot_task_dispatch ON records(subject_id,session_id,
+        COALESCE(json_extract(body,'$.value.status'),json_extract(body,'$.status')),id) WHERE collection='bot_tasks';
     ''')
 
 

@@ -1,5 +1,9 @@
 # Teams and personal Bots
 
+These are the legacy v3.0.0 review-team setup instructions. For independent Bot
+development without Mentor, use [the new Bot service](BOT_DEVELOPMENT.md). Existing
+review bindings retain the queue and role behavior documented below.
+
 A Bot can have a permanent organization-level identity bound explicitly to roles
 in multiple development sessions. Older unbound roles retain session-scoped identity.
 See [Persistent Bots](PERSISTENT_BOTS.md) for setup, customer runtimes and automatic wake-up. Gantry stores its mission, responsibilities, working style, onboarding,

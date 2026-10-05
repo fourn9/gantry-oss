@@ -1,5 +1,24 @@
 # Architecture
 
+The current source adds independent `gantry-ledger` and `gantry-crew` entry points.
+New Bot development uses its own project bindings, task queue and execution policy;
+legacy v3.0.0 Bot bindings continue to use their original Mentor jobs. See
+[service boundaries](SERVICE_SPLIT.md) and [setup, migration and evidence](BOT_DEVELOPMENT.md).
+The review diagrams below remain valid for that service.
+
+```mermaid
+flowchart TD
+  Review[gantry-ledger: customer submissions] --> Mentor[Mentor review policy and jobs]
+  Bots[gantry-crew: delegated goals] --> Plan[Bot organization: planning, reports, decisions]
+  Plan --> Tasks[Independent Bot task queue]
+  Tasks --> Runtime[Customer Bot runtime and tools]
+  Runtime --> Plan
+  Mentor <--> Core[Shared authenticated Core]
+  Plan <--> Core
+  Runtime <--> Core
+  Core --> Store[States, artifacts, events and persistent experience]
+```
+
 The local `connect` layer is additive. It bundles an owner-approved plan into the existing principal approval chain, a dedicated project zone, session, immutable baseline and change. Developer and Mentor capabilities use separate identities. The local bridge calls the same authenticated `Service.call` entry point as HTTP; it does not bypass Core authorization.
 
 ```mermaid

@@ -11,8 +11,9 @@ from .model import Fault
 from .service import Service, token_hash
 
 
-def main():
-    parser = argparse.ArgumentParser(description="Gantry robot design ledger")
+def main(service=None):
+    parser = argparse.ArgumentParser(description=("Gantry Crew: delegated Bot development" if service == 'bots' else
+        "Gantry Ledger: development state and review" if service == 'review' else "Gantry robot design ledger"))
     parser.add_argument("--url", default=os.getenv("GANTRY_URL", "http://127.0.0.1:8765"))
     parser.add_argument("--token-file", default=os.getenv("GANTRY_TOKEN_FILE"))
     sub = parser.add_subparsers(dest="command", required=True)
@@ -170,6 +171,16 @@ def main():
     resume.add_argument('state_id'); resume.add_argument('--destination', required=True); resume.add_argument('--key', required=True)
     from .feedback import add_parser as feedback_parser
     feedback_parser(sub)
+    if service:
+        common = {'init', 'serve', 'call', 'mcp', 'agent-config', 'agent-request', 'credential',
+                  'export', 'restore-backup', 'capture-workspace', 'restore-development-state', 'restore-artifact'}
+        allowed = common | ({'bot-worker', 'bot-service'} if service == 'bots' else
+            {'connect', 'disconnect', 'project', 'project-mcp', 'mentor-worker', 'recover-mentor-job'})
+        for name in list(sub.choices):
+            if name not in allowed: del sub.choices[name]
+        sub._choices_actions[:] = [action for action in sub._choices_actions if action.dest in allowed]
+        mcp.set_defaults(profile='bot' if service == 'bots' else 'review')
+        config.set_defaults(profile='bot' if service == 'bots' else 'review')
     args = parser.parse_args()
     try:
         if args.command == 'connect':
@@ -240,7 +251,7 @@ def main():
             require(1 <= args.expires_days <= 365,'invalid_input','Expiry must be 1–365 days')
             require(not Path(args.output_token).exists() and not Path(args.output_proposal).exists(), 'conflict','Use new output paths')
             token=secrets.token_urlsafe(32)
-            permissions=['read'] if args.profile=='read-only' else ['read','record','propose','work'] if args.profile=='developer' else ['read','propose']
+            permissions=['read'] if args.profile=='read-only' else ['read','record','propose','work'] if args.profile in {'developer', 'bot'} else ['read','propose']
             proposal={'title':'Delegate '+args.name,'changes':[{'id':args.name,'type':'principal','zone':args.zone,'data':{
                 'kind':'agent','permissions':permissions,'zones':[args.zone], 'token_hash':token_hash(token),
                 'allowed_commands':sorted(PROFILES[args.profile]),'expires_at':int(time.time()*1000)+args.expires_days*86400000}}]}
@@ -264,13 +275,18 @@ def main():
                         'next':'Inspect this report and share voluntarily through your chosen channel.'}
         elif args.command == 'bot-service':
             from .bot_worker import service_manifest
-            content = service_manifest(args.config, args.journal, args.executable, args.platform)
+            content = service_manifest(args.config, args.journal, args.executable, args.platform,
+                workflow='bot_development' if service == 'bots' else None)
             with open(args.output, 'x') as f:
                 os.chmod(args.output, 0o600); f.write(content)
             result = {'service_file': str(Path(args.output).absolute()), 'installed': False, 'started': False}
         elif args.command == 'bot-worker':
             from .bot_worker import run_bot, BotWorker, configured_client, environment_manifest
             config = json.loads(Path(args.config).read_text())
+            if service == 'bots':
+                if config.get('workflow') not in (None, 'bot_development'):
+                    raise Fault('scope_denied', 'This runtime belongs to another workflow; keep its original entry point')
+                config['workflow'] = 'bot_development'
             if args.manifest:
                 result = environment_manifest(config)
             elif args.recover_job:
@@ -380,6 +396,14 @@ def main():
     except (Fault, OSError, ValueError) as exc:
         print(json.dumps({"error": exc.as_dict() if isinstance(exc, Fault) else str(exc)}, ensure_ascii=False), file=sys.stderr)
         raise SystemExit(1)
+
+
+def review_main():
+    main(service='review')
+
+
+def bots_main():
+    main(service='bots')
 
 
 if __name__ == "__main__": main()
