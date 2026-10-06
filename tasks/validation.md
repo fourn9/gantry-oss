@@ -1,3 +1,14 @@
+# v3.1 designation — 2026-10-07
+
+The owner designated the existing Bot-owned organization implementation as v3.1.
+Package/runtime metadata and the README now use 3.1.0. Version propagation to the
+HTTP/MCP modules and a newly built 3.1.0 wheel were checked. The release record
+preserves v3.0 history and links to the prior implementation verification below.
+This metadata-only change did not rerun the engineering/model experiment or the
+full behavioral suite, and did not push to GitHub or alter a saved ledger.
+Agent-skills reference: 2686b620fc1fed2e8f60c704839c766b8594c6b6;
+using-agent-skills, documentation-and-adrs, git-workflow-and-versioning.
+
 # Bot-owned organization extension — 2026-10-06
 
 See [acceptance evidence](../docs/CREW_ORGANIZATION_ACCEPTANCE.md) for the real

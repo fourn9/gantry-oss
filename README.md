@@ -1,4 +1,4 @@
-# Gantry v3.0
+# Gantry v3.1
 
 An agent-friendly development ledger for robotics hardware and software.
 
@@ -9,7 +9,7 @@ Gantry has two product areas:
 - **Gantry Ledger** keeps the shared development state and the history of changes, evidence, discussions, verification and human decisions. Reviewing a submitted change is an operation in Ledger.
 - **Gantry Crew** gives customer-owned agents persistent roles, scopes and experience so they can receive work, collaborate and hand off results through Ledger.
 
-**Version: 3.0.0.** Local operation is the supported starting point. Human adoption, agent proposals and execution results remain separate. Gantry does not certify a design's physical safety or operate hardware by default.
+**Version: 3.1.0.** Local operation is the supported starting point. Human adoption, agent proposals and execution results remain separate. Gantry does not certify a design's physical safety or operate hardware by default.
 
 **Two service entry points:** `gantry-ledger` for customer-led development
 and review, and `gantry-crew` for delegated Bot development.

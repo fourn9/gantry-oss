@@ -1,7 +1,9 @@
 # Crew organization acceptance — 2026-10-06
 
-This extends the existing v3.0.0 source; no new public release or hosted deployment
-was performed. Package version remains 3.0.0. No private robot project was used.
+This experiment extended the v3.0.0 source; no public release or hosted deployment
+was performed. The package was 3.0.0 during the experiment; the project owner
+designated this implementation v3.1 (3.1.0) on 2026-10-07. No private robot project
+was used.
 
 ## What was exercised
 

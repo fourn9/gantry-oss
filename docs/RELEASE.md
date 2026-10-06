@@ -1,57 +1,51 @@
-# Gantry v3.0 — persistent organizations and customer Bots
+# Gantry v3.1 — Bot-owned hierarchical development
 
-Package version: **3.0.0**. Current implementation baseline, designated by the
-project owner. The source is published on the main branch; a v3.0.0 release tag
-has not been created. The previous release is preserved in [v2.1.0](releases/v2.1.0.md).
+Package version: **3.1.0**. Designated by the project owner on **2026-10-07**.
+This labels the implemented and verified organization loop. Local source and tag
+are prepared; this update does not publish a GitHub release or deploy a service.
+The prior [v3.0 record](releases/v3.0.0.md) is preserved.
 
-## Included
+## Added
 
-- Permanent organization/Bot identities, versioned role profiles and explicit
-  bindings to development sessions, retaining customer ownership and authority.
-- Evidence-backed individual experience and owner-authorized organization
-  reflections, reused across authorized sessions; contradictions retain history.
-- Hierarchical review, durable questions/objections/handoffs and blocking conditions.
-- Customer-owned Bot workers with private workspaces, environment declarations,
-  runtime fencing, queued PR-driven work and explicit interrupted-work recovery.
-- Customer inference bridge and optional existing subscription adapter. No default
-  provider, publisher-paid model account or automatic service installation.
-- Opt-in launchd/systemd service generation; CLI/API/MCP access to Bot context,
-  assignments and experience.
-- No local review/test count cap or default eight-hour expiry. Explicit owner
-  renewal retains existing connection state and immutable approval history.
+- Persistent integration, department-manager and specialist Bots reason in their
+  own customer-agent contexts, delegate work and collect reports without Mentor.
+- Directed peer consultation creates a read-only response task, then resumes the
+  requester with the saved answer and explicit resolution of blocking questions.
+- Opt-in action loops connect context retrieval, scoped edits, actual tool results,
+  intermediate checkpoints, decisions and reusable provisional experience.
+- Independent candidate states and exact-state verification support Bot-authored
+  comparison and selection. Selection is separate from human formal adoption.
+- Versioned organization proposals support atomic owner activation without creating
+  credentials or expanding existing principal privileges.
 
-Existing development state, artifacts, verification, human adoption, tool adapters
-and recovery mechanisms are retained. This version does not change a physical
-verification result or formally adopt any design.
+## Fixed and hardened
 
-## Verified boundary
+- Preserve exact provider inputs and reconcile lost Core acknowledgements on recovery.
+- Reject stale completion and cancellation, scope violations and unanswered blockers.
+- Bound action history in prompts while retaining paginated lossless records.
+- Attribute tool evidence to its current checkpoint and project zone; avoid duplicate
+  final checkpoints when intermediate work is already saved.
 
-The publication check ran 362 Python tests: 354 passed, 8 skipped,
-and 7 UI tests passed. Fixture inference was explicit; Core, file edits, queue,
-external bridge process, persistence and recovery were real. This version label
-adds no new capability or new claim of model quality/development speed.
+## Verification and limits
 
-## Remaining development
+The preceding implementation passed 538 Python cases with 8 optional-environment
+skips, plus 7 UI tests. Five real subscription Bots completed an anonymous two-candidate
+comparison through actual execution and recorded selection. Failed earlier attempts,
+source versions, usage and the limits of that evidence are documented in
+[Crew acceptance](CREW_ORGANIZATION_ACCEPTANCE.md).
 
-1. Detailed evidence-backed Bot activity (idle/thinking/working/blocked).
-2. General event and scheduled routines beyond the current PR-driven loop.
-3. Optional automatic isolated runtime/VM provisioning; customer-local operation
-   remains supported.
-4. Evidence-based organizational/role optimization with approved authority changes.
-5. Measuring and improving individual Bot learning and experience selection.
-
-Live customer-agent/CAD/simulation validation, streamlined onboarding and review of
-legacy advanced automation's explicit round/job limits remain follow-up work.
-The current Bot workspaces are not an OS sandbox or automatically provisioned VM.
+The v3.1 designation changes version metadata and release documentation only.
+No new robot-development speed, CAD fidelity or model-quality claim is made.
+Customer inference remains customer-funded; no publisher API account is introduced.
 
 ## Upgrade
 
-Back up the ledger, artifacts and worker journals, then stop workers before
-updating. Projections and indexes are additive; old events and artifact bytes are
-preserved. Explicitly configure organization/session bindings for persistent Bots.
-Do not silently federate existing local stores or assume historical session-only
-memories were migrated. Older binaries cannot read the new event tables; rollback
-uses the matching pre-upgrade backup and executable.
+Back up the ledger, artifacts and worker journals; stop workers before installing
+3.1.0. Existing configurations retain their behavior. Explicitly enable action loops,
+approve their environment manifests and delegate new commands to existing principals.
+Storage additions preserve old events, Bot IDs and Mentor work. Older executables
+cannot read new event types in-place; rollback uses the matching pre-upgrade backup.
 
-See [persistent Bot setup and limits](PERSISTENT_BOTS.md),
-[teams](TEAMS.md), and [local validation](../tasks/validation.md).
+See [Crew organization and operation](CREW_ORGANIZATION.md),
+[separate service entry points](BOT_DEVELOPMENT.md) and
+[validation history](../tasks/validation.md).
