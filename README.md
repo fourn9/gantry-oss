@@ -16,7 +16,11 @@ and review, and `gantry-crew` for delegated Bot development.
 The new Bot queue operates without Mentor; existing v3.0.0 workflows remain
 compatible. The earlier `gantry-review` and `gantry-bots` command names remain
 compatibility aliases. See [setup and verified limits](docs/BOT_DEVELOPMENT.md)
-and the [product boundary](docs/SERVICE_SPLIT.md). The local review workflow follows.
+and the [product boundary](docs/SERVICE_SPLIT.md).
+Opt-in Bot-owned reasoning, peer consultation and hierarchical delegation are
+documented in [Crew organization](docs/CREW_ORGANIZATION.md), with
+[real subscription acceptance evidence](docs/CREW_ORGANIZATION_ACCEPTANCE.md).
+The local review workflow follows.
 
 ## Connect a project
 

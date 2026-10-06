@@ -15,6 +15,8 @@ PAGE = {'after': S, 'limit': {'type': 'integer', 'minimum': 1, 'maximum': 100}}
 TASK = {'bot_id': S, 'state_id': S, 'kind': {'enum': ['plan', 'develop', 'verify', 'integrate', 'report']},
         'title': S, 'completion': A, 'write_scope': A, 'dependencies': A, 'after_tasks': A}
 ASSIGNMENT = {'type': 'object', 'properties': TASK, 'required': list(TASK), 'additionalProperties': False}
+# Optional branch label; the task/state IDs remain authoritative identities.
+TASK['candidate_id'] = S
 EDIT = {'type': 'object', 'properties': {'path': S, 'content': {'type': 'string'}},
         'required': ['path', 'content'], 'additionalProperties': False}
 REPORT = {'summary': S, 'rationale': S, 'unverified': A,
@@ -32,7 +34,7 @@ register('bind_development_bot', {'session_id': S, 'bot_id': S, 'principal_id': 
     'write_scope': A, 'can_assign': FLAG, 'can_integrate': FLAG, 'enabled': FLAG},
     ['session_id', 'bot_id', 'principal_id', 'version', 'write_scope', 'can_assign', 'can_integrate', 'enabled'])
 register('assign_bot_task', {'session_id': S, 'requested_by_bot': S, 'parent_task_id': S, **TASK},
-    ['session_id', *TASK])
+    ['session_id', *[k for k in TASK if k != 'candidate_id']])
 register('get_bot_project list_bot_tasks', {'session_id': S, **PAGE}, ['session_id'])
 register('get_bot_task', {'task_id': S}, ['task_id'])
 register('claim_bot_task', {'task_id': S, 'version': I, 'runtime_fence': S}, ['task_id', 'version', 'runtime_fence'])
@@ -142,14 +144,16 @@ class BotDevelopmentMixin:
         return self._dev_save(s, fx, 'bot_bindings', dict(a, id=key, role=role, workflow='bot_development',
             subject_id=bot['id'], version=a['version'] + 1, created_seq=s['seq'] + 1))
 
-    def _bd_assign(self, s, actor, a, fx, n, con):
+    def _bd_assign(self, s, actor, a, fx, n, con, consultation=False):
         p, d = self._bd_project(s, actor, a['session_id']); self.allowed(actor, 'work')
         b = self._bd_binding(s, d['id'], a['bot_id']); bot, org = self._persistent_identity(s, a['bot_id'])
         require(b['enabled'] and bot['enabled'] and org['id'] == p['organization_id'], 'mode_disabled', 'Assignee disabled')
         if not self._bd_owner(actor, p):
             sender, _, _, _ = self._bd_actor(s, actor, d['id'], a.get('requested_by_bot'))
-            require(sender['can_assign'] and self._bd_subordinate(s, sender['bot_id'], b['bot_id']),
+            require(consultation or sender['can_assign'] and self._bd_subordinate(s, sender['bot_id'], b['bot_id']),
                     'unauthorized', 'Assignment exceeds the manager delegation')
+        require(not consultation or a['kind'] == 'report' and not a['write_scope'],
+                'unauthorized', 'Consultation grants no edit scope')
         state = self._continuity_state(s, actor, a['state_id'])
         require(state['session_id'] == d['id'], 'scope_denied', 'Input belongs to another project')
         require(a['completion'], 'invalid_input', 'Task completion conditions required')
@@ -164,6 +168,9 @@ class BotDevelopmentMixin:
         parent = a.get('parent_task_id')
         if parent:
             old = self._dev_get(s, 'bot_tasks', parent)
+            require(all(in_scope(path, old['write_scope']) for path in a['write_scope']),
+                    'scope_denied', 'Child scope exceeds this assignment')
+            if old.get('candidate_id'): a.setdefault('candidate_id', old['candidate_id'])
             require(old['session_id'] == d['id'] and old['status'] == 'running', 'invalid_state', 'Parent must be running')
             require(not self._bd_subordinate(s, bot['id'], old['bot_id']) or bot['id'] == old['bot_id'],
                     'invalid_input', 'Child work cannot be assigned to a parent manager')
@@ -244,11 +251,13 @@ class BotDevelopmentMixin:
             visited.add(ident); child = self._dev_get(s, 'bot_tasks', ident); pending.extend(child['children'])
             if child.get('change_id'):
                 change = self._dev_get(s, 'dev_changes', child['change_id'])
-                candidates.append({'task_id': ident, 'status': child['status'], 'change': change})
+                candidates.append({'task_id': ident, 'status': child['status'], 'candidate_id': child.get('candidate_id'), 'change': change})
+        result['own_change'] = self._dev_get(s, 'dev_changes', task['change_id']) if task.get('change_id') else None
         result['candidate_changes'] = candidates
         result['candidates_truncated'] = bool(pending)
         if self._binding_access(s, actor, self._bd_binding(s, task['session_id'], task['bot_id'])):
             result['memory'] = self._persistent_memory_page(s, actor, bot, org, {'limit': 30}, con, recent=True)
+        result.update(self._crew_context(s, actor, task, con))
         return result
 
     def cmd_claim_bot_task(self, s, actor, a, fx, n, con):
@@ -296,7 +305,7 @@ class BotDevelopmentMixin:
         task = self._bd_checked(s, actor, a, con); self.allowed(actor, 'record')
         report = copy.deepcopy(a['report']); b = self._bd_binding(s, task['session_id'], task['bot_id'])
         if report['status'] == 'completed':
-            require(not any(m['blocking'] and m['status'] == 'open' for m in self._bd_messages(s, task, con)),
+            require(not any(m['blocking'] and m['status'] != 'resolved' for m in self._bd_messages(s, task, con)),
                     'dependency_pending', 'Resolve blocking discussion before completing work')
             require(all(s['bot_tasks'][i]['status'] in TERMINAL for i in task['children']),
                     'dependency_pending', 'Child work is still active')
@@ -305,8 +314,10 @@ class BotDevelopmentMixin:
             child = self._bd_assign(s, actor, {**assignment, 'session_id': task['session_id'],
                 'requested_by_bot': task['bot_id'], 'parent_task_id': task['id']}, fx, n, con)
             task['children'].append(child['id'])
-        require(report['status'] != 'waiting' or any(s['bot_tasks'][i]['status'] not in TERMINAL for i in task['children']),
-                'invalid_input', 'Waiting requires outstanding child work')
+        outstanding = any(s['bot_tasks'][i]['status'] not in TERMINAL for i in task['children'])
+        questions = [s['bot_task_messages'][i] for i in task.get('consultations', [])]
+        require(report['status'] != 'waiting' or outstanding or questions,
+                'invalid_input', 'Waiting requires child work or a consultation')
         if report['integrate_changes']:
             require(b['can_integrate'], 'unauthorized', 'Integration is not delegated to this Bot')
             require(not task.get('output_state'), 'invalid_state',
@@ -329,6 +340,8 @@ class BotDevelopmentMixin:
             'input_versions': copy.deepcopy(task['stamp']),
             'environment': copy.deepcopy(s['bot_runtimes'][task['bot_id']]['environment'])})
         task.update(status=report['status'], version=task['version'] + 1); task.pop('fence', None)
+        if task['status'] == 'waiting' and questions and not outstanding and not any(q['status'] == 'open' for q in questions):
+            task['status'] = 'pending'
         self._dev_save(s, fx, 'bot_tasks', task)
         team = {'session_id': task['session_id'], 'version': s['bot_projects'][task['session_id']]['version']}
         state_id = task.get('output_state', task['state_id']); manifest = self._manifest(s, s['dev_states'][state_id]['snapshot'])
@@ -340,6 +353,7 @@ class BotDevelopmentMixin:
         if org.get('share_reflections'):
             self._bd_share_memory(s, actor, org, memory, fx)
         self._bd_wake_parent(s, task, fx, n, con)
+        if task['status'] in TERMINAL: self._crew_return_response(s, task, fx, n)
         return {'task': self._bd_public(task), 'memory_id': memory['id'], 'formal_adoption': False}
 
     def _bd_share_memory(self, s, actor, org, memory, fx):
@@ -377,11 +391,12 @@ class BotDevelopmentMixin:
         require(task['version'] == a['version'] and task['status'] not in TERMINAL, 'conflict', 'Task already ended or changed')
         task.update(status='cancelled', version=task['version'] + 1, cancellation=a['reason']); task.pop('fence', None)
         self._dev_save(s, fx, 'bot_tasks', task); self._bd_wake_parent(s, task, fx, n, con)
+        self._crew_return_response(s, task, fx, n)
         return self._bd_public(task)
 
     def _bd_evidence(self, s, actor, sid, refs):
         for ref in refs:
-            obj = next((s[t][ref] for t in ('dev_states', 'bot_tasks', 'bot_task_messages') if ref in s.get(t, {})), None)
+            obj = next((s[t][ref] for t in ('dev_states', 'bot_tasks', 'bot_task_messages', 'bot_actions', 'bot_decisions') if ref in s.get(t, {})), None)
             require(obj and obj['session_id'] == sid, 'invalid_input', 'Evidence must belong to this project')
 
     def cmd_send_bot_message(self, s, actor, a, fx, n, con):
@@ -404,7 +419,9 @@ class BotDevelopmentMixin:
             self._bd_actor(s, actor, msg['session_id'], msg['from_bot_id'])
             require(actor['id'] == msg['principal_id'], 'unauthorized', 'Only author or owner can resolve')
         self._bd_evidence(s, actor, msg['session_id'], a['evidence'])
-        require(msg['status'] == 'open', 'conflict', 'Already resolved')
+        require(not msg.get('response_task_id') or msg['status'] == 'answered',
+                'dependency_pending', 'Read the consultation response before resolving')
+        require(msg['status'] in {'open', 'answered'}, 'conflict', 'Already resolved')
         msg.update(status='resolved', resolution=a, resolved_by=actor['id'])
         self._dev_save(s, fx, 'bot_task_messages', msg)
         task = self._dev_get(s, 'bot_tasks', msg['task_id']); task['discussion_version'] += 1

@@ -62,6 +62,10 @@ a file is not proof that its original tool can reopen or edit it.
 
 ## Customer execution and MCP
 
+For the opt-in iterative model/tool path, directed consultation, attributed decisions
+and atomic team onboarding, see [Crew organization](CREW_ORGANIZATION.md). The
+single-response customer bridge below remains supported for existing installations.
+
 Use the runtime setup in [Persistent Bots](PERSISTENT_BOTS.md), adding
 `"workflow": "bot_development"` to its configuration. Generate and approve the
 environment manifest with the same configuration and executable used at runtime:
@@ -187,8 +191,9 @@ real customer subprocess execution, scope checks, stale input rejection, discuss
 saved experience, interruption/acknowledgement recovery, restore and replay without
 Mentor. Existing review/Bot compatibility tests continue to run separately.
 
-The runtime mechanics and saved records are real. Tests use synthetic model answers.
-Live-model planning quality, development speed, native CAD automation and firmware
+The runtime mechanics and saved records are real. These regression tests use synthetic model answers.
+A separate [subscription fixture](CREW_ORGANIZATION_ACCEPTANCE.md) verifies real
+Bot reasoning and exact-state tool checks. General planning quality, development speed, native CAD automation and firmware
 toolchains need their own integration validation. No automatic optimal-organization
 learning, arbitrary process-memory restoration or cross-service live-job transfer
 is claimed.

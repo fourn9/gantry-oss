@@ -72,3 +72,10 @@ Parallel changes start from fixed states. Integration checks overlapping edits a
 - Review/engineering proposals store cited evidence and inferred roles/checks separately from verified facts.
 
 Inspect `docs/api-contracts.json` for the current command schemas. The source contracts define authoritative field names. Adapters must preserve original data and expose derived views with provenance and missing-data markers.
+
+## Bot-owned organization extension
+
+[Crew organization](CREW_ORGANIZATION.md) describes the separate responsibilities
+and timing paths. Customer Bot contexts choose work, consult peers and compare
+candidates. Core validates identity, versions and delegated scope; the worker
+executes the Bot-authored actions. Mentor is not required on this route.

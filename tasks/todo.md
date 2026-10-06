@@ -1,5 +1,15 @@
 # Implementation checklist
 
+## Bot-owned organization loop
+
+- [x] Record directed consultation, attributed decisions, candidate identity and lessons.
+- [x] Wake waiting requesters on replies and preserve stale-context/fence guarantees.
+- [x] Add opt-in iterative model actions with scoped context/files/tools and receipts.
+- [x] Add proposed organization and atomic owner activation without implicit privileges.
+- [x] Verify hierarchy, alternatives, failure/revision, interruption, memory and security.
+- [x] Run real subscription smoke separately from deterministic tests; report evidence.
+- [x] Review, run regressions/package checks, document operation and limits.
+
 - [x] Remove local review count cap; exercise new and legacy connections.
 - [x] Add role profiles, proposal/activation and onboarding contracts.
 - [x] Add communication and evidence-backed experience with access controls.

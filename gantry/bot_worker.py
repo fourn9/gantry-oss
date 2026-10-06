@@ -22,6 +22,7 @@ def environment_manifest(config):
     """Commit public local configuration, not credentials, in the runtime declaration."""
     fields = ('backend', 'command', 'executable_hash', 'cad_python', 'verification', 'environment_definition')
     if 'workflow' in config: fields += ('workflow',)
+    if config.get('agent_loop'): fields += ('agent_loop', 'local_tools', 'tool_runtime', 'sandbox')
     return {'name': config['name'], 'backend': config['backend'], 'tools': config.get('tools', []),
             'definition': digest({k: config.get(k) for k in fields})}
 
@@ -123,7 +124,7 @@ class BotWorker:
                 try:
                     if workflow == 'bot_development':
                         from .bot_execution import process_bot_task
-                        result = process_bot_task(self.client, job, self.root/'jobs', self.infer, self.runtime['fence'])
+                        result = process_bot_task(self.client, job, self.root/'jobs', self.infer, self.runtime['fence'], loop_config=self.config)
                     else:
                         from .mentor_daemon import process_job
                         result = process_job(self.client, job['id'], self.root/'jobs', self.infer,
@@ -146,7 +147,7 @@ class BotWorker:
             require(not retry_inference and not collect_interrupted_verification,
                     'invalid_input', 'Legacy recovery overrides do not apply to independent Bot tasks')
             from .bot_execution import recover_bot_task
-            return recover_bot_task(self.client, job_id, self.root/'jobs', self.runtime['fence'], self.infer, reason)
+            return recover_bot_task(self.client, job_id, self.root/'jobs', self.runtime['fence'], self.infer, reason, loop_config=self.config)
         from .mentor_recovery import recover_job
         from .mentor_daemon import process_job
         result = recover_job(self.client, job_id, self.root/'jobs', reason,

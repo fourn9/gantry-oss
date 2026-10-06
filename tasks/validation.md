@@ -1,3 +1,10 @@
+# Bot-owned organization extension — 2026-10-06
+
+See [acceptance evidence](../docs/CREW_ORGANIZATION_ACCEPTANCE.md) for the real
+subscription run, earlier failed attempts, token usage, exact limits and final
+546-case regression suite. This implementation is local and not published.
+The persistent implementation workflow is recorded in [AGENTS.md](../AGENTS.md).
+
 # Independent services: validation on 2026-10-04
 
 Verified for this source revision after v3.0.0. No paid

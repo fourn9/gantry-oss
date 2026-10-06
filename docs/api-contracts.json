@@ -1,4 +1,26 @@
 {
+  "activate_bot_team": {
+    "description": "activate bot team",
+    "schema": {
+      "additionalProperties": false,
+      "properties": {
+        "basis": {
+          "type": "object"
+        },
+        "intent": {
+          "type": "object"
+        },
+        "proposal_id": {
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "required": [
+        "proposal_id"
+      ],
+      "type": "object"
+    }
+  },
   "activate_team_proposal": {
     "description": "activate team proposal",
     "schema": {
@@ -232,6 +254,51 @@
       "type": "object"
     }
   },
+  "ask_bot": {
+    "description": "ask bot",
+    "schema": {
+      "additionalProperties": false,
+      "properties": {
+        "basis": {
+          "type": "object"
+        },
+        "evidence": {
+          "items": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "fence": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "intent": {
+          "type": "object"
+        },
+        "question": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "task_id": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "to_bot_id": {
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "required": [
+        "task_id",
+        "fence",
+        "to_bot_id",
+        "question",
+        "evidence"
+      ],
+      "type": "object"
+    }
+  },
   "assign_bot_task": {
     "description": "assign bot task",
     "schema": {
@@ -248,6 +315,10 @@
           "type": "object"
         },
         "bot_id": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "candidate_id": {
           "minLength": 1,
           "type": "string"
         },
@@ -3614,6 +3685,10 @@
                     "minLength": 1,
                     "type": "string"
                   },
+                  "candidate_id": {
+                    "minLength": 1,
+                    "type": "string"
+                  },
                   "completion": {
                     "items": {
                       "minLength": 1,
@@ -3945,6 +4020,44 @@
       "type": "object"
     }
   },
+  "get_bot_records": {
+    "description": "get bot records",
+    "schema": {
+      "additionalProperties": false,
+      "properties": {
+        "after": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "basis": {
+          "type": "object"
+        },
+        "intent": {
+          "type": "object"
+        },
+        "kind": {
+          "enum": [
+            "actions",
+            "decisions"
+          ]
+        },
+        "limit": {
+          "maximum": 100,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "task_id": {
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "required": [
+        "task_id",
+        "kind"
+      ],
+      "type": "object"
+    }
+  },
   "get_bot_task": {
     "description": "get bot task",
     "schema": {
@@ -3963,6 +4076,28 @@
       },
       "required": [
         "task_id"
+      ],
+      "type": "object"
+    }
+  },
+  "get_bot_team_proposal": {
+    "description": "get bot team proposal",
+    "schema": {
+      "additionalProperties": false,
+      "properties": {
+        "basis": {
+          "type": "object"
+        },
+        "intent": {
+          "type": "object"
+        },
+        "proposal_id": {
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "required": [
+        "proposal_id"
       ],
       "type": "object"
     }
@@ -5396,6 +5531,187 @@
       "type": "object"
     }
   },
+  "propose_bot_team": {
+    "description": "propose bot team",
+    "schema": {
+      "additionalProperties": false,
+      "properties": {
+        "acceptance": {
+          "items": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "basis": {
+          "type": "object"
+        },
+        "fence": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "goal": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "intent": {
+          "type": "object"
+        },
+        "lead_bot_id": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "members": {
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "bot_id": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "can_assign": {
+                "type": "boolean"
+              },
+              "can_integrate": {
+                "type": "boolean"
+              },
+              "name": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "parent_bot_id": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "principal_id": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "profile": {
+                "additionalProperties": false,
+                "properties": {
+                  "focus_paths": {
+                    "items": {
+                      "maxLength": 4000,
+                      "minLength": 1,
+                      "type": "string"
+                    },
+                    "maxItems": 20,
+                    "type": "array"
+                  },
+                  "mission": {
+                    "maxLength": 4000,
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "onboarding": {
+                    "items": {
+                      "maxLength": 4000,
+                      "minLength": 1,
+                      "type": "string"
+                    },
+                    "maxItems": 20,
+                    "type": "array"
+                  },
+                  "report_when": {
+                    "items": {
+                      "maxLength": 4000,
+                      "minLength": 1,
+                      "type": "string"
+                    },
+                    "maxItems": 20,
+                    "type": "array"
+                  },
+                  "responsibilities": {
+                    "items": {
+                      "maxLength": 4000,
+                      "minLength": 1,
+                      "type": "string"
+                    },
+                    "maxItems": 20,
+                    "type": "array"
+                  },
+                  "style": {
+                    "maxLength": 4000,
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "workflow": {
+                    "items": {
+                      "maxLength": 4000,
+                      "minLength": 1,
+                      "type": "string"
+                    },
+                    "maxItems": 20,
+                    "type": "array"
+                  }
+                },
+                "required": [
+                  "mission",
+                  "responsibilities",
+                  "focus_paths",
+                  "workflow",
+                  "report_when",
+                  "style",
+                  "onboarding"
+                ],
+                "type": "object"
+              },
+              "write_scope": {
+                "items": {
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "type": "array"
+              }
+            },
+            "required": [
+              "bot_id",
+              "name",
+              "parent_bot_id",
+              "principal_id",
+              "profile",
+              "write_scope",
+              "can_assign",
+              "can_integrate"
+            ],
+            "type": "object"
+          },
+          "maxItems": 64,
+          "minItems": 1,
+          "type": "array"
+        },
+        "organization_id": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "rationale": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "session_id": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "task_id": {
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "required": [
+        "session_id",
+        "organization_id",
+        "lead_bot_id",
+        "goal",
+        "acceptance",
+        "members",
+        "rationale"
+      ],
+      "type": "object"
+    }
+  },
   "propose_review_team": {
     "description": "propose review team",
     "schema": {
@@ -5991,6 +6307,178 @@
       "type": "object"
     }
   },
+  "record_bot_action": {
+    "description": "record bot action",
+    "schema": {
+      "additionalProperties": false,
+      "properties": {
+        "basis": {
+          "type": "object"
+        },
+        "details": {
+          "type": "object"
+        },
+        "fence": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "intent": {
+          "type": "object"
+        },
+        "kind": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "task_id": {
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "required": [
+        "task_id",
+        "fence",
+        "kind",
+        "details"
+      ],
+      "type": "object"
+    }
+  },
+  "record_bot_decision": {
+    "description": "record bot decision",
+    "schema": {
+      "additionalProperties": false,
+      "properties": {
+        "alternatives": {
+          "items": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "basis": {
+          "type": "object"
+        },
+        "conditions": {
+          "items": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "evidence": {
+          "items": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "fence": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "intent": {
+          "type": "object"
+        },
+        "rationale": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "targets": {
+          "items": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "task_id": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "verdict": {
+          "enum": [
+            "authorize",
+            "revise",
+            "select",
+            "continue",
+            "stop",
+            "escalate"
+          ]
+        }
+      },
+      "required": [
+        "task_id",
+        "fence",
+        "verdict",
+        "targets",
+        "rationale",
+        "evidence",
+        "alternatives",
+        "conditions"
+      ],
+      "type": "object"
+    }
+  },
+  "record_bot_experience": {
+    "description": "record bot experience",
+    "schema": {
+      "additionalProperties": false,
+      "properties": {
+        "applicability": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "basis": {
+          "type": "object"
+        },
+        "evidence": {
+          "items": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "fence": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "intent": {
+          "type": "object"
+        },
+        "limitations": {
+          "items": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "observation": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "task_id": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "used_memories": {
+          "items": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "task_id",
+        "fence",
+        "observation",
+        "applicability",
+        "limitations",
+        "evidence",
+        "used_memories"
+      ],
+      "type": "object"
+    }
+  },
   "record_bot_memory": {
     "description": "record bot memory",
     "schema": {
@@ -6574,6 +7062,33 @@
       "type": "object"
     }
   },
+  "refresh_bot_task": {
+    "description": "refresh bot task",
+    "schema": {
+      "additionalProperties": false,
+      "properties": {
+        "basis": {
+          "type": "object"
+        },
+        "fence": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "intent": {
+          "type": "object"
+        },
+        "task_id": {
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "required": [
+        "task_id",
+        "fence"
+      ],
+      "type": "object"
+    }
+  },
   "related_review_context": {
     "description": "related review context",
     "schema": {
@@ -6902,6 +7417,51 @@
         }
       },
       "required": [
+        "message_id",
+        "reason",
+        "evidence"
+      ],
+      "type": "object"
+    }
+  },
+  "resolve_bot_question": {
+    "description": "resolve bot question",
+    "schema": {
+      "additionalProperties": false,
+      "properties": {
+        "basis": {
+          "type": "object"
+        },
+        "evidence": {
+          "items": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "fence": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "intent": {
+          "type": "object"
+        },
+        "message_id": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "reason": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "task_id": {
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "required": [
+        "task_id",
+        "fence",
         "message_id",
         "reason",
         "evidence"
@@ -7744,6 +8304,48 @@
       "required": [
         "bot_id",
         "fence"
+      ],
+      "type": "object"
+    }
+  },
+  "stop_bot_task": {
+    "description": "stop bot task",
+    "schema": {
+      "additionalProperties": false,
+      "properties": {
+        "basis": {
+          "type": "object"
+        },
+        "fence": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "intent": {
+          "type": "object"
+        },
+        "reason": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "target_task_id": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "task_id": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "version": {
+          "minimum": 1,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "task_id",
+        "fence",
+        "target_task_id",
+        "version",
+        "reason"
       ],
       "type": "object"
     }

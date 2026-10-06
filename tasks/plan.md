@@ -1,5 +1,21 @@
 # Organization and personal Bot foundations
 
+## Current implementation: Bot-owned organization loop
+
+User approved the architecture and implementation on 2026-10-06. Follow
+`docs/CREW_ORGANIZATION.md`; extend the existing service split, not a new product.
+Apply Addy Osmani agent-skills revision 2686b620fc1fed2e8f60c704839c766b8594c6b6:
+spec-driven-development, planning-and-task-breakdown, incremental-implementation,
+test-driven-development and security/code review. Existing approvals cover routine
+implementation and additive data contracts. Preserve optional migration work below.
+
+Build vertical slices: (1) attributed decisions and directed consultation with
+wait/reply/restart; (2) opt-in model action loop, actual scoped tool execution and
+durable receipts; (3) proposed organization and atomic activation; (4) parallel
+candidate/experience acceptance, real subscription smoke, regressions and packaging.
+Do not substitute parent-written engineering choices for Bot reasoning. Runtime
+mechanics and model quality are separate acceptance claims.
+
 ## Current follow-up: independent services
 
 Reuse the following historical foundations, but remove Mentor as a dependency of

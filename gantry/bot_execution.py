@@ -23,6 +23,13 @@ def _input(context, workspace):
     persist(full_context, context)
     context['full_context'] = {'path': str(full_context.resolve()), 'sha256': digest(context),
         'purpose': 'Complete authorized context, manifests and receipts remain available to the customer bridge.'}
+    # Action bodies are lossless ledger receipts, not repeated prompt history.
+    context['actions'] = [{k: a[k] for k in ('id', 'kind', 'attempt', 'input_state')} | {
+        'round': a['details'].get('round'),
+        'rationale': str(a['details'].get('rationale', ''))[:500],
+        'error': a['details'].get('result', {}).get('error') if isinstance(a['details'].get('result'), dict) else None,
+        'detail_reference': {'operation': 'get_bot_records', 'kind': 'actions', 'task_id': a['task_id']}}
+        for a in context.get('actions', [])]
     manifest = context['development'].pop('manifest')
     context['development'].pop('diffs', None)
     # Restore receipts contain one hash per file and are proof of transfer, not
@@ -82,7 +89,7 @@ def _input(context, workspace):
     return context
 
 
-def process_bot_task(client, queued, root, infer_fn, runtime_fence, recovered=None):
+def process_bot_task(client, queued, root, infer_fn, runtime_fence, recovered=None, loop_config=None):
     attempt = queued['attempt'] if recovered else queued['attempt'] + 1
     directory = Path(root) / 'development' / digest(queued['id']) / str(attempt)
     directory.mkdir(parents=True, exist_ok=True, mode=0o700)
@@ -113,7 +120,11 @@ def process_bot_task(client, queued, root, infer_fn, runtime_fence, recovered=No
                            initial_fingerprint=safe_fingerprint(workspace))
             persist(marker, journal)
         if journal['phase'] == 'inference':
-            receipt = infer_fn(journal['input'], BOT_ANSWER, directory/'model')
+            if loop_config and loop_config.get('agent_loop'):
+                from .crew_runtime import run_actions
+                receipt = run_actions(client, journal['input'], ref, infer_fn, loop_config, directory/'actions')
+            else:
+                receipt = infer_fn(journal['input'], BOT_ANSWER, directory/'model')
             validate(receipt['output'], BOT_ANSWER)
             journal.update(phase='output_saved', receipt=receipt); persist(marker, journal)
         if journal['phase'] == 'output_saved':
@@ -132,7 +143,9 @@ def process_bot_task(client, queued, root, infer_fn, runtime_fence, recovered=No
             client.call('check_bot_task', ref)
             require(safe_fingerprint(workspace) == journal['fingerprint'], 'stale_basis', 'Workspace changed after output was saved')
             answer = journal['receipt']['output']
-            if journal['fingerprint'] != journal['initial_fingerprint']:
+            loop_saved = (loop_config and loop_config.get('agent_loop')
+                and journal['receipt'].get('checkpoint_fingerprint') == journal['fingerprint'])
+            if journal['fingerprint'] != journal['initial_fingerprint'] and not loop_saved:
                 snapshot, missing = capture_workspace(client, workspace, journal['key'] + ':capture', claim['context']['zone'])
                 require(safe_fingerprint(workspace) == journal['fingerprint'], 'stale_basis', 'Files changed while capturing')
                 # Core checks every changed byte, including changes made by an external tool bridge.
@@ -161,7 +174,7 @@ def process_bot_task(client, queued, root, infer_fn, runtime_fence, recovered=No
         raise
 
 
-def recover_bot_task(client, task_id, root, runtime_fence, infer_fn, reason):
+def recover_bot_task(client, task_id, root, runtime_fence, infer_fn, reason, loop_config=None):
     view = client.call('get_bot_task', {'task_id': task_id}); task = view['task']
     directory = Path(root)/'development'/digest(task_id)/str(task['attempt'])
     marker = directory/'task.json'
@@ -171,7 +184,7 @@ def recover_bot_task(client, task_id, root, runtime_fence, infer_fn, reason):
     # A locally known running tool/model must not be launched twice. Unknown
     # remote effects still require the caller's explicit stopped assertion.
     import os
-    for receipt_path in (directory/'model'/'inference.json',):
+    for receipt_path in [directory/'model'/'inference.json', *directory.glob('actions/*/model/inference.json')]:
         if receipt_path.exists():
             receipt = json.loads(receipt_path.read_text())
             pid = receipt.get('pid')
@@ -211,4 +224,4 @@ def recover_bot_task(client, task_id, root, runtime_fence, infer_fn, reason):
         journal['phase'] = 'checkpointed'
         journal['key'] += ':recovered:' + digest(runtime_fence)[:8]
     journal['claim'] = recovered; persist(marker, journal)
-    return process_bot_task(client, recovered['task'], root, infer_fn, runtime_fence, recovered)
+    return process_bot_task(client, recovered['task'], root, infer_fn, runtime_fence, recovered, loop_config)

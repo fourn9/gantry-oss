@@ -24,6 +24,9 @@ BOT_WRITES = set('capture_artifact assign_bot_task claim_bot_task checkpoint_bot
     'hold_bot_task recover_bot_task cancel_bot_task send_bot_message resolve_bot_message '
     'start_bot_runtime heartbeat_bot_runtime stop_bot_runtime record_state_restore'.split())
 PROFILES['bot'] = BOT_READS | BOT_WRITES
+PROFILES['bot'].update({'refresh_bot_task', 'ask_bot', 'record_bot_decision', 'record_bot_action', 'record_bot_experience'})
+PROFILES['bot'].update({'propose_bot_team', 'get_bot_team_proposal', 'get_bot_records'})
+PROFILES['bot'].update({'resolve_bot_question', 'stop_bot_task'})
 # Standalone review does not expose organizational setup or Bot execution.
 PROFILES['review'] = (READ_TOOLS | REVIEW_TOOLS) - (TEAM_TOOLS | {
     'get_persistent_bot', 'list_persistent_memories', 'bot_inbox', 'get_bot_context',
