@@ -70,6 +70,9 @@ class Handler(BaseHTTPRequestHandler):
             self.server.request_count+=1
             if self.server.request_count>30:self.reply(429,{'error':'rate_limited'});return
             headers=self.headers
+            encodings=headers.get_all('Content-Encoding',[])
+            if encodings and (len(encodings)!=1 or encodings[0].strip().lower()!='identity'):
+                self.reply(400,{'error':'unsupported_encoding'});return
             if len(headers.get_all('Authorization',[]))!=1 or not secrets.compare_digest(headers.get('Authorization',''),'Bearer '+self.server.token):
                 self.reply(401,{'error':'unauthorized'});return
             if headers.get('Origin') or headers.get('Transfer-Encoding') or len(headers.get_all('Content-Length',[]))!=1:

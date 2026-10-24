@@ -9,7 +9,7 @@ Gantry has two product areas:
 - **Gantry Ledger** keeps the shared development state and the history of changes, evidence, discussions, verification and human decisions. Reviewing a submitted change is an operation in Ledger.
 - **Gantry Crew** gives customer-owned agents persistent roles, scopes and experience so they can receive work, collaborate and hand off results through Ledger.
 
-**Version: 3.1.0.** Local operation is the supported starting point. Human adoption, agent proposals and execution results remain separate. Gantry does not certify a design's physical safety or operate hardware by default.
+**Version: 3.1.1.** Local operation is the supported starting point. Human adoption, agent proposals and execution results remain separate. Gantry does not certify a design's physical safety or operate hardware by default.
 
 **Two service entry points:** `gantry-ledger` for customer-led development
 and review, and `gantry-crew` for delegated Bot development.
@@ -24,7 +24,11 @@ The local review workflow follows.
 
 ## Connect a project
 
-Python 3.11+ on macOS or Linux. No model account is needed to store and retrieve development state.
+Python 3.11+ on macOS or Linux, with current security patches. Before installing,
+follow the [runtime and installer security update guide](docs/SECURITY-UPDATES.md),
+including the hash-pinned pip bootstrap. No model account is needed to store and
+retrieve development state. Run `python -m gantry.security_check` with the same
+interpreter used by your MCP/server after installation.
 
 ```sh
 git clone https://github.com/fourn9/gantry-oss.git

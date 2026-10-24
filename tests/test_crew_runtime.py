@@ -16,7 +16,7 @@ class CrewRuntimeTests(CrewCoordinationTests):
     def test_model_revises_after_actual_tool_failure(self):
         from gantry.project_sandbox import backend, runtime_roots
         if backend() == 'unavailable': self.skipTest('OS sandbox unavailable')
-        self.enable_loop('designer', local_tools={'check': {'argv': [sys.executable, '-c',
+        self.enable_loop('designer', local_tools={'check': {'argv': [str(Path(sys.executable).resolve()), '-c',
             "from pathlib import Path; assert Path('mechanical.txt').read_text() == '2'"],
             'timeout_seconds': 10}}, tool_runtime=runtime_roots(), sandbox=backend())
         task = self.task('designer'); observed = []

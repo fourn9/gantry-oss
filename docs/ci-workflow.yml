@@ -15,10 +15,16 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '${{ matrix.python }}'
+          check-latest: true
+      - run: python -m pip install 'pip @ https://files.pythonhosted.org/packages/3f/06/3e4420302363fbb71be3c7f35ce042f54bfca330e3e66b3a2e3c4cca579f/pip-26.2.2-py3-none-any.whl#sha256=fd7f4dfa8190e014013b9f08f3e973f4e4c26ffd179a204895533a7254813a70'
+      - run: python -m pip install --upgrade --only-binary=:all: 'pip>=26.2.2' 'setuptools>=78.1.1' 'PyNaCl>=1.6.2,<2' pip-audit
       - run: python -m pip install '.[feedback]'
+      - run: python -m gantry.security_check
+      - run: python -m pip_audit --skip-editable
       - run: python -m unittest discover -s tests -p 'test_*.py' -q
       - run: python examples/development_loop.py
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
+          check-latest: true
       - run: node --test tests/test_review_web.mjs

@@ -17,4 +17,11 @@ This is an early release, not an externally audited security product. Use a trus
 
 No third-party security audit or supported public multi-tenant hosting guarantee is claimed. Maintainers handle security reports on a best-effort basis without an SLA.
 
+Runtime and installer updates are required independently of Gantry upgrades.
+See [October 2026 maintenance and update instructions](docs/SECURITY-UPDATES.md).
+`python -m gantry.security_check` is an offline, read-only baseline check, not a
+complete vulnerability scan. The HTTP API and feedback receiver accept plain
+JSON only and reject non-identity Content-Encoding; reverse proxies must not
+silently decompress untrusted uploads before forwarding them.
+
 Use the latest release. See the [publication security review](docs/SECURITY-REVIEW.md) and [2.0.3 connection review](docs/CONNECT-REVIEW.md) for validation and remaining limitations. In particular, isolate mutually untrusted projects into separate ledgers, and do not equate zone-scoped writes with universal per-session read isolation. The optional feedback receiver holds encrypted envelopes only; its offline recipient key and public-facing deployment require separate operator controls.

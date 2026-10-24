@@ -121,6 +121,9 @@ class Handler(BaseHTTPRequestHandler):
             if not self.valid_host(): raise Fault('unauthorized', 'Untrusted Host')
             if self.headers.get('Transfer-Encoding') or len(self.headers.get_all('Content-Length', [])) != 1:
                 raise Fault('invalid_input', 'Require exactly one Content-Length and no Transfer-Encoding')
+            encodings = self.headers.get_all('Content-Encoding', [])
+            if encodings and (len(encodings) != 1 or encodings[0].strip().lower() != 'identity'):
+                raise Fault('invalid_input', 'Compressed request bodies are not supported')
             now = time.monotonic(); address = self.client_address[0]
             with self.server.failure_lock:
                 attempts = self.server.failures[address]
@@ -161,8 +164,8 @@ class Handler(BaseHTTPRequestHandler):
             code = 401 if exc.code == "unauthorized" else 404 if exc.code == "not_found" else 409 if exc.code in {
                 "conflict", "stale_basis", "idempotency_mismatch", "human_approval_required", "review_pending"} else 400
             self.respond(code, {"error": exc.as_dict()})
-        except (ValueError, TypeError, KeyError) as exc:
-            self.respond(400, {"error": {"code": "invalid_input", "message": str(exc)}})
+        except (ValueError, TypeError, KeyError):
+            self.respond(400, {"error": {"code": "invalid_input", "message": "Invalid request"}})
         except Exception:
             sys.stderr.write("gantry-http: internal_error\n")
             self.respond(500, {"error": {"code": "internal_error", "message": "Request failed; inspect server log"}})
