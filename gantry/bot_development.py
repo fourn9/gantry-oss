@@ -10,6 +10,7 @@ from .development import in_scope
 from .development_contracts import CAPTURE
 from .model import require, uid, digest
 from .persistent_bots import VERSION, FLAG
+from .requirement_traceability import REFS, selected_refs, stale_refs
 
 PAGE = {'after': S, 'limit': {'type': 'integer', 'minimum': 1, 'maximum': 100}}
 TASK = {'bot_id': S, 'state_id': S, 'kind': {'enum': ['plan', 'develop', 'verify', 'integrate', 'report']},
@@ -17,6 +18,7 @@ TASK = {'bot_id': S, 'state_id': S, 'kind': {'enum': ['plan', 'develop', 'verify
 ASSIGNMENT = {'type': 'object', 'properties': TASK, 'required': list(TASK), 'additionalProperties': False}
 # Optional branch label; the task/state IDs remain authoritative identities.
 TASK['candidate_id'] = S
+TASK['requirement_refs'] = REFS
 EDIT = {'type': 'object', 'properties': {'path': S, 'content': {'type': 'string'}},
         'required': ['path', 'content'], 'additionalProperties': False}
 REPORT = {'summary': S, 'rationale': S, 'unverified': A,
@@ -34,7 +36,7 @@ register('bind_development_bot', {'session_id': S, 'bot_id': S, 'principal_id': 
     'write_scope': A, 'can_assign': FLAG, 'can_integrate': FLAG, 'enabled': FLAG},
     ['session_id', 'bot_id', 'principal_id', 'version', 'write_scope', 'can_assign', 'can_integrate', 'enabled'])
 register('assign_bot_task', {'session_id': S, 'requested_by_bot': S, 'parent_task_id': S, **TASK},
-    ['session_id', *[k for k in TASK if k != 'candidate_id']])
+    ['session_id', *[k for k in TASK if k not in {'candidate_id', 'requirement_refs'}]])
 register('get_bot_project list_bot_tasks', {'session_id': S, **PAGE}, ['session_id'])
 register('get_bot_task', {'task_id': S}, ['task_id'])
 register('claim_bot_task', {'task_id': S, 'version': I, 'runtime_fence': S}, ['task_id', 'version', 'runtime_fence'])
@@ -178,6 +180,7 @@ class BotDevelopmentMixin:
             status='pending', version=1, attempt=0, generation=d['generation'], discussion_version=0,
             dependency_hashes={path: manifest[path]['hash'] for path in a['dependencies']},
             children=[], reports=[], created_seq=s['seq'] + 1, created_at=self.clock(), author=actor['id'])
+        task['requirement_refs'] = selected_refs(s, state['context'], a.get('requirement_refs'))
         self._dev_save(s, fx, 'bot_tasks', task)
         n.append({'type': 'bot_assignment', 'target': d['id'], 'session_id': d['id'], 'task_id': task['id'], 'zones': [d['zone']]})
         return self._bd_public(task)
@@ -207,6 +210,7 @@ class BotDevelopmentMixin:
         require(all(in_scope(path, b['write_scope']) and in_scope(path, d['write_scope']) for path in task['write_scope']),
                 'scope_denied', 'Delegated scope changed')
         require(task['principal_id'] == actor['id'], 'unauthorized', 'Task belongs to another principal')
+        require(not stale_refs(s, task.get('requirement_refs', [])), 'stale_basis', 'Requirements changed; reassess and assign a new task')
         rt = self._runtime_fence(s, actor, bot['id'], task['runtime_fence'], con)
         dependencies = []
         for ident in task['after_tasks']:
@@ -283,7 +287,7 @@ class BotDevelopmentMixin:
         if not task.get('change_id'):
             change = self.cmd_begin_change(s, actor, {'state_id': task['state_id'], 'title': task['title'],
                 'purpose': task['title'], 'write_scope': task['write_scope'], 'dependencies': task['dependencies'],
-                'assignee': actor['id']}, fx, n, con)
+                'assignee': actor['id'], 'requirement_refs': task.get('requirement_refs', [])}, fx, n, con)
             task['change_id'] = change['id']
         change = self._dev_get(s, 'dev_changes', task['change_id'])
         result = self.cmd_checkpoint_change(s, actor, {'change_id': change['id'], 'version': change['version'],

@@ -6,6 +6,7 @@ contains a complete saved-file composition, not a mutable workspace pointer.
 import copy
 import difflib
 from .engineering_context import assess as engineering_assess
+from . import requirement_traceability as trace
 from .development import in_scope
 from .model import require, uid, digest, identifier, Fault
 
@@ -19,6 +20,9 @@ class ContinuityMixin:
             ('zones' not in actor or p['zone'] in actor['zones']) for p in s.get('product_projects', {}).values())
         if not delegated_baseline: self._dev_session(s, actor, state['session_id'])
         self._dev_artifact(s, state['snapshot'])
+        for ref in state['context'].get('requirement_refs', []):
+            self.zone_write(actor, s['revisions'][ref['revision_id']]['zone'])
+            self.zone_write(actor, s['entries'][ref['requirement_id']]['zone'])
         return state
 
     def _manifest(self, s, snapshot):
@@ -33,7 +37,7 @@ class ContinuityMixin:
                     summary, capture, unfinished, work_status='working', **extra):
         manifest = self._manifest(s, snapshot)
         from .engineering_context import assess
-        assess(context, manifest)  # Validate declarations; permit saving failed/unverified work.
+        trace.assess(s, context, assess(context, manifest))  # Allow failed/unverified, reject invalid links.
         state = dict(id=uid('devstate'), session_id=d['id'], snapshot=snapshot,
             parents=parents, hierarchy=copy.deepcopy(hierarchy), context=copy.deepcopy(context),
             summary=summary, capture=copy.deepcopy(capture), unfinished=unfinished,
@@ -108,9 +112,12 @@ class ContinuityMixin:
                 except UnicodeDecodeError: pass
             if 'text' not in diff: diff['preview'] = 'binary_or_size_limit; restore saved files for inspection'
             diffs.append(diff)
+        engineering = engineering_assess(state['context'], manifest)
         return {'state': state, 'manifest': manifest, 'evaluations': evaluations, 'shares': shares,
             'diffs': diffs,
-            'engineering': engineering_assess(state['context'], manifest),
+            'engineering': engineering,
+            'requirement_coverage': {**trace.assess(s, state['context'], engineering),
+                                     **trace.work_links(s, state, con)},
             'restores': restores, 'adoptions': adoptions,
             'status': {'work': state['work_status'],
                 'sharing': 'integrated' if state.get('integrated_changes') else 'shared' if shares else 'local',
@@ -137,9 +144,11 @@ class ContinuityMixin:
         require(a['write_scope'], 'invalid_input', 'Write scope required')
         manifest = self._manifest(s, state['snapshot'])
         require(set(a['dependencies']) <= set(manifest), 'invalid_input', 'Dependency not in baseline')
+        refs = trace.selected_refs(s, state['context'], a.get('requirement_refs'))
         obj = dict(a, id=uid('change'), version=1, session_id=d['id'], base_state=state['id'],
             head=state['id'], author=actor['id'], status='working', sharing='local', checkpoints=[],
             dependency_hashes={p: manifest[p]['hash'] for p in a['dependencies']})
+        obj['requirement_refs'] = refs
         return self._dev_save(s, fx, 'dev_changes', obj)
 
     def _change(self, s, actor, a):
@@ -212,8 +221,8 @@ class ContinuityMixin:
                 if path in files: merged[path] = copy.deepcopy(files[path])
                 else: merged.pop(path, None)
             for key, value in head['context'].items():
-                if value == base['context'][key]: continue
-                if key in context_owners or target['context'][key] != base['context'][key]:
+                if value == base['context'].get(key): continue
+                if key in context_owners or target['context'].get(key) != base['context'].get(key):
                     conflicts.append({'path': 'context.'+key, 'reason': 'concurrent_context', 'change': change['id']})
                 context_owners[key] = change['id']; context[key] = copy.deepcopy(value)
             selected.append((change, head)); unfinished.extend(head['unfinished'])

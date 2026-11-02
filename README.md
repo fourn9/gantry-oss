@@ -129,3 +129,10 @@ The optional [local hardware adapter](docs/HARDWARE-ADAPTER.md) reads/edits/writ
 STEP with CadQuery, runs static interference checks, and captures external strength,
 tolerance or prototype measurements against a frozen acceptance plan. Results stay
 bound to the evaluated files; missing evidence does not become a pass.
+
+### Requirement traceability
+
+Link versioned requirements to development states, changes, Crew tasks and engineering
+checks. See what remains unverified, fails, or needs review after a requirement change,
+without confusing work completion with adoption. Existing free-text notes stay unlinked.
+See [setup, API contracts and limits](docs/REQUIREMENT_TRACEABILITY.md).

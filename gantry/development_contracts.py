@@ -25,7 +25,8 @@ CONTRACT = {'title': S, 'input_snapshot': S, 'write_scope': A, 'recipe': S, 'rec
         'description': S, 'require_exit_zero': {'type': 'boolean'}, 'required_files': A,
         'verdict_file': S}, 'required': ['description', 'require_exit_zero', 'required_files'],
         'additionalProperties': False}, 'dependencies': A, 'hypothesis': S, 'rationale': S}
-register('mentor_propose', {**REF, 'milestone_id': S, 'input_state': S, 'evidence': A,
+from .requirement_traceability import REFS
+register('mentor_propose', {'requirement_refs': REFS, **REF, 'milestone_id': S, 'input_state': S, 'evidence': A,
     'alternatives': A, 'selection_reason': S, 'contract': {'type': 'object',
     'properties': CONTRACT, 'required': list(CONTRACT), 'additionalProperties': False}},
     ['session_id', 'milestone_id', 'contract'])

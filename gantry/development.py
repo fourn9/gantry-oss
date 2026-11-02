@@ -186,6 +186,8 @@ class DevelopmentMixin:
                     'invalid_input', 'Mentor must cite recorded input state or milestone evidence')
             require(not a.get('alternatives') or a.get('selection_reason'), 'invalid_input',
                     'Compared alternatives require a submitted selection reason')
+            from .requirement_traceability import selected_refs
+            c['requirement_refs'] = selected_refs(s, state['context'], a.get('requirement_refs'))
             c.update(input_state=state['id'], evidence=a['evidence'], alternatives=a.get('alternatives', []),
                      selection_reason=a.get('selection_reason', c['rationale']))
         require(c['expected_outputs'] and c['completion']['required_files'], 'invalid_input', 'At least one required output is needed')
@@ -209,7 +211,8 @@ class DevelopmentMixin:
         return self._dev_save(s, effects, 'dev_contracts', c)
 
     def _dev_reasons(self, s, actor, d, c):
-        reasons = []
+        from .requirement_traceability import stale_refs
+        reasons = ['stale_requirements'] if stale_refs(s, c.get('requirement_refs', [])) else []
         if s.get('product_sessions', {}).get(d['id'], {}).get('outcome', 'open') != 'open': reasons.append('session_not_open')
         if d['mode'] != 'execute': reasons.append('mode_disabled')
         if c['status'] != 'proposed': reasons.append('not_ready')
@@ -316,6 +319,9 @@ class DevelopmentMixin:
         if not valid: reasons.append('stale_basis')
         if e['origin'] == 'delegated':
             c = self._dev_get(s, 'dev_contracts', e['contract_id'])
+            from .requirement_traceability import stale_refs
+            if stale_refs(s, c.get('requirement_refs', [])):
+                valid = False; reasons.append('stale_requirements')
             if c.get('review_submission'):
                 try:
                     review, team = self._review_access(s, actor, c['review_submission'])

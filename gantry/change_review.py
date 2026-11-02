@@ -202,6 +202,8 @@ class ChangeReviewMixin:
         change = s['dev_changes'][r['change_id']]
         basis = [r['state_id'], r['team_version'], r['specialists'], sorted(evaluations),
                  s['dev_states'][r['state_id']]['context']]
+        refs = s['dev_states'][r['state_id']]['context'].get('requirement_refs', [])
+        if refs: basis.append([[ref, s['entries'][ref['requirement_id']]['revision_id']] for ref in refs])
         if change.get('discussion_version'): basis.append(change['discussion_version'])
         return digest(basis)
 
