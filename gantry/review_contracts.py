@@ -1,5 +1,6 @@
 """Explicit submission/review contracts, additive to development changes."""
 from .contracts import register, S, I, A
+from .requirement_traceability import REFS
 
 def obj(fields, required=None):
     return {'type': 'object', 'properties': fields,
@@ -33,6 +34,7 @@ ENGINEERING_CHECK = obj({'id': S, 'scope': {'enum': ['placement', 'motion', 'ser
     'connection', 'structural', 'electrical', 'thermal', 'other']}, 'components': A,
     'paths': A, 'required': {'type': 'boolean'}, 'method': S, 'acceptance': S,
     'rationale': S, 'evidence': A, 'finding_id': S})
+ENGINEERING_CHECK['properties']['requirement_refs'] = REFS
 ENGINEERING_PLAN = obj({'components': {'type': 'array', 'maxItems': 100, 'items': ENGINEERING_COMPONENT},
     'checks': {'type': 'array', 'maxItems': 100, 'items': ENGINEERING_CHECK}, 'limitations': A})
 # Legacy/manual reviews may omit the plan. The automated coordinator requests it.
@@ -48,7 +50,7 @@ register('respond_to_change_review', {'submission_id': S, 'candidate_state': S, 
     'responses': {'type': 'array', 'maxItems': 100, 'items': obj({'finding_id': S, 'explanation': S})}},
     ['submission_id', 'candidate_state', 'responses'])
 from .development_contracts import CONTRACT
-register('propose_review_work', {'submission_id': S, 'finding_ids': A,
+register('propose_review_work', {'submission_id': S, 'finding_ids': A, 'requirement_refs': REFS,
     'contract': obj(CONTRACT)}, ['submission_id', 'finding_ids', 'contract'])
 
 register('reflect_change_review', {'submission_id': S, 'response_id': S,

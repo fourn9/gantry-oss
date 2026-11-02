@@ -65,6 +65,9 @@ class ChangeReviewMixin:
 
     def _review_current(self, s, r, team):
         change = self._dev_get(s, 'dev_changes', r['change_id'])
+        from .requirement_traceability import stale_refs
+        require(not stale_refs(s, s['dev_states'][r['state_id']]['context'].get('requirement_refs', [])),
+                'stale_basis', 'Review requirement baseline changed; reassess and submit a new state')
         require(s['dev_sessions'][r['session_id']]['mode'] != 'record', 'mode_disabled', 'Review inference disabled in record-only mode')
         self._dev_artifact(s, s['dev_states'][r['state_id']]['snapshot'])
         require(change['head'] == r['state_id'] and team['version'] == r['team_version'],
@@ -202,6 +205,8 @@ class ChangeReviewMixin:
         change = s['dev_changes'][r['change_id']]
         basis = [r['state_id'], r['team_version'], r['specialists'], sorted(evaluations),
                  s['dev_states'][r['state_id']]['context']]
+        refs = s['dev_states'][r['state_id']]['context'].get('requirement_refs', [])
+        if refs: basis.append([[ref, s['entries'][ref['requirement_id']]['revision_id']] for ref in refs])
         if change.get('discussion_version'): basis.append(change['discussion_version'])
         return digest(basis)
 
@@ -341,7 +346,9 @@ class ChangeReviewMixin:
                 'scope_denied', 'Work must stay within the developer change scope')
         d = self._dev_session(s, actor, r['session_id'])
         m = self._milestone(s, fx, n, d, 'submission', 'Correction proposed from PR review', [r['state_id']])
-        c = self._mentor_propose(s, actor, {'session_id': d['id'], 'milestone_id': m['id'],
+        from .requirement_traceability import _subset_refs
+        refs = _subset_refs(change.get('requirement_refs', []), a.get('requirement_refs'))
+        c = self._mentor_propose(s, actor, {'requirement_refs': refs, 'session_id': d['id'], 'milestone_id': m['id'],
             'input_state': r['state_id'], 'evidence': [r['state_id']], 'contract': a['contract']}, fx, n, con, review=r)
         c['finding_ids'] = sorted(set(a['finding_ids']))
         return self._dev_save(s, fx, 'dev_contracts', c)

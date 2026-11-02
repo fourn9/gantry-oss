@@ -94,6 +94,12 @@ def validate_entry(kind, data):
     require(kind in MANAGED | RECORDED, "invalid_input", "Unknown entry type", type=kind)
     require(isinstance(data, dict), "invalid_input", "Entry data must be an object")
     canonical(data)
+    if kind == "requirement" and 'verification_checks' in data:
+        checks = data['verification_checks']
+        require(isinstance(checks, list) and len(checks) <= 200 and
+                all(isinstance(c, str) for c in checks), 'invalid_input', 'verification_checks must be check IDs')
+        for c in checks: identifier(c)
+        require(len(set(checks)) == len(checks), 'invalid_input', 'Duplicate verification check')
     if kind == "zone":
         require(data.get("participation", "participating") in {"participating", "external"},
                 "invalid_input", "Invalid zone participation")

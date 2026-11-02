@@ -125,8 +125,15 @@ class DevelopmentMixin:
         result = {'seq': s['seq'], 'session': d}
         for table in ('dev_contracts', 'dev_executions', 'dev_milestones', 'dev_steps'):
             result[table[4:]] = [copy.deepcopy(v) for v in s.get(table, {}).values() if v['session_id'] == d['id']]
+        from .requirement_traceability import stale_refs
         for c in result['contracts']:
-            c['applicable'] = c['input_snapshot'] == d['snapshot'] and c['generation'] == d['generation']
+            c['stale_requirements'] = stale_refs(s, c.get('requirement_refs', []))
+            c['applicable'] = c['input_snapshot'] == d['snapshot'] and c['generation'] == d['generation'] and not c['stale_requirements']
+        for e in result['executions']:
+            contract = s.get('dev_contracts', {}).get(e.get('contract_id'), {})
+            stale = stale_refs(s, contract.get('requirement_refs', []))
+            e['continuation_allowed'] = e['status'] == 'running' and not stale
+            e['continuation_reasons'] = ['stale_requirements'] if stale else []
         return result
 
     def cmd_mentor_context(self, s, actor, a, effects, notices, con):
@@ -186,6 +193,8 @@ class DevelopmentMixin:
                     'invalid_input', 'Mentor must cite recorded input state or milestone evidence')
             require(not a.get('alternatives') or a.get('selection_reason'), 'invalid_input',
                     'Compared alternatives require a submitted selection reason')
+            from .requirement_traceability import selected_refs
+            c['requirement_refs'] = selected_refs(s, state['context'], a.get('requirement_refs'))
             c.update(input_state=state['id'], evidence=a['evidence'], alternatives=a.get('alternatives', []),
                      selection_reason=a.get('selection_reason', c['rationale']))
         require(c['expected_outputs'] and c['completion']['required_files'], 'invalid_input', 'At least one required output is needed')
@@ -209,7 +218,8 @@ class DevelopmentMixin:
         return self._dev_save(s, effects, 'dev_contracts', c)
 
     def _dev_reasons(self, s, actor, d, c):
-        reasons = []
+        from .requirement_traceability import stale_refs
+        reasons = ['stale_requirements'] if stale_refs(s, c.get('requirement_refs', [])) else []
         if s.get('product_sessions', {}).get(d['id'], {}).get('outcome', 'open') != 'open': reasons.append('session_not_open')
         if d['mode'] != 'execute': reasons.append('mode_disabled')
         if c['status'] != 'proposed': reasons.append('not_ready')
@@ -236,6 +246,8 @@ class DevelopmentMixin:
             other = s.get('dev_contracts', {}).get(dep, {})
             if other.get('status') != 'done' or other.get('generation') != d['generation']:
                 reasons.append('dependency_pending')
+            elif stale_refs(s, other.get('requirement_refs', [])):
+                reasons.append('dependency_invalidated')
             elif other.get('submission'):
                 try: self._dev_artifact(s, other['submission']['snapshot'])
                 except Fault: reasons.append('evidence_invalid')
@@ -316,6 +328,9 @@ class DevelopmentMixin:
         if not valid: reasons.append('stale_basis')
         if e['origin'] == 'delegated':
             c = self._dev_get(s, 'dev_contracts', e['contract_id'])
+            from .requirement_traceability import stale_refs
+            if stale_refs(s, c.get('requirement_refs', [])):
+                valid = False; reasons.append('stale_requirements')
             if c.get('review_submission'):
                 try:
                     review, team = self._review_access(s, actor, c['review_submission'])
@@ -332,7 +347,8 @@ class DevelopmentMixin:
                 valid = False; reasons.append('capture_incomplete')
             for dep in c['dependencies']:
                 upstream = s.get('dev_contracts', {}).get(dep, {})
-                if upstream.get('status') != 'done' or not upstream.get('submission', {}).get('valid'):
+                if (upstream.get('status') != 'done' or not upstream.get('submission', {}).get('valid')
+                        or stale_refs(s, upstream.get('requirement_refs', []))):
                     valid = False; reasons.append('dependency_invalidated')
             complete = c['completion']
             ok = (not complete['require_exit_zero'] or a['exit_code'] == 0)
@@ -387,7 +403,7 @@ class DevelopmentMixin:
         reasons = [r for r in self._dev_reasons(s, actor, d, c) if r not in {'budget_exhausted', 'resource_unavailable', 'conflict'}]
         if reasons: return {'reused': False, 'reasons': reasons}
         # Whole input snapshot is conservative: never infer undeclared equivalence.
-        fields = ('input_snapshot', 'generation', 'recipe', 'recipe_hash', 'write_scope', 'expected_outputs', 'completion', 'dependencies')
+        fields = ('input_snapshot', 'generation', 'recipe', 'recipe_hash', 'write_scope', 'expected_outputs', 'completion', 'dependencies', 'requirement_refs', 'input_state')
         for prior in s.get('dev_contracts', {}).values():
             if prior['id'] == c['id'] or prior['session_id'] != c['session_id'] or prior['status'] != 'done': continue
             if any(prior.get(k) != c.get(k) for k in fields): continue
@@ -400,7 +416,7 @@ class DevelopmentMixin:
             except Fault: continue
             c.update(status='done', version=c['version'] + 1, submission=copy.deepcopy(submission),
                      reuse_receipt={'source_contract': prior['id'], 'source_execution': submission['execution_id'],
-                                    'actor': actor['id'], 'at': self.clock(), 'key': digest({k:c[k] for k in fields})})
+                                    'actor': actor['id'], 'at': self.clock(), 'key': digest({k:c.get(k) for k in fields})})
             self._dev_save(s, effects, 'dev_contracts', c)
             self._milestone(s, effects, notices, d, 'submission', 'Reused a matching verified result', [c['id'], submission['snapshot']])
             return {'reused': True, 'contract': c}

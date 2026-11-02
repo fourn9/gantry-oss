@@ -4,6 +4,7 @@ No model-generated pass, shell command or authority change is accepted here.
 """
 import copy
 from .model import require
+from .requirement_traceability import _subset_refs
 
 
 def bind_plan(plan, context, manifest, submission_id, state_id, findings, evidence_check):
@@ -27,6 +28,7 @@ def bind_plan(plan, context, manifest, submission_id, state_id, findings, eviden
             item['inputs'] = {path: manifest[path]['hash'] for path in item['paths']}
             item['provenance'] = 'mentor_inferred'
     for check in result['checks']:
+        check['requirement_refs'] = _subset_refs(context.get('requirement_refs', []), check.get('requirement_refs', []))
         require(check['components'] and set(check['components']) <= component_ids,
                 'invalid_input', 'Check refers to unknown components')
         require(check['finding_id'] in findings, 'invalid_input', 'Check must link to an actionable finding')

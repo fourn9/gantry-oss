@@ -190,6 +190,7 @@ def _run_locked(client, contract_id, recipes, root, interval):
         # Check server cancellation/deadline before launching anything.
         current = client.call('development_state', {'session_id': j['execution']['session_id']})
         e = next(x for x in current['executions'] if x['id'] == j['execution']['id'])
+        require(e.get('continuation_allowed', True), 'stale_basis', 'Execution requirements changed; reassess before launch')
         require(e['status'] == 'running' and e['deadline'] > time.time_ns() // 1000000,
                 'execution_expired', 'Execution cancelled or expired before launch; reconcile without running')
         j.update(phase='launched', job_id=uid('job'), missing=[], previous=fingerprint(workspace), outbox=[])
@@ -327,7 +328,7 @@ def _follow_job(client,root,j,journal,interval):
             try:
                 state=client.call('development_state',{'session_id':j['execution']['session_id']})
                 live=next(x for x in state['executions'] if x['id']==j['execution']['id'])
-                _lease(root,j,cancel=live['status']!='running')
+                _lease(root,j,cancel=live['status']!='running' or not live.get('continuation_allowed', True))
                 _drain_outbox(client,root,j,journal)
             except (OSError,Fault) as exc:
                 # Business/authentication refusals are not network outages.

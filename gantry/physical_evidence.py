@@ -28,6 +28,8 @@ def evaluate(check, report, hashes):
     expected={p:hashes[p] for p in check['inputs']}
     reasons=[]; rows=[]
     if not isinstance(report,dict): reasons.append('report_missing_or_invalid'); report={}
+    if check.get('requirement_refs') and report.get('requirement_refs') != check['requirement_refs']:
+        reasons.append('requirement_refs_mismatch')
     if report.get('status')!='completed':reasons.append('execution_not_completed')
     for key,value in [('inputs',expected),('conditions',check['conditions']),('evaluator',check['evaluator']),('environment',check['environment'])]:
         if report.get(key)!=value:reasons.append(key+'_mismatch')

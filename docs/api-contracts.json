@@ -356,6 +356,26 @@
           "minLength": 1,
           "type": "string"
         },
+        "requirement_refs": {
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "requirement_id": {
+                "type": "string"
+              },
+              "revision_id": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "requirement_id",
+              "revision_id"
+            ],
+            "type": "object"
+          },
+          "maxItems": 200,
+          "type": "array"
+        },
         "session_id": {
           "minLength": 1,
           "type": "string"
@@ -482,6 +502,26 @@
         "purpose": {
           "minLength": 1,
           "type": "string"
+        },
+        "requirement_refs": {
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "requirement_id": {
+                "type": "string"
+              },
+              "revision_id": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "requirement_id",
+              "revision_id"
+            ],
+            "type": "object"
+          },
+          "maxItems": 200,
+          "type": "array"
         },
         "state_id": {
           "minLength": 1,
@@ -939,6 +979,70 @@
           ],
           "type": "object"
         },
+        "context": {
+          "additionalProperties": false,
+          "properties": {
+            "constraints": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "decisions": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "environment": {
+              "type": "object"
+            },
+            "open_questions": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "requirement_refs": {
+              "items": {
+                "additionalProperties": false,
+                "properties": {
+                  "requirement_id": {
+                    "type": "string"
+                  },
+                  "revision_id": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "requirement_id",
+                  "revision_id"
+                ],
+                "type": "object"
+              },
+              "maxItems": 200,
+              "type": "array"
+            },
+            "requirements": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "type": "array"
+            }
+          },
+          "required": [
+            "requirements",
+            "constraints",
+            "decisions",
+            "open_questions",
+            "environment"
+          ],
+          "type": "object"
+        },
         "fence": {
           "minLength": 1,
           "type": "string"
@@ -1040,6 +1144,26 @@
                 "minLength": 1,
                 "type": "string"
               },
+              "type": "array"
+            },
+            "requirement_refs": {
+              "items": {
+                "additionalProperties": false,
+                "properties": {
+                  "requirement_id": {
+                    "type": "string"
+                  },
+                  "revision_id": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "requirement_id",
+                  "revision_id"
+                ],
+                "type": "object"
+              },
+              "maxItems": 200,
               "type": "array"
             },
             "requirements": {
@@ -1438,6 +1562,26 @@
                       },
                       "required": {
                         "type": "boolean"
+                      },
+                      "requirement_refs": {
+                        "items": {
+                          "additionalProperties": false,
+                          "properties": {
+                            "requirement_id": {
+                              "type": "string"
+                            },
+                            "revision_id": {
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "requirement_id",
+                            "revision_id"
+                          ],
+                          "type": "object"
+                        },
+                        "maxItems": 200,
+                        "type": "array"
                       },
                       "scope": {
                         "enum": [
@@ -3712,6 +3856,26 @@
                       "report"
                     ]
                   },
+                  "requirement_refs": {
+                    "items": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "requirement_id": {
+                          "type": "string"
+                        },
+                        "revision_id": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "requirement_id",
+                        "revision_id"
+                      ],
+                      "type": "object"
+                    },
+                    "maxItems": 200,
+                    "type": "array"
+                  },
                   "state_id": {
                     "minLength": 1,
                     "type": "string"
@@ -4532,6 +4696,26 @@
               },
               "type": "array"
             },
+            "requirement_refs": {
+              "items": {
+                "additionalProperties": false,
+                "properties": {
+                  "requirement_id": {
+                    "type": "string"
+                  },
+                  "revision_id": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "requirement_id",
+                  "revision_id"
+                ],
+                "type": "object"
+              },
+              "maxItems": 200,
+              "type": "array"
+            },
             "requirements": {
               "items": {
                 "minLength": 1,
@@ -5160,6 +5344,26 @@
         "milestone_id": {
           "minLength": 1,
           "type": "string"
+        },
+        "requirement_refs": {
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "requirement_id": {
+                "type": "string"
+              },
+              "revision_id": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "requirement_id",
+              "revision_id"
+            ],
+            "type": "object"
+          },
+          "maxItems": 200,
+          "type": "array"
         },
         "selection_reason": {
           "minLength": 1,
@@ -5995,6 +6199,26 @@
         },
         "intent": {
           "type": "object"
+        },
+        "requirement_refs": {
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "requirement_id": {
+                "type": "string"
+              },
+              "revision_id": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "requirement_id",
+              "revision_id"
+            ],
+            "type": "object"
+          },
+          "maxItems": 200,
+          "type": "array"
         },
         "submission_id": {
           "minLength": 1,
