@@ -155,10 +155,11 @@ retry; it is not a distributed lock. Keep exclusive editor access. Allegro uses
 gantry-native script-collect --root C:/work/disposable --package C:/captures/pcb-001 --output C:/captures/pcb-result-001
 ```
 
-Collection verifies the plan/script/digest, captures the on-disk file, and reports
-`applied_in_memory` or `unknown`. **It never reports a verified saved update.**
-Native save is an operator step. On-disk bytes may still be the original file;
-`saved: false` remains until an additional qualified save/reopen adapter exists.
+With the default v1 plan, collection verifies the plan/script/digest, captures the
+on-disk file, and reports `applied_in_memory` or `unknown`. It does not report a
+saved update. Native save is an operator step and on-disk bytes may still be the
+original file. Altium can opt into the separate v2 persistence path below; Allegro
+retains the v1 `saved: false` contract.
 The native-host receipt is an explicit report, not cryptographic proof against
 tampering by the OS user. Absolute local paths appear in the generated script;
 review before sharing the bundle. There is no arbitrary caller-provided script execution.

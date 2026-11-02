@@ -28,7 +28,7 @@ runtime dependencies. Existing captures and native v1 plans remain readable.
   download with before/after revision checks, size checks and original bytes.
   Downloads never forward API credentials to a content host. Short-lived signed
   URLs never enter captures/errors; unexpected hosts/redirects fail closed.
-- [ ] Existing publish/restore and reviewed writes continue working. CLI and
+- [x] Existing publish/restore and reviewed writes continue working. CLI and
   capability catalog describe exact scopes. Regression, packaging and security
   checks recorded separately from unavailable authenticated/vendor tests.
 
@@ -73,3 +73,13 @@ two-source publication, requirement links, binary restore and replay pass; this
 is real local Core execution with synthetic cloud API responses. The seven file
 tests cover version/checksum/size/identity mismatch, permissions, signed URL
 exclusion, cross-host/private-DNS rejection, redirect rejection and response bounds.
+
+Final verification: Python discovery ran 780 tests in 92.530 seconds: 779 passed,
+one optional CAD interpreter test skipped. That exact test passed separately with
+the installed CadQuery interpreter configured (4.258 seconds). Nine JS tests pass.
+A wheel built from committed source installs without dependencies in a fresh venv;
+the new command help/imports and both capability catalogs run there. A public,
+unauthenticated GitHub read also passed (no remote write or customer account).
+Diff whitespace checks and targeted credential/private-project pattern scans pass.
+These results do not qualify licensed vendor hosts or authenticated SaaS writes.
+See [verification and remaining prerequisites](../docs/EXTERNAL-INTEGRATION-VERIFICATION.md).
