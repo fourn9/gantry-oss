@@ -23,6 +23,7 @@ def environment_manifest(config):
     fields = ('backend', 'command', 'executable_hash', 'cad_python', 'verification', 'environment_definition')
     if 'workflow' in config: fields += ('workflow',)
     if config.get('experience_learning'): fields += ('experience_learning',)
+    if config.get('personal_continuity'): fields += ('personal_continuity',)
     if config.get('agent_loop'): fields += ('agent_loop', 'local_tools', 'tool_runtime', 'sandbox')
     return {'name': config['name'], 'backend': config['backend'], 'tools': config.get('tools', []),
             'definition': digest({k: config.get(k) for k in fields})}
@@ -72,6 +73,9 @@ class BotWorker:
         require(isinstance(config.get('experience_learning', False), bool), 'invalid_input', 'experience_learning must be boolean')
         require(not config.get('experience_learning') or config.get('workflow') == 'bot_development',
                 'invalid_input', 'Experience learning belongs to independent Bot development')
+        require(isinstance(config.get('personal_continuity', False), bool), 'invalid_input', 'personal_continuity must be boolean')
+        require(not config.get('personal_continuity') or config.get('workflow') == 'bot_development',
+                'invalid_input', 'Personal continuity belongs to independent Bot development')
         self.client, self.config = client, config
         self.bot_id = config['bot_id']
         self.root = Path(journal) / digest(self.bot_id)
@@ -115,6 +119,15 @@ class BotWorker:
         require(self.runtime and not self.lost.is_set(), 'runtime_offline', 'Reconnect the stopped runtime first')
         self.client.call('heartbeat_bot_runtime', {'bot_id': self.bot_id, 'fence': self.runtime['fence']})
         results = []; after = None
+        if self.config.get('personal_continuity'):
+            cursor = None; wakes = []
+            while True:
+                page = self.client.call('poll_bot_continuations', {'bot_id': self.bot_id,
+                    'runtime_fence': self.runtime['fence'], **({'after': cursor} if cursor else {})})
+                wakes.extend(page['items']); cursor = page['next_cursor']
+                if not cursor: break
+            persist(self.root/'continuations.json', {'items': wakes})
+            results.extend(item for item in wakes if item['status'] == 'blocked')
         if self.config.get('experience_learning'):
             from .bot_learning_runtime import drain_reflections
             results.extend(drain_reflections(self.client, self.bot_id, self.infer, self.root/'learning'))
@@ -146,6 +159,13 @@ class BotWorker:
             if not after: break
         persist(self.root/'last-tick.json', {'bot_id': self.bot_id, 'results': results})
         return results
+
+    def recover_reflection(self, reflection_id, reason, retry_inference=False):
+        require(self.runtime and not self.lost.is_set(), 'runtime_offline', 'Runtime is offline')
+        require(self.config.get('experience_learning'), 'mode_disabled', 'Enable experience learning first')
+        from .bot_reflection_recovery import recover_reflection
+        return recover_reflection(self.client, self.bot_id, reflection_id, self.infer,
+                                  self.root/'learning', reason, retry_inference)
 
     def recover(self, job_id, reason, retry_inference=False, collect_interrupted_verification=False):
         require(self.runtime and not self.lost.is_set(), 'runtime_offline', 'Runtime is offline')

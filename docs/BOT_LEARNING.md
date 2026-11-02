@@ -6,6 +6,9 @@ new task contexts. It does not train model weights, silently rewrite an owner
 profile, choose a new inference vendor, certify a design, or demonstrate parity
 with a commercial personal assistant.
 
+See [persistent work and selective continuation](BOT_CONTINUITY.md) for ongoing
+commitments, experience/action links, procedural corrections and safe reflection recovery.
+
 ## Execution path
 
 ```mermaid
@@ -81,7 +84,9 @@ A lesson remains `hypothesis` / `inconclusive`. A self-rating cannot promote it 
 a validated physical result, approve a design, change requirements or expand
 permissions. `needs_independent_check` is available to subsequent Bot planning;
 it does not silently dispatch a manager or claim that another reviewer has run.
-Citations must identify this attempt's actual task/state/action/decision records.
+Citations identify this attempt's plan/task/state/action/decision/experience-use
+records or linked tool-output artifacts; planning intent is explicitly distinct
+from an observation.
 Core verifies provenance, not that a natural-language claim follows from evidence.
 
 ## Enable and use
@@ -156,9 +161,10 @@ then fixed a missing context-hash transfer into lessons and added a regression
 test. In the final runtime-helper smoke, planning succeeded but reflection's
 subscription provider returned HTTP 429 (retry limit exceeded). The pending
 reflection and its export/journal were preserved; no paid fallback or blind
-inference rerun was made. Thus **the final revision has deterministic end-to-end
-coverage, but its complete real-model runtime retest remains unfinished**. The
-earlier successful smoke does not establish that this final path completed.
+inference rerun was made. That revision retained deterministic coverage but had
+not completed its real-model
+runtime retest at that time. The subsequent continuity extension and its runtime
+results are recorded separately in [continuity validation](BOT_CONTINUITY_VALIDATION.md).
 
 Next evaluations should use the same model/settings on fresh contexts with and
 without experience, changed/contradictory situations, unseen engineering tasks,

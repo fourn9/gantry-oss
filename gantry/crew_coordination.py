@@ -8,7 +8,7 @@ from .model import require, uid
 REF = {'task_id': S, 'fence': S}
 register('refresh_bot_task', REF, list(REF))
 register('stop_bot_task', {**REF, 'target_task_id': S, 'version': I, 'reason': S}, [*REF, 'target_task_id', 'version', 'reason'])
-register('get_bot_records', {'task_id': S, 'kind': {'enum': ['actions', 'decisions']}, **PAGE}, ['task_id', 'kind'])
+register('get_bot_records', {'task_id': S, 'kind': {'enum': ['actions', 'decisions', 'learning_uses']}, **PAGE}, ['task_id', 'kind'])
 register('resolve_bot_question', {**REF, 'message_id': S, 'reason': S, 'evidence': A},
          [*REF, 'message_id', 'reason', 'evidence'])
 register('ask_bot', {**REF, 'to_bot_id': S, 'question': S, 'evidence': A},
@@ -44,11 +44,24 @@ class CrewCoordinationMixin:
     def cmd_get_bot_records(self, s, actor, a, fx, n, con):
         task = self._dev_get(s, 'bot_tasks', a['task_id'])
         self._bd_project(s, actor, task['session_id'], active=False)
+        if a['kind'] == 'learning_uses':
+            require(self._working_context(s, actor, task) is not None, 'unauthorized', 'Experience links are private to their Bot and owner')
         table = 'bot_' + a['kind']; limit = a.get('limit', 20)
         rows = con.execute('SELECT id FROM records WHERE collection=? AND subject_id=? AND id>? ORDER BY id LIMIT ?',
                            (table, task['id'], a.get('after', ''), limit + 1)).fetchall()
-        return {'items': [self._dev_get(s, table, row[0]) for row in rows[:limit]],
+        values = [self._dev_get(s, table, row[0]) for row in rows[:limit]]
+        if table == 'bot_actions': values = [self._crew_action_view(s, actor, task, v) for v in values]
+        return {'items': values,
                 'next_cursor': rows[limit-1][0] if len(rows) > limit else None}
+
+    def _crew_action_view(self, s, actor, task, record):
+        project = s['bot_projects'][task['session_id']]
+        own = actor['id'] == task['principal_id'] and self._binding_access(s, actor,
+            self._bd_binding(s, task['session_id'], task['bot_id']))
+        if not (own or self._bd_owner(actor, project)) and record['kind'] in {
+                'working_state', 'experience_use', 'remember', 'context', 'records', 'inspect'}:
+            return {**record, 'details': {'private': True, 'reason': 'Bot working context or memory'}}
+        return record
 
     def _crew_records(self, s, con, table, tid):
         rows = con.execute('SELECT id FROM records WHERE collection=? AND subject_id=? ORDER BY created_seq DESC,id DESC LIMIT 20', (table, tid))
@@ -60,7 +73,7 @@ class CrewCoordinationMixin:
         request = self._dev_get(s, 'bot_task_messages', task['reply_request_id']) if task.get('reply_request_id') else None
         return {'consultations': consultations, 'response_request': copy.deepcopy(request),
                 'decisions': self._crew_records(s, con, 'bot_decisions', task['id']),
-                'actions': self._crew_records(s, con, 'bot_actions', task['id']),
+                'actions': [self._crew_action_view(s, actor, task, v) for v in self._crew_records(s, con, 'bot_actions', task['id'])],
                 'action_history': {'total': con.execute('SELECT count(*) FROM records WHERE collection=? AND subject_id=?',
                     ('bot_actions', task['id'])).fetchone()[0], 'retrieval': 'get_bot_records', 'kind': 'actions', 'recent_limit': 20},
                 'decision_history': {'retrieval': 'get_bot_records', 'kind': 'decisions', 'recent_limit': 20}}
@@ -92,6 +105,7 @@ class CrewCoordinationMixin:
             principal_id=actor['id'], body=a['question'], kind='question', blocking=True,
             evidence=a['evidence'], status='open', response_task_id=response['id'], created_seq=s['seq'] + 1)
         self._dev_save(s, fx, 'bot_task_messages', msg)
+        self._inherit_continuation(task, response)
         response['reply_request_id'] = msg['id']; self._dev_save(s, fx, 'bot_tasks', response)
         task.setdefault('consultations', []).append(msg['id'])
         task['discussion_version'] += 1

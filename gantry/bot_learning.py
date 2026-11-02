@@ -30,6 +30,7 @@ class BotLearningMixin:
             state_id=task.get('output_state', task['state_id']),
             environment_hash=s['bot_runtimes'][task['bot_id']]['environment_hash'],
             requirement_refs=copy.deepcopy(task.get('requirement_refs', [])),
+            working_state=copy.deepcopy(self._working_note(s, task['session_id'], task['bot_id'])),
             query={'after': a.get('after', ''), 'limit': limit},
             recall=recall(self, s, actor, task, con, a.get('after', ''), limit), created_seq=s['seq']+1)
         return self._dev_save(s, fx, 'bot_learning_plans', packet)
@@ -42,6 +43,8 @@ class BotLearningMixin:
         require(packet['status'] == 'pending', 'stale_basis', 'Plan is already immutable')
         require(packet['stamp'] == task['stamp'] and packet['state_id'] == task.get('output_state', task['state_id']),
                 'stale_basis', 'Planning inputs changed')
+        require(packet.get('working_state') == self._working_note(s, task['session_id'], task['bot_id']),
+                'stale_basis', 'Working commitments changed; prepare a new plan')
         current = recall(self, s, actor, task, con, **packet['query'])
         require(current == packet['recall'], 'stale_basis', 'Experience or source access changed; prepare a new plan')
         available = {m['id']: m for m in current['items']}
@@ -119,13 +122,18 @@ class BotLearningMixin:
         record, task, plan = self._learning_reflection_access(s, actor, a['reflection_id'])
         return {**copy.deepcopy(record), 'plan': copy.deepcopy(plan),
             'task': {'id': task['id'], 'title': task['title'], 'completion': task['completion']},
+            'evidence_rules': {'planning_intent_id': plan['id'], 'executor_report_task_id': task['id'],
+                'saved_state_id': record['report_record']['state_id'],
+                'observations': 'Same-attempt action, decision and experience-use IDs before this report; output_artifact IDs linked by those tool receipts',
+                'limits': 'Plans are intent; states are saved bytes; reports and use links are executor claims. None establishes physical correctness.'},
             'observations': self._learning_observations(s, record, con),
-            'observations_coverage': 'At most 20 receipts from this attempt before its report; get_bot_records pages the full history'}
+            'experience_actions': self._learning_observations(s, record, con, 'bot_learning_uses'),
+            'observations_coverage': 'At most 20 action and 20 experience-use receipts from this attempt before its report; get_bot_records pages full history'}
 
-    def _learning_observations(self, s, record, con):
+    def _learning_observations(self, s, record, con, table='bot_actions'):
         rows = con.execute('SELECT id FROM records WHERE collection=? AND subject_id=? AND created_seq<=? '
-            'ORDER BY created_seq DESC,id DESC LIMIT 20', ('bot_actions', record['task_id'], record['created_seq']))
-        values = [self._dev_get(s, 'bot_actions', r[0]) for r in rows]
+            'ORDER BY created_seq DESC,id DESC LIMIT 20', (table, record['task_id'], record['created_seq']))
+        values = [self._dev_get(s, table, r[0]) for r in rows]
         return [v for v in values if v['attempt'] == record['report_record']['attempt']]
 
     def cmd_complete_bot_reflection(self, s, actor, a, fx, n, con):
@@ -139,7 +147,7 @@ class BotLearningMixin:
         lesson_keys = [digest(v) for v in a['output']['lessons']]
         require(len(lesson_keys) == len(set(lesson_keys)), 'invalid_input', 'Do not duplicate a lesson in one reflection')
         for lesson in a['output']['lessons']:
-            self._learning_evidence(s, task, record, lesson['evidence'])
+            self._learning_evidence(s, task, record, lesson['evidence'], con)
             for relation in ('supersedes', 'contradicts'):
                 for mid in lesson[relation]:
                     require(mid in allowed, 'invalid_input', 'Link only a recalled source')
@@ -160,7 +168,7 @@ class BotLearningMixin:
         for feedback in a['output']['feedback']:
             mid = feedback['memory_id']
             require(mid in used and mid not in seen, 'invalid_input', 'Feedback requires unique non-rejected plan memory')
-            self._learning_evidence(s, task, record, feedback['evidence']); seen.add(mid)
+            self._learning_evidence(s, task, record, feedback['evidence'], con); seen.add(mid)
             self._dev_save(s, fx, 'bot_experience_feedback', dict(copy.deepcopy(feedback),
                 id=digest([record['id'], mid]), subject_id=mid, reflection_id=record['id'],
                 session_id=record['session_id'], bot_id=record['bot_id'], principal_id=actor['id'],
@@ -169,11 +177,22 @@ class BotLearningMixin:
             memory_ids=memory_ids, completed_seq=s['seq']+1)
         return self._dev_save(s, fx, 'bot_reflections', record)
 
-    def _learning_evidence(self, s, task, record, refs):
+    def _learning_evidence(self, s, task, record, refs, con):
         # Citations must be this attempt's saved objects, not unrelated successful work.
         for ref in refs:
-            if ref in {task['id'], record['report_record']['state_id']}:
+            if ref in {task['id'], record['report_record']['state_id'], record['plan_id']}:
                 continue
-            action = s.get('bot_actions', {}).get(ref) or s.get('bot_decisions', {}).get(ref)
+            if ref.startswith('rev_'):
+                # Only a tool receipt from this attempt can establish this link.
+                linked = con.execute("SELECT id FROM records WHERE collection='bot_actions' AND subject_id=? AND created_seq<=? "
+                    "AND COALESCE(json_extract(body,'$.value.attempt'),json_extract(body,'$.attempt'))=? "
+                    "AND COALESCE(json_extract(body,'$.value.kind'),json_extract(body,'$.kind'))='tool' "
+                    "AND COALESCE(json_extract(body,'$.value.details.result.output_artifact'),"
+                    "json_extract(body,'$.details.result.output_artifact'))=? LIMIT 1",
+                    (task['id'], record['created_seq'], record['report_record']['attempt'], ref)).fetchone()
+                require(linked, 'invalid_input', 'Tool output must belong to this attempt')
+                self._dev_artifact(s, ref)
+                continue
+            action = s.get('bot_actions', {}).get(ref) or s.get('bot_decisions', {}).get(ref) or s.get('bot_learning_uses', {}).get(ref)
             require(action and action['task_id'] == task['id'] and action.get('attempt') == record['report_record']['attempt']
                 and action['created_seq'] <= record['created_seq'], 'invalid_input', 'Cite actual observations from this attempt')

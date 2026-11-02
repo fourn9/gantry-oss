@@ -17,6 +17,8 @@ LESSON = obj({'kind': {'enum': ['procedure', 'failure', 'preference', 'coordinat
     'observation': TEXT, 'strategy': TEXT, 'when_to_use': TEXT, 'when_not_to_use': STRINGS,
     'paths': STRINGS, 'tags': STRINGS, 'evidence': {**STRINGS, 'minItems': 1},
     'supersedes': STRINGS, 'contradicts': STRINGS})
+# Optional for compatibility with existing stored reflections and customer bridges.
+LESSON['properties']['procedure_steps'] = {**STRINGS, 'type':['array','null']}
 REFLECTION = obj({'lessons': items(LESSON, 10), 'feedback': items(obj({'memory_id': S,
     'outcome': {'enum': ['helpful', 'harmful', 'unknown']}, 'reason': TEXT, 'evidence': {**STRINGS, 'minItems': 1}})),
     'unknowns': STRINGS})

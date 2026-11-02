@@ -1591,6 +1591,18 @@
                     "maxItems": 40,
                     "type": "array"
                   },
+                  "procedure_steps": {
+                    "items": {
+                      "maxLength": 4000,
+                      "minLength": 1,
+                      "type": "string"
+                    },
+                    "maxItems": 40,
+                    "type": [
+                      "array",
+                      "null"
+                    ]
+                  },
                   "strategy": {
                     "maxLength": 4000,
                     "minLength": 1,
@@ -2408,6 +2420,73 @@
         "parent_bot_id",
         "profile",
         "enabled"
+      ],
+      "type": "object"
+    }
+  },
+  "configure_bot_continuation": {
+    "description": "configure bot continuation",
+    "schema": {
+      "additionalProperties": false,
+      "properties": {
+        "basis": {
+          "type": "object"
+        },
+        "bot_id": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "completion": {
+          "items": {
+            "maxLength": 4000,
+            "minLength": 1,
+            "type": "string"
+          },
+          "maxItems": 40,
+          "minItems": 1,
+          "type": "array"
+        },
+        "dependencies": {
+          "items": {
+            "maxLength": 4000,
+            "minLength": 1,
+            "type": "string"
+          },
+          "maxItems": 40,
+          "type": "array"
+        },
+        "enabled": {
+          "type": "boolean"
+        },
+        "intent": {
+          "type": "object"
+        },
+        "session_id": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "version": {
+          "minimum": 0,
+          "type": "integer"
+        },
+        "write_scope": {
+          "items": {
+            "maxLength": 4000,
+            "minLength": 1,
+            "type": "string"
+          },
+          "maxItems": 40,
+          "type": "array"
+        }
+      },
+      "required": [
+        "session_id",
+        "bot_id",
+        "version",
+        "enabled",
+        "write_scope",
+        "dependencies",
+        "completion"
       ],
       "type": "object"
     }
@@ -4445,7 +4524,8 @@
         "kind": {
           "enum": [
             "actions",
-            "decisions"
+            "decisions",
+            "learning_uses"
           ]
         },
         "limit": {
@@ -4527,6 +4607,33 @@
       },
       "required": [
         "proposal_id"
+      ],
+      "type": "object"
+    }
+  },
+  "get_bot_working_state": {
+    "description": "get bot working state",
+    "schema": {
+      "additionalProperties": false,
+      "properties": {
+        "basis": {
+          "type": "object"
+        },
+        "bot_id": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "intent": {
+          "type": "object"
+        },
+        "session_id": {
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "required": [
+        "session_id",
+        "bot_id"
       ],
       "type": "object"
     }
@@ -5919,6 +6026,42 @@
       "type": "object"
     }
   },
+  "poll_bot_continuations": {
+    "description": "poll bot continuations",
+    "schema": {
+      "additionalProperties": false,
+      "properties": {
+        "after": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "basis": {
+          "type": "object"
+        },
+        "bot_id": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "intent": {
+          "type": "object"
+        },
+        "limit": {
+          "maximum": 100,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "runtime_fence": {
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "required": [
+        "bot_id",
+        "runtime_fence"
+      ],
+      "type": "object"
+    }
+  },
   "prepare_bot_learning": {
     "description": "prepare bot learning",
     "schema": {
@@ -7031,6 +7174,61 @@
         "limitations",
         "evidence",
         "used_memories"
+      ],
+      "type": "object"
+    }
+  },
+  "record_bot_learning_use": {
+    "description": "record bot learning use",
+    "schema": {
+      "additionalProperties": false,
+      "properties": {
+        "action_ids": {
+          "items": {
+            "maxLength": 4000,
+            "minLength": 1,
+            "type": "string"
+          },
+          "maxItems": 40,
+          "minItems": 1,
+          "type": "array"
+        },
+        "basis": {
+          "type": "object"
+        },
+        "change": {
+          "maxLength": 4000,
+          "minLength": 1,
+          "type": "string"
+        },
+        "condition_check": {
+          "maxLength": 4000,
+          "minLength": 1,
+          "type": "string"
+        },
+        "fence": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "intent": {
+          "type": "object"
+        },
+        "memory_id": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "task_id": {
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "required": [
+        "task_id",
+        "fence",
+        "memory_id",
+        "action_ids",
+        "change",
+        "condition_check"
       ],
       "type": "object"
     }
@@ -9268,6 +9466,102 @@
       },
       "required": [
         "subscription_id"
+      ],
+      "type": "object"
+    }
+  },
+  "update_bot_working_state": {
+    "description": "update bot working state",
+    "schema": {
+      "additionalProperties": false,
+      "properties": {
+        "basis": {
+          "type": "object"
+        },
+        "commitments": {
+          "items": {
+            "maxLength": 4000,
+            "minLength": 1,
+            "type": "string"
+          },
+          "maxItems": 40,
+          "type": "array"
+        },
+        "due_at": {
+          "minimum": 1,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "fence": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "focus": {
+          "maxLength": 4000,
+          "minLength": 1,
+          "type": "string"
+        },
+        "intent": {
+          "type": "object"
+        },
+        "next_steps": {
+          "items": {
+            "maxLength": 4000,
+            "minLength": 1,
+            "type": "string"
+          },
+          "maxItems": 40,
+          "type": "array"
+        },
+        "task_id": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "unknowns": {
+          "items": {
+            "maxLength": 4000,
+            "minLength": 1,
+            "type": "string"
+          },
+          "maxItems": 40,
+          "type": "array"
+        },
+        "version": {
+          "minimum": 0,
+          "type": "integer"
+        },
+        "watch_paths": {
+          "items": {
+            "maxLength": 4000,
+            "minLength": 1,
+            "type": "string"
+          },
+          "maxItems": 40,
+          "type": "array"
+        },
+        "watch_tasks": {
+          "items": {
+            "maxLength": 4000,
+            "minLength": 1,
+            "type": "string"
+          },
+          "maxItems": 40,
+          "type": "array"
+        }
+      },
+      "required": [
+        "task_id",
+        "fence",
+        "version",
+        "focus",
+        "next_steps",
+        "commitments",
+        "unknowns",
+        "watch_paths",
+        "watch_tasks",
+        "due_at"
       ],
       "type": "object"
     }

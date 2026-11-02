@@ -140,3 +140,6 @@ Link versioned requirements to development states, changes, Crew tasks and engin
 checks. See what remains unverified, fails, or needs review after a requirement change,
 without confusing work completion with adoption. Existing free-text notes stay unlinked.
 See [setup, API contracts and limits](docs/REQUIREMENT_TRACEABILITY.md).
+
+Persistent Bot work, conditional experience and selective continuation: see
+[the continuity guide](docs/BOT_CONTINUITY.md).

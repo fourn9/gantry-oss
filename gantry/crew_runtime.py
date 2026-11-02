@@ -19,21 +19,24 @@ from .runner import persist
 from . import project_sandbox
 
 SCHEMA = {'type': 'object', 'properties': {
-    'action': {'enum': ['read', 'edit', 'context', 'records', 'inspect', 'tool', 'publish_physical', 'ask', 'resolve', 'decision', 'remember', 'team', 'stop', 'finish']},
+    'action': {'enum': ['read', 'edit', 'context', 'records', 'inspect', 'tool', 'publish_physical', 'ask', 'resolve', 'decision', 'remember', 'working_state', 'experience_use', 'team', 'stop', 'finish']},
     'arguments_json': S, 'rationale': S}, 'required': ['action', 'arguments_json', 'rationale'], 'additionalProperties': False}
-API_ACTIONS = {'ask': 'ask_bot', 'decision': 'record_bot_decision', 'remember': 'record_bot_experience'}
+API_ACTIONS = {'ask': 'ask_bot', 'decision': 'record_bot_decision', 'remember': 'record_bot_experience',
+               'working_state': 'update_bot_working_state', 'experience_use': 'record_bot_learning_use'}
 GUIDE = {
     'read': 'path; optional offset and length (bytes). Returns exact hash and bounded text/base64.',
     'edit': 'path, content, expected_hash (sha256 from read, or absent). Within task scope only.',
     'context': 'pointer (JSON pointer into full authorized context), optional offset, limit for arrays/maps.',
     'inspect': 'task_id. Read another task in this project, including its exact candidate and reports; use pointer/offset/limit to fetch a specific part.',
-    'records': 'kind (actions/decisions), optional after/limit. Retrieves exact saved task history; paginated.',
+    'records': 'kind (actions/decisions/learning_uses), optional after/limit. Retrieves exact saved task history; paginated.',
     'publish_physical': 'plan_path: a frozen physical plan already saved in the current state. Imports reports from this workspace through the fenced Bot adapter; never adopts.',
     'tool': 'name from available_tools. No arbitrary argv. Results are observations, not adoption.',
     'ask': 'to_bot_id, question, evidence (state/task/message IDs). Creates a read-only response task. Then finish waiting.',
     'resolve': 'message_id, reason, evidence. Only the question author resolves its blocker after reading the answer.',
     'decision': 'verdict (authorize/revise/select/continue/stop/escalate), targets (task IDs), rationale, evidence, alternatives, conditions. Records your judgment, never grants access.',
     'remember': 'observation, applicability, limitations, evidence, used_memories. Save scoped provisional experience.',
+    'working_state': 'version (current working_state.note.version or 0), focus, next_steps, commitments, unknowns, watch_paths, watch_tasks, due_at (UTC epoch milliseconds or null). Update ongoing commitments at meaningful boundaries. These are hypotheses, not requirements or permission. Watches alone do not authorize new tasks; owner standing delegation is separate.',
+    'experience_use': 'memory_id, action_ids, change, condition_check. Link a non-rejected memory in this attempt learning plan to actual saved action IDs from actions/records. Explain what changed and how applicability was checked. Never invent actions or claim causality from success alone.',
     'team': 'configuration for propose_bot_team: session_id,organization_id,lead_bot_id,goal,acceptance,members,rationale. Members specify bot_id,name,parent_bot_id,principal_id,profile,write_scope,can_assign,can_integrate. Proposes only; human activates. Existing principal privileges cannot be expanded.',
     'stop': 'task_id, reason. Cancels a task you manage; it does not cancel its children automatically.',
     'finish': 'summary, rationale, unverified, status (completed/waiting/blocked/failed), assignments, integrate_changes, edits. Use edits=[]; edit action saves intermediate work. Assignments: bot_id,state_id,kind (plan/develop/verify/integrate/report),title,completion,write_scope,dependencies,after_tasks, optional candidate_id and requirement_refs (explicit requirement/revision pairs; [] means exploration). Omitted child references inherit the parent task. Managers choose assignments; candidate tags isolate alternatives. Do not finish completed with unresolved blocking questions.'}

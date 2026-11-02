@@ -1,0 +1,194 @@
+# Persistent work and experience for customer Bots
+
+A Bot can retain unfinished commitments across tasks, use conditional experience
+while working, revise its procedures after outcomes, and reassess its responsibility
+when an explicitly watched input changes. These are extensions of the existing
+customer-owned persistent Bot and learning paths, not a second agent identity.
+
+The customer model chooses the work, consultation, delegation and lessons. Crew
+names the service; it is not a planning dispatcher. Core verifies authority,
+versions and provenance. Mentor remains a separate optional review service.
+
+## One continuous path
+
+```mermaid
+flowchart LR
+    Changes[Watched shared input or task report / due time] --> Worker[Customer worker]
+    Worker --> Scope[Check standing delegation and deduplicate]
+    Scope --> Bot[Same Bot: ongoing work + canonical state + experience]
+    Bot --> Act[Plan / consult / delegate / use tools]
+    Act --> Records[Action receipts + checkpoint + report]
+    Records --> Reflect[Same Bot: reflect and correct conditional procedure]
+    Reflect --> Bot
+    Act --> Note[Update commitments and next steps]
+    Note --> Changes
+```
+
+A wake creates an ordinary reassessment task against the current active shared
+state. It supplies the owner's completion conditions and delegated scope; the
+model decides what follows. It is not a claim that the resulting work is useful,
+complete, physically valid or formally adopted. The owner's existing project
+acceptance and the task's requirement revisions still apply.
+
+## Persistent records
+
+| Record | Purpose | Update rule |
+| --- | --- | --- |
+| Existing Bot/profile/organization | Identity, role, style, hierarchy and authority | Existing owner-controlled versioned configuration |
+| `bot_working_states` | One working note per Bot/project: focus, next steps, commitments, unknowns, watched paths/tasks, optional due time | Bot writes under an active fenced task and expected note version; event history retained |
+| Existing learning plan | Recalled experience and ordered plan | Freeze working-note input as well as state/authority/source versions; reject a stale submission |
+| `bot_learning_uses` | Which planned memory influenced which recorded action, with explanation and applicability check | Append-only reference to actual same-attempt receipts; reported influence, not causal proof |
+| Existing memories/reflections | Conditional strategies, optional ordered `procedure_steps`, correction links and usefulness feedback | New lessons retain old ones via `supersedes`/`contradicts`; no learned permissions |
+| `bot_continuations` | Owner's standing delegation for a Bot/project and last consumed change signal | Explicit human configuration, optimistic version, current binding/project/organization checks |
+
+Working notes are hypotheses, not a copy of the design requirements. The returned
+context also identifies the canonical project and active state. Completing a task
+adds its report reference but does not silently close commitments. The note's
+source state remains separate from the last report state. Notes survive a fresh
+task context and runtime restart. They do not automatically carry unfinished
+commitments into an unrelated project; shared organizational experience follows
+the existing explicit sharing policy.
+
+Only the bound Bot and project owner can read its private working note. Standard
+working-state, memory and private-context action bodies are redacted in peer
+receipt views. Peers still see project work, reports and intentionally shared
+lessons. A Bot can intentionally put information in a shared report; this is not
+an information-flow sandbox against an authorized malicious executor. Ledger
+administrators and local journal owners retain their existing administrative access.
+
+## Selective continuation
+
+A working note can watch:
+
+- Paths in the saved task state. Change detection compares the **active shared
+  state** to the shared state observed when the note was written. A local candidate
+  differing from that baseline does not itself create a false new-input event.
+- Other task IDs in the same project, for a changed report or terminal status.
+- One optional deadline, `due_at`, in UTC epoch milliseconds. `null` removes it.
+
+These are precise triggers chosen by the Bot. They are not full semantic monitoring
+of every event. Recurring schedules require a Bot to explicitly set the next due
+point. Arbitrary external signals, hidden tool state and unwatched requirement
+changes do not independently wake it. Existing requirement-change gates still
+hold stale execution; changes can be reported through ordinary scoped tasks.
+
+The owner must separately configure `configure_bot_continuation` with the Bot ID,
+project/session ID, enabled flag, expected version, allowed write scope, dependency
+paths and completion conditions. A working note cannot grant this authority.
+Disabled or changed bindings/project/delegation invalidate it. Disabling or changing
+a standing delegation also invalidates pending and running descendant assignments
+and consultation tasks. Each descendant still needs its own existing permissions.
+
+The worker coalesces changes while that Bot/project has pending, running, waiting
+or held work. It does not consume a new signal during that interval. The next poll
+can reassess it after work finishes. Identical consumed signals produce no new
+task or inference call. Held work is not replaced because its effects may be
+unknown. Reassessment tasks do not silently supersede a failed task or adopt a design.
+
+The backend polls indexed records; it does not keep a model thinking continuously.
+No claim of optimal organization or guaranteed termination of Bot-authored future
+schedules is made. Operators can disable standing delegation or stop the worker.
+
+## Enable in a customer's environment
+
+Keep the existing private Bot worker configuration and inference bridge. Add:
+
+```json
+{
+  "workflow": "bot_development",
+  "agent_loop": true,
+  "experience_learning": true,
+  "personal_continuity": true
+}
+```
+
+This fragment is not a complete worker config. Keep the existing Bot ID, backend,
+credential file, tool definitions and sandbox configuration. Use
+`codex_subscription` for the existing ChatGPT login, or the customer's configured
+bridge. No API-key fallback, paid model or publisher telemetry is added.
+
+1. Explicitly provision the new operations from the `bot` capability profile.
+   Old credentials keep their current command allowlists.
+2. Run `gantry-crew bot-worker --config CONFIG --journal JOURNAL --manifest`.
+   The flags change the environment digest. Approve the new manifest using the
+   existing owner-side `configure_bot_runtime` operation.
+3. Configure standing delegation via authenticated owner CLI/API. The Bot cannot
+   configure or enlarge it. Example payload (replace the IDs and paths):
+
+   ```json
+   {
+     "session_id": "YOUR_PROJECT_SESSION_ID",
+     "bot_id": "YOUR_EXISTING_BOT_ID",
+     "version": 0,
+     "enabled": true,
+     "write_scope": ["mechanical/"],
+     "dependencies": ["mechanical/assembly.json"],
+     "completion": ["Reassess the changed assembly and report evidence and unresolved interfaces"]
+   }
+   ```
+
+4. Let the Bot update its working note through a fenced task, then start the normal
+   worker or an explicitly installed user service. No worker is installed or started
+   by upgrading source. Polling without a relevant change uses no model inference.
+5. Inspect `get_bot_task`, `get_bot_working_state`, learning/reflection records and
+   private worker journals. `continuations.json` contains the latest wake checks.
+
+All operations are available through the common CLI, API and MCP contracts.
+`update_bot_working_state` requires the entire note content and its current version
+(0 before the first note). Task reports also increment that version, so read it
+again before updating. In the iterative worker, `working_state` and
+`experience_use` are normal recorded actions. `records` with kind `learning_uses`
+provides paginated experience/action links to the Bot and owner. Single-response
+bridges can call these APIs explicitly; they do not capture nonexistent intermediate
+actions automatically.
+
+## Reflection, failures and recovery
+
+Reflections receive the report, planning intent, at most 20 action receipts and
+20 experience-use receipts, with access to paginated history. Explicit evidence
+rules distinguish intent, saved files, executor reports and tool observations.
+A procedure can include ordered steps and applicability limits. Self-assessment
+and claimed usefulness remain unverified statements; a plan or remembered success
+cannot certify a physical outcome.
+
+A failed model call, invalid structured reflection or unknown provider outcome
+leaves the reflection pending in Core and held in the private journal. It does
+not block unrelated work or retry the same model call on every poll. Inspect the
+journal, stop/reconcile previous processes, then use:
+
+```sh
+gantry-crew bot-worker --config CONFIG --journal JOURNAL \
+  --recover-reflection REFLECTION_ID --confirm-stopped "Previous process is stopped"
+```
+
+A complete saved receipt is reused. If no complete receipt exists, or a rejected
+answer needs a new inference, explicitly add `--retry-inference`. Earlier attempts
+are archived under `recoveries/`; they are not deleted. A reflection already
+committed in Core is returned without another inference. Normal task recovery uses
+its existing separate `--recover-job` path. Lost transport acknowledgements still
+reconcile idempotent requests rather than masquerading as failed inference.
+
+Keep the original private journals to preserve local effect and inference receipts.
+Moving between machines requires transferring them securely along with the normal
+runtime setup. Core retains pending reflections, but journal-only failure details
+and uncertain provider receipts are not a distributed provider-job protocol.
+
+## Migration, cost and limits
+
+Three additive indexed collections use existing event append/replay/export. Existing
+ledgers need no event rewriting, artifact migration or destructive reset. Old
+working-less Bot tasks and optional procedure fields remain compatible. All old
+runtime flags default off; no existing organization is enabled behind its owner.
+
+Normally learning adds planning and reflection calls to development calls. These
+consume the customer's subscription/API allowance. Fine-grained action calls can
+be substantial; this change does not claim a free or faster reasoning loop. Saved
+inputs/receipts make that overhead visible. Oversized contexts still produce an
+explicit limit error rather than silent truncation of authority.
+
+This is experience-driven behavior and persistent work context, not model-weight
+training or proven continuously improving intelligence. Retrieval can miss relevant
+experience; the same model may repeat or rationalize mistakes. Next evaluate held-out
+work with and without experience, repeated failure, changed conditions, independent
+correctness, end-to-end time and token cost. See [validation](BOT_CONTINUITY_VALIDATION.md)
+and [the existing learning design](BOT_LEARNING.md).
