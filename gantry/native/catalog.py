@@ -14,5 +14,7 @@ PRODUCTS = {
 def catalog():
     return [{'id':ident,'name':name,'route':route,'scope':scope,
              'native_runtime_verified':False,'physical_validation':False,
+             'persistence_route':('opt_in_save_reload_capture' if ident=='altium' else
+                'native_update_readback' if route=='direct' else 'not_implemented'),
              'status':'blocked_sdk' if route=='sdk_required' else 'experimental_contract_tested'}
             for ident,(name,route,scope) in PRODUCTS.items()]

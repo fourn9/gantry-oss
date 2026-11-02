@@ -24,7 +24,7 @@ runtime dependencies. Existing captures and native v1 plans remain readable.
   or threads retain each raw response and source relationship. Cursor loops,
   malformed payloads and acquisition bounds cannot masquerade as completeness.
   Partial acquisition persists completed pages and a resumable pending queue.
-- [ ] Cloud file bodies: Google Drive blob download and SharePoint selected file
+- [x] Cloud file bodies: Google Drive blob download and SharePoint selected file
   download with before/after revision checks, size checks and original bytes.
   Downloads never forward API credentials to a content host. Short-lived signed
   URLs never enter captures/errors; unexpected hosts/redirects fail closed.
@@ -65,3 +65,11 @@ Altium execution. No installed vendor host is available.
 Slice 2: external integration suite 43 tests passed. Eight collection tests cover
 resume, raw page preservation, nested blocks, thread pagination, rate limits,
 cursor cycles, depth/request bounds and tampered resume scope. No account calls.
+
+Slice 3: external suite 51 tests passed. The new Core roundtrip exposed an existing
+bug: a second publication referenced an already assembled file as an ordinary
+part. The integration publisher now reuses its leaf references. CLI capture,
+two-source publication, requirement links, binary restore and replay pass; this
+is real local Core execution with synthetic cloud API responses. The seven file
+tests cover version/checksum/size/identity mismatch, permissions, signed URL
+exclusion, cross-host/private-DNS rejection, redirect rejection and response bounds.

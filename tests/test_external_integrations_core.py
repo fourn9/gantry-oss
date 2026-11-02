@@ -99,3 +99,44 @@ class PublicationTests(unittest.TestCase):
         self.assertIn('imports/'+source+'/payload/after/native/bracket.SLDPRT',view['manifest'])
         self.assertEqual(view['state']['context']['environment']['external_sources'][source]['requirement_refs'],[ref])
         self.assertTrue(self.call('replay')['matched'])
+
+    def test_cloud_bytes_and_nested_notes_survive_cli_capture_core_and_restore(self):
+        from unittest.mock import patch
+        from contextlib import redirect_stdout
+        import io
+        from gantry.integrations.__main__ import main
+        from gantry.integrations.transport import Response
+        from gantry.continuity_adapter import restore_development_state
+        state,_,_,ref=self.prepare()
+        cfg=self.root/'file-config.json';cfg.write_text(json.dumps({'provider':'google-drive','file':'part'}))
+        refs=self.root/'requirement-links.json';refs.write_text(json.dumps([ref]))
+        meta={'id':'part','size':'6','version':'1','mimeType':'application/octet-stream',
+              'capabilities':{'canDownload':True}}
+        def transport(req,token):return Response(b'CAD\x00\x01\x02' if 'alt=media' in req.url else json.dumps(meta).encode(),{})
+        from gantry.integrations.files import capture_file
+        capture=self.root/'cloud-capture'
+        with patch('gantry.integrations.files.capture_file',side_effect=lambda *a,**kw:capture_file(*a,**kw,transport=transport)), redirect_stdout(io.StringIO()):
+            self.assertEqual(main(['pull-file','--config',str(cfg),'--source-id','cloud-part',
+                '--requirements',str(refs),'--output',str(capture)]),0)
+        change=self.begin(state,['imports/cloud-part/'])
+        cp=publish(self.client,state['id'],change['id'],change['version'],capture,'cloud-body')
+        destination=self.root/'restored-cloud'
+        restored=restore_development_state(self.client,cp['state']['id'],destination,'restore-cloud')
+        destination=Path(restored['workspace'])
+        self.assertEqual((destination/'imports/cloud-part/payload/content.bin').read_bytes(),b'CAD\x00\x01\x02')
+        view=self.call('get_development_state',{'state_id':cp['state']['id']})
+        self.assertEqual(view['requirement_coverage']['items'][0]['status'],'unverified')
+        self.assertEqual(view['status']['adoption'],'unadopted')
+        # A partial note capture remains partial after the same publication route.
+        from gantry.integrations.collections import capture_collection
+        def page(req,token):return Response(b'{"results":[],"has_more":true,"next_cursor":"next"}',{})
+        notes=capture_collection({'provider':'notion','block':'root'},'notes',[ref],max_requests=1,transport=page)
+        write_bundle(self.root/'notes',notes)
+        change=self.begin(cp['state'],['imports/notes/'])
+        next_cp=publish(self.client,cp['state']['id'],change['id'],change['version'],self.root/'notes','notes-body')
+        restored=restore_development_state(self.client,next_cp['state']['id'],self.root/'restored-notes','restore-notes')
+        workspace=Path(restored['workspace'])
+        index=json.loads((workspace/'imports/notes/payload/collection.json').read_text())
+        self.assertEqual(index['status'],'partial');self.assertEqual(len(index['pending']),1)
+        self.assertEqual((workspace/'imports/cloud-part/payload/content.bin').read_bytes(),b'CAD\x00\x01\x02')
+        self.assertTrue(self.call('replay')['matched'])

@@ -29,6 +29,7 @@ def catalog():
             if ident=='cursor': routes.append('existing_project_mcp')
             if ident=='python': routes.append('existing_scoped_runner')
             if ident in {'notion','slack'}: routes.append('bounded_related_capture')
+            if ident in {'google-drive','sharepoint'}: routes.append('revision_checked_file_download')
             rows.append({'id':ident,'name':name,'reference_status':group,'routes':routes,
                 'native_write':ident in OPERATIONS,'native_write_operations':sorted(OPERATIONS.get(ident,[])),
                 'write_concurrency':{op:('provider_condition' if (ident,op) in ATOMIC else 'preflight_only')

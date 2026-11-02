@@ -33,7 +33,9 @@ def publish(client,state_id,change_id,version,bundle_path,key):
         'missing_dependencies':manifest['missing']}
     raw=client.call('capture_artifact',request,key+':raw:'+digest(request))
     # Same-source files absent from the new capture are removed, other project files survive.
-    assembled={name:[{'revision_id':state['snapshot'],'path':name}] for name in before['manifest'] if not name.startswith(prefix)}
+    assembled={name:([{'revision_id':part['revision_id'],'path':part['path']} for part in info['chunks']]
+                    if 'chunks' in info else [{'revision_id':state['snapshot'],'path':name}])
+               for name,info in before['manifest'].items() if not name.startswith(prefix)}
     assembled.update({name:[{'revision_id':raw['revision_id'],'path':name}] for name in files})
     combined=client.call('capture_artifact',{'files':{},'assembled_files':assembled,'zone':session['zone'],
         'capture_scope':'development_state_with_external_capture','missing_dependencies':manifest['missing']},key+':merge:'+digest(assembled))

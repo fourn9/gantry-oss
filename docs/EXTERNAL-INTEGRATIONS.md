@@ -21,10 +21,10 @@ always-on sync, webhook listener or provider OAuth onboarding application.
 | Jira Cloud | Issue fields/status | No full history or complete comments |
 | Linear | Issue, team, workflow status and cycle via fixed GraphQL query | No creation; selected updates use the separate write path |
 | Notion | Direct child blocks; optional bounded descendant/pagination capture and resume | No attached binaries or page-wide atomic revision |
-| Google Drive | Native Google document export to text/CSV/PDF/DOCX/XLSX | Export bytes are not the native editable cloud document; no ordinary binary download |
+| Google Drive | Google document export; blob file download with before/after version checks | Export is not the native editable cloud document; no dependent-file discovery |
 | Google Sheets | Explicit A1 range values | No formulas/formats or atomic revision |
 | Excel | Graph workbook range or local XLSX selected cells | No recalculation; cached formula values are marked unverified |
-| SharePoint | Graph drive item metadata and eTag | Document bytes must be supplied separately; download URLs are not followed |
+| SharePoint | Graph item metadata; selected file download from explicitly allowed tenant host | Global SharePoint Online only; no dependent-file discovery or document editing beyond named write operations |
 | Onshape | Part Studio mass properties at an immutable microversion | No full document/assembly editing or material validation; named parameter updates use the write path |
 | Slack | Explicit history window or thread; optional pagination and thread capture/resume | No live bot mentions, slash commands, new message posting or attachment download |
 | Cursor | Existing `gantry connect --client cursor` / project MCP | Depends on customer's agent and client trust setup; no hosted Cursor launch |
@@ -127,6 +127,46 @@ unchanged. The normal `publish` command stores the bundle in a scoped checkpoint
 Sources: [Notion children](https://developers.notion.com/reference/get-block-children),
 [Slack replies](https://docs.slack.dev/reference/methods/conversations.replies/).
 
+### Cloud file content
+
+`pull-file` adds file content to the existing metadata/export routes. These config
+objects are alternatives, each in its own file:
+
+```json
+{"provider":"google-drive","file":"your-blob-file-id","credential_ref":"GANTRY_CONNECTOR_DRIVE"}
+{"provider":"sharepoint","drive":"your-drive-id","item":"your-item-id","download_host":"your-tenant.sharepoint.com","credential_ref":"GANTRY_CONNECTOR_GRAPH"}
+```
+
+```sh
+gantry-integrations pull-file --config file.json --source-id bracket-source --requirements requirements.json --output ./captures/file-001
+```
+
+The original bytes are in `content.bin`; the provider's original filename/type is
+in selected metadata. Gantry preserves bytes, not the ability to edit an unknown
+proprietary format. Google Drive blob files use `files.get?alt=media`; native Docs/
+Sheets still use the export path. Download permission, declared size, before/after
+version and available MD5 are checked. SharePoint uses a Graph-selected file and
+compares eTag/metadata before and after. A changed source rejects the capture.
+This brackets a read; it is not a multi-request atomic transaction.
+
+SharePoint's short-lived content URL is used only in memory. The operator must
+configure the exact `tenant.sharepoint.com` download host. The content request has
+no Graph bearer token, cookies or Referer; redirects are refused. All resolved
+addresses must be public, the selected address is pinned for the connection, and
+TLS verifies the configured hostname. Signed URLs are excluded from saved metadata
+and errors. Other CDNs, personal OneDrive, government clouds and arbitrary hosts
+are intentionally unsupported. DNS resolution uses the operating system timeout;
+the 30-second read deadline is checked after resolution and between bounded reads.
+
+Maximum content is 8 MiB in this route. Larger files use local export capture or
+the existing chunked artifact path. Downloaded files are not opened/executed. Check
+for embedded sensitive data before sharing; pattern detection is not full DLP.
+The normal publication path supports successive source captures and preserves
+earlier source files, including snapshots assembled from stored chunks.
+
+Sources: [Drive downloads](https://developers.google.com/workspace/drive/api/guides/manage-downloads),
+[Graph content download](https://learn.microsoft.com/en-us/graph/api/driveitem-get-content?view=graph-rest-1.0).
+
 ### Provider configuration examples
 
 All accept an optional `credential_ref` named `GANTRY_CONNECTOR_*`. Except public
@@ -218,7 +258,7 @@ spreadsheet or Onshape is evidence, not automatically a passing physical check.
 
 ## Security and operational limits
 
-- HTTPS to fixed public SaaS hosts; no arbitrary URL, redirects, inherited proxy,
+- HTTPS to fixed public SaaS hosts (plus explicitly allowed SharePoint content host); no arbitrary URL, redirects, inherited proxy,
   automatic command execution, or implicit writes. Native updates require the explicit
   planned-write path. Existing GitHub/cloud features
   outside this CLI are unchanged.

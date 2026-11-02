@@ -21,13 +21,15 @@ def main(argv=None):
     related=sub.add_parser('pull-related',help='Capture bounded Notion descendants or Slack pages/threads; resumable')
     related.add_argument('--config',required=True);related.add_argument('--resume')
     related.add_argument('--max-requests',type=int,default=20);related.add_argument('--max-depth',type=int,default=6)
+    binary=sub.add_parser('pull-file',help='Capture selected Drive/SharePoint file bytes and bracket revision checks')
+    binary.add_argument('--config',required=True)
     local=sub.add_parser('capture',help='Preserve explicitly selected saved files')
     local.add_argument('--provider',required=True); local.add_argument('--root',required=True)
     local.add_argument('--path',action='append',required=True); local.add_argument('--cells',help='JSON worksheet -> cell addresses')
-    for cmd in (pull,local,related):
+    for cmd in (pull,local,related,binary):
         cmd.add_argument('--source-id',required=True); cmd.add_argument('--output',required=True)
         cmd.add_argument('--requirements',help='JSON array of requirement_id/revision_id references')
-        if cmd is not related:
+        if cmd in (pull,local):
             cmd.add_argument('--select',help='JSON filename -> JSON pointers; original bytes remain saved')
     inspect=sub.add_parser('inspect'); inspect.add_argument('--bundle',required=True)
     prepare=sub.add_parser('prepare-write',help='Read a target and save a reviewable native update plan')
@@ -75,7 +77,10 @@ def main(argv=None):
                            args.version,args.bundle,args.key)
         else:
             refs=load(args.requirements,[]); selectors=load(getattr(args,'select',None),{})
-            if args.action=='pull-related':
+            if args.action=='pull-file':
+                from .files import capture_file
+                bundle=capture_file(load(args.config),args.source_id,refs)
+            elif args.action=='pull-related':
                 from .collections import capture_collection
                 bundle=capture_collection(load(args.config),args.source_id,refs,max_requests=args.max_requests,
                     max_depth=args.max_depth,resume=args.resume)
