@@ -1,0 +1,20 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {readFile} from 'node:fs/promises';
+const {mountMesh}=await import('data:text/javascript;base64,'+Buffer.from(await readFile(new URL('../gantry/web/studio_mesh.js',import.meta.url),'utf8')).toString('base64'));
+function canvas(){
+ globalThis.ResizeObserver=class{observe(){} disconnect(){}};
+ globalThis.requestAnimationFrame=()=>1;globalThis.cancelAnimationFrame=()=>{};
+ return {getContext:()=>({}),getBoundingClientRect:()=>({width:600,height:400}),setPointerCapture(){}};
+}
+const meshes=[{path:'part.stl',triangles:[[[0,0,0],[1,0,0],[0,1,0]]]}];
+test('camera survives remount when conversation changes the layout',()=>{
+ const first=mountMesh(canvas(),meshes,()=>{});first.view('top');first.zoom(1.5);
+ const saved=first.camera();first.destroy();const second=mountMesh(canvas(),meshes,()=>{},saved);
+ assert.deepEqual(second.camera(),saved);assert.equal(second.camera().zoom,1.5);assert.equal(second.camera().pitch,Math.PI/2);second.destroy();
+});
+test('ordinary scrolling does not zoom or trap the page; Alt scroll does',()=>{
+ const c=canvas(),m=mountMesh(c,meshes,()=>{});let prevented=0;
+ c.onwheel({deltaY:200,preventDefault:()=>prevented++});assert.equal(prevented,0);assert.equal(m.camera().zoom,1);
+ c.onwheel({altKey:true,deltaY:200,preventDefault:()=>prevented++});assert.equal(prevented,1);assert.ok(m.camera().zoom<1);m.destroy();
+});

@@ -5,22 +5,24 @@ import {parseMesh,mountMesh} from './studio_mesh.js';
 
 export function createStudio({api,modal,toast,fail}){
   let overview,detail,project,node,viewEpoch=0,artifactEpoch=0,mesh,tab='cad',compare=false,compareState='',file='',selectedPart='',conversation=null,lastWork='',draft='',mentions=[],threadDetail;
-  let downloadState=null,recent=[],cache=new Map(),drafts=new Map();
+  let downloadState=null,recent=[],cache=new Map(),drafts=new Map(),cameras=new Map(),meshKey='';
   const route=()=>location.hash.slice(1).split('/').map(x=>decodeURIComponent(x));
   const handles=()=>['studio','studio-work','studio-inbox','studio-recent'].includes(route()[0]||'studio');
   const a=view.action;
-  function reset(){viewEpoch++;artifactEpoch++;mesh?.destroy();cache.clear();drafts.clear();overview=detail=undefined;recent=[];lastWork='';conversation=null;threadDetail=null;draft='';mentions=[];}
+  function reset(){viewEpoch++;artifactEpoch++;disposeMesh();cache.clear();drafts.clear();cameras.clear();overview=detail=undefined;recent=[];lastWork='';conversation=null;threadDetail=null;draft='';mentions=[];}
+  function disposeMesh(){if(mesh){if(mesh.camera)cameras.set(meshKey,mesh.camera());mesh.destroy();mesh=null;while(cameras.size>50)cameras.delete(cameras.keys().next().value);}}
+  function chooseFile(path){file=path;selectedPart=path;selectConversation(null);threadDetail=null;drawWork();}
   function remember(){if(conversation)drafts.set(JSON.stringify([detail.work.id,conversation]),{draft,mentions:[...mentions]});}
   function selectConversation(value){remember();conversation=value;const saved=drafts.get(JSON.stringify([detail.work.id,value]));draft=saved?.draft||'';mentions=saved?.mentions||[];}
   function sidebar(){const side=view.sidebar(overview,recent,{project:project?.id});$('#nav').innerHTML=side.nav;$('#sidebar-projects').innerHTML=side.projects;$('#recent-sessions').innerHTML=side.recent;}
   async function render(){
-    remember();const current=++viewEpoch,parts=route(),kind=parts[0]||'studio';artifactEpoch++;mesh?.destroy();
+    remember();const current=++viewEpoch,parts=route(),kind=parts[0]||'studio';artifactEpoch++;disposeMesh();
     document.body.classList.add('studio-mode');$('#main').className='studio-main';
     $('#main').innerHTML=view.hint('Loading workspace…');
     const loaded=await api('studio_overview');if(current!==viewEpoch||!handles())return;overview=loaded;
     if(kind==='studio-work'){
       const value=await api('studio_work',{work_id:parts[1],...(parts[2]?{state_id:parts[2]}:{})});if(current!==viewEpoch||!handles())return;
-      if(lastWork!==value.work.id){conversation=null;threadDetail=null;draft='';mentions=[];tab='cad';compare=false;file='';lastWork=value.work.id;}
+      if(lastWork!==value.work.id){conversation=null;threadDetail=null;draft='';mentions=[];tab='cad';compare=false;file='';selectedPart='';lastWork=value.work.id;}
       detail=value;project=overview.projects.find(p=>p.id===detail.work.project_id);node=null;
       recent=[detail.work,...recent.filter(w=>w.id!==detail.work.id)].slice(0,30);
       if(parts[3]){const thread=value.threads.find(t=>t.id===parts[3]);threadDetail=null;if(thread){tab=thread.anchor.kind==='code'?'code':'cad';file=thread.anchor.path||'';selectedPart=thread.anchor.part||'';selectConversation({anchor:thread.anchor,state_id:thread.state_id,thread_id:thread.id});}}
@@ -42,6 +44,7 @@ export function createStudio({api,modal,toast,fail}){
       (overview.next?a('more-work','Load more work',overview.next,'class="studio-more"'):'');
   }
   function drawWork(){
+    disposeMesh();
     const versions=detail.versions,index=versions.findIndex(v=>v.id===detail.selected.state.id);
     if(!versions.some(v=>v.id===compareState&&v.id!==detail.selected.state.id))compareState=versions[Math.max(0,index-1)]?.id;
     if(index===0)compare=false;
@@ -60,7 +63,7 @@ export function createStudio({api,modal,toast,fail}){
   }
   const options=(paths,selected)=>paths.map(p=>`<option value="${e(p)}" ${p===selected?'selected':''}>${e(p)}</option>`).join('');
   async function loadArtifact(){
-    const current=++artifactEpoch;mesh?.destroy();downloadState=null;const target=$('#studio-artifact'),v=detail.selected;
+    const current=++artifactEpoch;disposeMesh();downloadState=null;const target=$('#studio-artifact'),v=detail.selected;
     if(tab==='checks'){target.innerHTML=view.checks(detail);return;}
     const old=compare?await api('get_development_state',{state_id:compareState}):null;if(current!==artifactEpoch)return;
     const match=tab==='cad'?cadFile:codeFile;const paths=[...new Set([...Object.keys(v.manifest),...(old?Object.keys(old.manifest):[])])].filter(match).sort();
@@ -76,9 +79,9 @@ export function createStudio({api,modal,toast,fail}){
       for(const p of previewPaths){const t=parseMesh(await bytes(v,p),p);triangles+=t.length;if(triangles>80000)throw new Error('Assembly preview is too large. Export a lighter mesh.');meshes.push({path:p,triangles:t});}
       if(old?.manifest[file])meshes.push({path:file,previous:true,triangles:parseMesh(await bytes(old,file),file)});
       if(current!==artifactEpoch)return;
-      body.innerHTML=`<div class="studio-mesh-tools"><label>Part <select id="studio-part">${options(previewPaths,selectedPart||file)}</select></label><div>${a('orientation','Isometric','iso')}${a('orientation','Top','top')}${a('orientation','Front','front')}</div></div><div class="studio-cad"><canvas id="studio-canvas" aria-label="Saved 3D mesh preview" tabindex="0"></canvas></div><div class="studio-caption"><span>${compare?'Current assembly · Amber: previous selected file':'Saved mesh preview · Coordinates and units as exported'}</span>${a('part-conversation',icon('sessions')+'Discuss this part')}</div>${!v.manifest[file]?'<p class="studio-small">This file was deleted in the selected version. Amber geometry is from the previous version.</p>':''}`;
-      selectedPart=previewPaths.includes(selectedPart)?selectedPart:previewPaths.includes(file)?file:previewPaths[0];
-      mesh=mountMesh($('#studio-canvas'),meshes,path=>{selectedPart=path;$('#studio-part').value=path;mesh.select(path);});mesh.select(selectedPart);return;
+      body.innerHTML=`<div class="studio-mesh-tools"><span class="studio-small">Selected part: ${e(file)}</span><div>${a('orientation','Isometric','iso')}${a('orientation','Top','top')}${a('orientation','Front','front')}${a('zoom','−','0.8','aria-label="Zoom out"')}${a('zoom','+','1.25','aria-label="Zoom in"')}</div></div><div class="studio-cad"><canvas id="studio-canvas" aria-label="Saved 3D mesh preview" tabindex="0"></canvas></div><div class="studio-caption"><span>${compare?'Current assembly · Amber: previous '+file:'Saved mesh preview · Coordinates and units as exported'}</span>${a('part-conversation',icon('sessions')+'Discuss this part')}</div>${!v.manifest[file]?'<p class="studio-small">This file was deleted in the selected version. Amber geometry is from the previous version.</p>':''}`;
+      selectedPart=previewPaths.includes(file)?file:'';
+      meshKey=detail.work.id+':'+v.state.id;mesh=mountMesh($('#studio-canvas'),meshes,chooseFile,cameras.get(meshKey));mesh.select(selectedPart);return;
     }
     const read=async(st,p)=>st?.manifest[p]?new TextDecoder('utf-8',{fatal:true}).decode(await bytes(st,p,262144)):'';
     const text=await read(v,file),before=await read(old,file);if(current!==artifactEpoch)return;
@@ -118,6 +121,7 @@ export function createStudio({api,modal,toast,fail}){
     tab:async value=>{remember();selectConversation(null);threadDetail=null;tab=value;file='';drawWork();},
     compare:()=>{compare=!compare;drawWork();},
     orientation:value=>mesh?.view(value),
+    zoom:value=>mesh?.zoom(Number(value)),
     conversation:()=>openConversation({kind:'work'}),
     'part-conversation':()=>{if(!selectedPart||!detail.selected.manifest[selectedPart])throw new Error('Select a current saved mesh part.');return openConversation({kind:'cad',path:selectedPart,part:selectedPart,hash:detail.selected.manifest[selectedPart].hash});},
     line:async(value,el)=>{const epoch=viewEpoch,artifact=artifactEpoch,path=file,stateId=el.dataset.side==='before'?compareState:detail.selected.state.id;const state=stateId===detail.selected.state.id?detail.selected:await api('get_development_state',{state_id:stateId});if(epoch!==viewEpoch||artifact!==artifactEpoch)return;return openConversation({kind:'code',path,hash:state.manifest[path].hash,line:Number(value)},stateId);},
@@ -138,8 +142,7 @@ export function createStudio({api,modal,toast,fail}){
   document.addEventListener('change',event=>{const el=event.target;const run=async()=>{
     if(el.id==='studio-version'){selectConversation(null);threadDetail=null;file='';location.hash=view.workURL(detail.work.id,el.value);}
     if(el.id==='studio-compare-version'){compareState=el.value;drawWork();}
-    if(el.id==='studio-file'){file=el.value;selectedPart=file;selectConversation(null);threadDetail=null;drawWork();}
-    if(el.id==='studio-part'){selectedPart=el.value;mesh?.select(selectedPart);}
+    if(el.id==='studio-file')chooseFile(el.value);
     if(el.id==='studio-mention'&&el.value){if(!mentions.includes(el.value))mentions.push(el.value);draft+=(draft&&!draft.endsWith(' ')?' ':'')+'@'+el.value+' ';remember();drawConversation();$('#studio-draft').focus();}
   };run().catch(fail);});
   document.addEventListener('submit',async event=>{if(event.target.id!=='studio-comment-form')return;event.preventDefault();const submit=event.submitter;submit.disabled=true;
@@ -156,5 +159,5 @@ export function createStudio({api,modal,toast,fail}){
       conversation.thread_id=result.thread_id;remember();drawConversation();toast('Comment saved');
     }catch(err){if(sameTarget()&&$('#studio-comment-error'))$('#studio-comment-error').textContent=err.message;else fail(err);}finally{submit.disabled=false;}
   });
-  return {handles,render,reset,leave:()=>{remember();viewEpoch++;artifactEpoch++;mesh?.destroy();document.body.classList.remove('studio-mode');$('#main').className='';}};
+  return {handles,render,reset,leave:()=>{remember();viewEpoch++;artifactEpoch++;disposeMesh();document.body.classList.remove('studio-mode');$('#main').className='';}};
 }
