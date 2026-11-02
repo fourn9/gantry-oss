@@ -23,9 +23,9 @@ Verified 2026-11-02, CPython 3.12.15 / macOS arm64 / CadQuery 2.8.0.
 
 No mock geometry was used in the CAD tests/demo. Strength observation unit tests
 use synthetic numeric fixtures; no FEA, physical prototype test or live vendor CAD
-account was executed. The demo invokes the real Service in-process; production
-publishing uses existing HTTP Client calls. No production LLM was invoked; Mentor
-review responses in the additional integration test are explicit fixtures.
+account was executed. The standalone demo invokes the real Service in-process;
+the additional live verification below exercises HTTP and actual model inference.
+Mentor responses in the automated regression tests remain explicit fixtures.
 
 Security review: no model-generated Python/shell execution, unchanged Core permissions,
 plan/source hash checks, preserved raw reports, new CAD output paths, bounded JSON,
@@ -38,3 +38,38 @@ The changes are additive and require no ledger migration. Existing engineering
 context/checkpoint APIs remain authoritative; restoring previous states preserves
 old results. Revert the adapter modules/optional dependency/UI-neutral state-view
 field to roll back code; never delete stored project evidence as part of rollback.
+
+## Additional live HTTP and subscription review verification
+
+Verified against commit ba199d120a0d11ff31f5426f21f37c56fc700421 on 2026-11-02,
+using an isolated synthetic assembly and a real loopback HTTP server:
+
+1. Imported, translated and exported STEP geometry with CadQuery. Static clearance
+   changed from fail to pass; the missing required strength result stayed unknown.
+2. Captured artifacts, published checkpoints and submitted a change review through
+   the authenticated HTTP Client. Worker artifact retrieval also used HTTP.
+3. The existing Mentor worker invoked official Codex with ChatGPT subscription
+   login for both the mechanical specialist and integration coordinator. Both jobs
+   completed and their outputs were returned to Core. No fixture inference or
+   API-key fallback was used in this live run.
+4. The coordinator returned conditional, requested defined structural assumptions
+   and a strength report, preserved the acceptance thresholds, and identified that
+   the proposed plan changes were outside the delegated write scope.
+5. Formal adoption remained unadopted. Event replay matched.
+
+The worker restored STEP files but omitted native geometry from the LLM text
+input. The reviewers inspected actual machine-produced evidence, not geometry
+independently. The CAD edit recipe and experiment sequencing were supplied by the
+operator. A subsequent autonomous developer correction job was not exercised.
+This does not establish cloud deployment, live vendor connectivity, FEA execution,
+tolerance analysis or physical prototype validation.
+
+Two preliminary harness attempts stopped before inference: one used a stale
+session version after team configuration; the other retained record-only mode,
+which correctly prevented review scheduling. Correcting initialization order and
+explicitly selecting suggest mode allowed the final run to complete. No product
+code changes were required.
+
+Only this sanitized summary is published. Model journals, local ledgers and
+credentials are not included in the source repository. These feature-branch
+results do not change the already published v3.1.1 release.
