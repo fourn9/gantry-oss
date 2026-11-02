@@ -1,0 +1,64 @@
+# Gantry v3.3.0 — requirements across development and execution
+
+Additive update to the public preview. Requirements can now be traced from an
+adopted revision through development states, changes, Mentor proposals, Crew work
+and physical evidence. Existing records are preserved; no ledger migration is required.
+
+## Added
+
+- Optional pinned requirement references and explicit verification check IDs show
+  which requirements a change serves and which checks remain unmet or unverified.
+- API and State UI distinguish historical evidence from current applicability.
+  Work completion, verification, sharing and formal human adoption remain separate.
+- Mentor proposals, consultations and delegated child tasks retain their requirement
+  subset. Explicitly unlinked exploratory work remains supported.
+- Requirement changes hold reviews and new execution. The local Runner requests
+  cancellation during execution; stale results remain recorded but cannot satisfy
+  the changed baseline. Reassess the state and create a new assignment to resume.
+- CAD and physical plans, reports and checkpoints carry the same requirement
+  references. Missing or mismatched links cannot produce a passing assessment.
+- Crew can publish physical evidence through the fenced `publish_physical` action
+  using Bot credentials, without administrator capabilities.
+
+## Installation
+
+Download the attached wheel and install it in a patched Python environment:
+
+```sh
+python -m pip install --upgrade ./gantry_ledger-3.3.0-py3-none-any.whl
+# Optional local CAD support:
+python -m pip install './gantry_ledger-3.3.0-py3-none-any.whl[cad]'
+```
+
+See [requirement traceability](REQUIREMENT_TRACEABILITY.md) for the state, work and
+physical-report contracts. Legacy free-text requirements remain unlinked until
+explicitly mapped; no requirement fulfillment is inferred from their text.
+
+## Verification and limits
+
+Release checks: 683 Python regression cases (one skipped, no failures), nine
+JavaScript rendering tests, installed-wheel imports/CLI checks and package-layout
+inspection passed. The 50 pinned optional CAD/runtime dependencies had no known
+vulnerabilities reported by pip-audit on 2026-11-02. This is a point-in-time package
+advisory check, not a native-library or operating-system security certification.
+
+Local regression includes real CadQuery STEP geometry screening through requirement
+coverage, Bot-scoped physical publication, stale-review holds, reassigned-work
+resumption and cancellation of an actual Python child process after a requirement
+change. Review/model responses and non-geometric measurements are synthetic fixtures.
+Detailed checks are recorded in [the implementation record](../tasks/requirement-traceability.md).
+
+This release does not certify physical safety, run a strength solver, or establish
+live commercial-CAD compatibility. Runner cancellation is cooperative software
+process control, not a hardware emergency stop. Customer production LLMs and a
+deployed browser service were not exercised. No paid inference or customer project
+data is included.
+
+## Upgrade and rollback
+
+Stop workers and back up the ledger and artifact store before upgrading. History
+is not rewritten. To roll back, stop workers and reinstall the v3.2.0 wheel;
+retain all backups and use a separate pre-upgrade copy for older workers. Older
+versions do not enforce the new requirement guards and must not execute work that
+depends on them. An older runtime's compatibility with newly written records is
+not guaranteed. Updating Gantry does not patch Python or the operating system.

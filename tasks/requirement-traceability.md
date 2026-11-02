@@ -81,3 +81,16 @@ Reproduce with the project's optional CAD runtime installed:
   python -m unittest discover -s tests -p test_requirement_handoff.py -q
   python -m unittest discover -s tests -p 'test_*.py' -q
   node --test tests/test_requirements_web.mjs tests/test_review_web.mjs
+
+## v3.3.0 release verification (2026-11-02)
+
+- Final Python regression after all guards: 683 cases, one skipped, no failures,
+  85.169 seconds. Nine JavaScript tests passed.
+- Built wheel, installed it outside the checkout, verified version/imports and
+  hardware CLI. The offline runtime security baseline reported no findings.
+- Inspected package layout: only Gantry code/static assets and distribution metadata;
+  no databases, project data, tokens, logs or private keys. Source privacy/credential
+  pattern scan found only existing negative-test private-key header fixtures.
+- pip-audit checked all 50 pinned optional CAD/runtime packages without skipped
+  packages or known vulnerabilities. No dependency versions changed in this update.
+- Public release metadata is v3.3.0. No hosted deployment or customer ledger mutation.
