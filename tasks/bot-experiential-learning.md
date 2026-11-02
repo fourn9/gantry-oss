@@ -108,4 +108,6 @@ Final local checks (2026-11-03):
 - Web regression: 9 passed.
 - Fresh-tree wheel: 85 Gantry files; every packaged path and byte matched source.
 - Schema snapshot updated; whitespace checks passed.
-No GitHub push/tag/release or live customer configuration change was made.
+At that implementation checkpoint, no GitHub push/tag/release or live customer
+configuration change had been made. Subsequent continuity work and runtime
+evidence are recorded in [continuity validation](../docs/BOT_CONTINUITY_VALIDATION.md).
