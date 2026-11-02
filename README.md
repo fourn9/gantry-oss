@@ -23,6 +23,12 @@ plus generated Altium/Allegro editor scripts. See [exact coverage and native-run
 qualification still required](docs/NATIVE-DESKTOP.md). Zuken and Capital SDK
 implementation remains blocked; none of these eight products has a verified live run.
 
+`gantry-engineering` joins checkout, saved-file checkpoints, external captures,
+physical evaluation, recovery and review in one local workflow. Explicit cross-tool
+dependencies expose which downstream checks need reassessment. See the
+[workflow and limits](docs/ENGINEERING-WORKFLOW.md) and
+[executed verification](docs/ENGINEERING-WORKFLOW-VERIFICATION.md).
+
 **Two service entry points:** `gantry-ledger` for customer-led development
 and review, and `gantry-crew` for delegated Bot development.
 The new Bot queue operates without Mentor; existing v3.0.0 workflows remain

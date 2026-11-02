@@ -1,8 +1,8 @@
 # Local CAD and physical evidence adapter
 
 This path uses the existing Gantry ledger, immutable development states, scoped
-changes, artifact storage and Mentor review. There is no second database or new
-cloud solver. Customer agents invoke the local CLI or Python functions and use
+changes, artifact storage and Mentor review. Core remains the state authority;
+local journals only support recovery. There is no new cloud solver. Customer agents invoke the local CLI or Python functions and use
 Gantry's existing authenticated API to publish checkpoints.
 
 ## Actual support
@@ -150,10 +150,13 @@ check. Old states/results are retained. `status.verification` remains the existi
 execution-evaluation axis; scoped physical checks are under `engineering`. Passing
 one check does not set global verification or adoption to pass.
 
-The HTTP calls are idempotent, but the compound publisher refuses an advanced change
-head. After a lost final response, inspect `list_development_states` and its checkpoint
-before retrying. Captured artifacts may remain if checkpoint authorization/conflict
-fails; no unapproved state is adopted and no external computation is replayed.
+The publisher journals exact checkpoint arguments before dispatch under the local
+`.gantry/hardware/` directory. After a lost final response, retry with the original
+state/change/version and key to recover the same result. A different change head or
+reused key with a different intent is rejected. Captured artifacts may remain if
+checkpoint authorization/conflict fails. No external computation is replayed.
+The [joined workflow](ENGINEERING-WORKFLOW.md) also tracks the local change pointer,
+runs external evaluators and carries downstream dependencies into Mentor review.
 
 ## References and limits
 

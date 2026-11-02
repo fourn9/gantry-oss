@@ -27,6 +27,7 @@ gantry-ledger = "gantry.cli:review_main"
 gantry-crew = "gantry.cli:bots_main"
 gantry-integrations = "gantry.integrations.__main__:main"
 gantry-native = "gantry.native.__main__:main"
+gantry-engineering = "gantry.engineering_cli:main"
 # Compatibility aliases for the names used before product branding was fixed.
 gantry-review = "gantry.cli:review_main"
 gantry-bots = "gantry.cli:bots_main"
