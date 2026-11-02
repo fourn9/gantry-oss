@@ -19,7 +19,7 @@ from .runner import persist
 from . import project_sandbox
 
 SCHEMA = {'type': 'object', 'properties': {
-    'action': {'enum': ['read', 'edit', 'context', 'records', 'inspect', 'tool', 'ask', 'resolve', 'decision', 'remember', 'team', 'stop', 'finish']},
+    'action': {'enum': ['read', 'edit', 'context', 'records', 'inspect', 'tool', 'publish_physical', 'ask', 'resolve', 'decision', 'remember', 'team', 'stop', 'finish']},
     'arguments_json': S, 'rationale': S}, 'required': ['action', 'arguments_json', 'rationale'], 'additionalProperties': False}
 API_ACTIONS = {'ask': 'ask_bot', 'decision': 'record_bot_decision', 'remember': 'record_bot_experience'}
 GUIDE = {
@@ -28,6 +28,7 @@ GUIDE = {
     'context': 'pointer (JSON pointer into full authorized context), optional offset, limit for arrays/maps.',
     'inspect': 'task_id. Read another task in this project, including its exact candidate and reports; use pointer/offset/limit to fetch a specific part.',
     'records': 'kind (actions/decisions), optional after/limit. Retrieves exact saved task history; paginated.',
+    'publish_physical': 'plan_path: a frozen physical plan already saved in the current state. Imports reports from this workspace through the fenced Bot adapter; never adopts.',
     'tool': 'name from available_tools. No arbitrary argv. Results are observations, not adoption.',
     'ask': 'to_bot_id, question, evidence (state/task/message IDs). Creates a read-only response task. Then finish waiting.',
     'resolve': 'message_id, reason, evidence. Only the question author resolves its blocker after reading the answer.',
@@ -35,7 +36,7 @@ GUIDE = {
     'remember': 'observation, applicability, limitations, evidence, used_memories. Save scoped provisional experience.',
     'team': 'configuration for propose_bot_team: session_id,organization_id,lead_bot_id,goal,acceptance,members,rationale. Members specify bot_id,name,parent_bot_id,principal_id,profile,write_scope,can_assign,can_integrate. Proposes only; human activates. Existing principal privileges cannot be expanded.',
     'stop': 'task_id, reason. Cancels a task you manage; it does not cancel its children automatically.',
-    'finish': 'summary, rationale, unverified, status (completed/waiting/blocked/failed), assignments, integrate_changes, edits. Use edits=[]; edit action saves intermediate work. Assignments: bot_id,state_id,kind (plan/develop/verify/integrate/report),title,completion,write_scope,dependencies,after_tasks, optional candidate_id. Managers choose assignments; candidate tags isolate alternatives. Do not finish completed with unresolved blocking questions.'}
+    'finish': 'summary, rationale, unverified, status (completed/waiting/blocked/failed), assignments, integrate_changes, edits. Use edits=[]; edit action saves intermediate work. Assignments: bot_id,state_id,kind (plan/develop/verify/integrate/report),title,completion,write_scope,dependencies,after_tasks, optional candidate_id and requirement_refs (explicit requirement/revision pairs; [] means exploration). Omitted child references inherit the parent task. Managers choose assignments; candidate tags isolate alternatives. Do not finish completed with unresolved blocking questions.'}
 
 
 def _schema(properties, required=None):
@@ -46,7 +47,7 @@ def action_schemas():
     # Build from the authoritative contracts, not hand-maintained prose alone.
     schemas = {'finish': BOT_ANSWER,
         'edit': _schema({'path': S, 'content': {'type': 'string'}, 'expected_hash': S}),
-        'tool': _schema({'name': S})}
+        'tool': _schema({'name': S}), 'publish_physical': _schema({'plan_path': S})}
     for name, op in {**API_ACTIONS, 'resolve': 'resolve_bot_question', 'team': 'propose_bot_team',
                      'records': 'get_bot_records'}.items():
         schema = json.loads(json.dumps(CONTRACTS[op]['schema']))
@@ -152,6 +153,10 @@ def _api_effect(client, operation, args, step, key):
 
 def _execute(client, context, ref, config, action, args, workspace, step, key):
     scope = context['task']['write_scope']
+    if action == 'publish_physical':
+        validate(args, _schema({'plan_path': S}))
+        from .hardware import publish_bot
+        return publish_bot(client, ref['task_id'], ref['fence'], workspace, args['plan_path'], key)
     if action == 'context': return _context_value(context, args)
     if action == 'inspect':
         validate(args, _schema({'task_id': S, 'pointer': {'type': 'string'},

@@ -7,6 +7,8 @@ from .store import Store
 from .adapters import artifact_file_parts
 from .continuity_adapter import capture_workspace
 from .physical_evidence import evaluate
+from .requirement_traceability import _subset_refs, REFS
+from .contracts import validate
 
 
 def publish(client, state_id, change_id, version, root, plan_path, key):
@@ -19,7 +21,24 @@ def publish(client, state_id, change_id, version, root, plan_path, key):
     require(change and change['head']==state_id and change['version']==version,
             'stale_basis','Change head/version differs; restore the intended state')
     session=client.call('development_state',{'session_id':state['session_id']})['session']
-    artifact,missing=capture_workspace(client,root,key,session['zone'])
+    args=_physical_checkpoint(client,before,root,session['zone'],plan_path,key)
+    return client.call('checkpoint_change',{'change_id':change_id,'version':version,**args},key+':checkpoint')
+
+
+def publish_bot(client, task_id, fence, root, plan_path, key):
+    """Same adapter via the Bot's fenced, scoped checkpoint capability."""
+    ref={'task_id':task_id,'fence':fence}
+    client.call('check_bot_task',ref)
+    context=client.call('get_bot_task',{'task_id':task_id})
+    args=_physical_checkpoint(client,context['development'],root,context['zone'],plan_path,key)
+    args.pop('work_status')
+    return client.call('checkpoint_bot_task',{**ref,**args},key+':checkpoint')
+
+
+def _physical_checkpoint(client, before, root, zone, plan_path, key):
+    Store.safe_name(plan_path)
+    state=before['state']
+    artifact,missing=capture_workspace(client,root,key,zone)
     manifest=artifact['data']['files']; hashes={p:v['hash'] for p,v in manifest.items()}
     require(plan_path in before['manifest'] and plan_path in manifest
             and before['manifest'][plan_path]['hash']==hashes[plan_path],
@@ -50,13 +69,19 @@ def publish(client, state_id, change_id, version, root, plan_path, key):
         components[c['id']]={'id':c['id'],'role':c['role'],'assembly':c['assembly'],'inputs':{p:hashes[p] for p in c['paths']}}
     check_ids=set()
     for c in plan['checks']:
-        require(isinstance(c,dict) and set(c)=={'id','scope','components','required','inputs','report','conditions','evaluator','environment','criteria'}
+        require(isinstance(c,dict) and set(c)-{'requirement_refs','source_check'}=={'id','scope','components','required','inputs','report','conditions','evaluator','environment','criteria'}
                 and isinstance(c['id'],str) and c['id'] and c['id'] not in check_ids
+                and isinstance(c['inputs'],list) and bool(c['inputs']) and all(isinstance(p,str) for p in c['inputs'])
                 and isinstance(c['components'],list) and c['components'] and all(isinstance(x,str) and x in components for x in c['components']),
                 'invalid_input','Distinct scoped physical checks required')
         check_ids.add(c['id']); Store.safe_name(c['report'])
         old=checkmap.get(c['id'])
-        require(not old or old.get('physical_plan')=={'path':plan_path,'sha256':hashes[plan_path]},
+        inferred = bool(old and old.get('provenance') == 'mentor_inferred' and not old.get('physical_plan')
+            and c.get('source_check') == {'submission_id':old.get('source_submission'),'state_id':old.get('source_state')}
+            and old.get('source_submission') and old.get('source_state')
+            and all(old.get(k) == c.get(k) for k in ('scope','components','required'))
+            and set(old.get('inputs', {})) <= set(c['inputs']))
+        require(not old or inferred or old.get('physical_plan')=={'path':plan_path,'sha256':hashes[plan_path]},
                 'conflict','Plan cannot overwrite another check definition')
         require(all(set(components[x]['inputs'])<=set(c['inputs']) for x in c['components']),
                 'invalid_input','Check must bind every declared component input')
@@ -64,19 +89,27 @@ def publish(client, state_id, change_id, version, root, plan_path, key):
         if c['report'] in manifest:
             try: report=read(c['report'])
             except (json.JSONDecodeError,UnicodeDecodeError): pass  # Preserve original malformed bytes; cannot pass.
-        result=evaluate(c,report,hashes)
+        validate(c.get('requirement_refs', []), REFS)
+        # Only frozen plan links (or unchanged legacy check links) define purpose.
+        refs=_subset_refs(context.get('requirement_refs', []),
+                          c.get('requirement_refs', (old or {}).get('requirement_refs', [])))
+        require(not old or old.get('requirement_refs', []) == refs,
+                'conflict', 'Requirement mapping changed; save a reassessed check in a new state first')
+        result=evaluate({**c, 'requirement_refs': refs},report,hashes)
         checkmap[c['id']]={k:c[k] for k in ('id','scope','components','required')}
-        checkmap[c['id']].update(status=result['status'],inputs={**result['inputs'],plan_path:hashes[plan_path]},
+        if old and old.get('source_submission'):
+            checkmap[c['id']].update({k:copy.deepcopy(old[k]) for k in ('source_submission','source_state','source_evidence','provenance') if k in old})
+        checkmap[c['id']].update(requirement_refs=refs,status=result['status'],inputs={**result['inputs'],plan_path:hashes[plan_path]},
             evidence={c['report']:hashes[c['report']]} if c['report'] in manifest else {},
             physical_plan={'path':plan_path,'sha256':hashes[plan_path]},physical_result=result)
     engineering.update(components=list(components.values()),checks=list(checkmap.values()))
     unfinished=[x for x in state['unfinished'] if x not in {'physical-check:'+i for i in check_ids}]
     unfinished+=['physical-check:'+c['id'] for c in checkmap.values() if c['required'] and c['status']!='pass']
-    return client.call('checkpoint_change',{'change_id':change_id,'version':version,
+    return {
         'snapshot':artifact['revision_id'],'summary':'Hardware candidate and physical evidence captured',
         'rationale':'Compare captured reports against the unchanged acceptance plan',
         'unfinished':sorted(set(unfinished)),'work_status':'paused','context':context,
-        'capture':{'scope':'saved CAD/code and external physical reports','missing':missing+['unsaved edits','independent physical certification']}},key+':checkpoint')
+        'capture':{'scope':'saved CAD/code and external physical reports','missing':missing+['unsaved edits','independent physical certification']}}
 
 
 def screen_report(root, request, check):
@@ -100,7 +133,7 @@ def screen_report(root, request, check):
     require(all(p['path'] in hashes and p['sha256']==hashes[p['path']] for p in raw['sources']),
             'stale_basis','All screened CAD inputs must be declared by the check')
     for name,h in hashes.items():source(root,name,h)
-    return {'status':'completed','inputs':hashes,
+    return {'status':'completed','inputs':hashes,'requirement_refs':copy.deepcopy(check.get('requirement_refs', [])),
         'conditions':{'unit':'mm','frame':request['frame'],'clearance':request['clearance'],
             'overlap_tolerance':request['overlap_tolerance'],'pairs':request['pairs'],
             'parts':{p['id']:p['path'] for p in request['parts']}},

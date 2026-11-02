@@ -59,8 +59,8 @@ Free-text `context.requirements` remains explicitly unlinked, not silently match
 
 Mentor execution checks hold stale requirement contracts; results arriving after a requirement
 change remain recorded but invalid for current execution acceptance. Crew checks hold stale
-tasks before claim and at existing fenced action/check boundaries. A running external process
-is not forcibly stopped by a requirement edit. Reassess, checkpoint the new requirement references
+tasks before claim and at existing fenced action/check boundaries. Unsupervised external processes are not stopped by a requirement edit; Gantry Runner uses the
+continuation checks described below. Reassess, checkpoint the new requirement references
 and assign new work. Existing review fingerprints also include current requirement revisions.
 
 The State tab shows coverage, pinned/current versions, missing checks and work purpose.
@@ -85,3 +85,47 @@ establish file identity, not whether a test actually proves the engineering clai
 not automatically extract all requirements, judge test adequacy, discover physical dependencies,
 or prove hardware safety. Changing a requirement reference on a check is a new submitted
 assertion, not automatic validation of the old result against a new requirement.
+
+## Complete Adapter → Mentor / Crew path
+
+A physical plan check accepts `requirement_refs` in addition to its existing fields. Declare
+these links when saving the plan in the baseline. `hardware screen` copies the exact references
+into its measurement report; external solvers must emit that same `requirement_refs` array.
+`hardware publish` preserves them in engineering checks and computes requirement coverage.
+A report without matching references is retained as unknown, not credited against the linked
+requirement. Legacy unlinked plans remain supported. Plan bytes still cannot be changed during
+publication. No requirement link is guessed from a matching name or check ID.
+
+Mentor's inferred engineering checks may include requirement_refs from the reviewed state.
+Applying the proposal preserves them but initializes the checks as unverified. Review-work
+proposals inherit the change's requirement subset; optional top-level requirement_refs may
+narrow it. Exploratory changes stay exploratory. Crew consultations and omitted child-task
+references inherit the originating task's subset. Explicit child scope remains a Bot decision
+within its pinned input state.
+
+Crew's action loop exposes `publish_physical` with `{"plan_path":"physical-plan.json"}`.
+It calls the same physical adapter through the Bot's existing fenced `checkpoint_bot_task`
+permission, without using a developer/admin credential. Reports must already be in the task's
+workspace, within its edit scope; the plan must already be captured in the task's current state.
+The adapter captures artifacts and evaluates conditions before Core rechecks the task fence and
+scope at checkpoint. Bot checkpoint context may contain updated engineering evidence but may
+not replace/remove the state's requirement scope. Use a reassessed state and a new assignment
+for changed requirements. The local physical screening command is static geometry screening;
+strength/thermal/test-rig measurements still come from explicitly identified external evaluators.
+
+Requirement changes also affect existing completed dependencies and result-reuse matching.
+Mentor Runner checks continuation before process launch and on its normal polling loop, requesting
+cancellation on stale requirements. This is cooperative process supervision, not an instantaneous
+physical emergency stop. Late results remain recorded but are not valid current acceptance.
+Crew checks before claims/actions/checkpoints/completion hold stale tasks. Cancel/reassess the
+old assignment, create a checkpoint with the new references and review plan, then assign new work.
+No result is automatically rebound to the new requirement. No paid model is required for this
+handoff; the customer's selected agent still supplies the engineering decisions.
+
+To fulfill a Mentor-inferred check, freeze the physical plan with the same check ID, scope,
+components, required flag and requirement references, plus
+`source_check: {"submission_id":"review_ID","state_id":"devstate_ID"}` from the inferred
+check. The plan must cover its existing input paths. The Adapter then preserves source review
+and state provenance while recording the measured result. Without this explicit correspondence
+it refuses to overwrite the inferred check. Threshold adequacy remains an engineering review
+responsibility; correspondence alone is not certification.

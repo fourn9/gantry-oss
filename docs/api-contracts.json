@@ -979,6 +979,70 @@
           ],
           "type": "object"
         },
+        "context": {
+          "additionalProperties": false,
+          "properties": {
+            "constraints": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "decisions": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "environment": {
+              "type": "object"
+            },
+            "open_questions": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "requirement_refs": {
+              "items": {
+                "additionalProperties": false,
+                "properties": {
+                  "requirement_id": {
+                    "type": "string"
+                  },
+                  "revision_id": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "requirement_id",
+                  "revision_id"
+                ],
+                "type": "object"
+              },
+              "maxItems": 200,
+              "type": "array"
+            },
+            "requirements": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "type": "array"
+            }
+          },
+          "required": [
+            "requirements",
+            "constraints",
+            "decisions",
+            "open_questions",
+            "environment"
+          ],
+          "type": "object"
+        },
         "fence": {
           "minLength": 1,
           "type": "string"
@@ -1498,6 +1562,26 @@
                       },
                       "required": {
                         "type": "boolean"
+                      },
+                      "requirement_refs": {
+                        "items": {
+                          "additionalProperties": false,
+                          "properties": {
+                            "requirement_id": {
+                              "type": "string"
+                            },
+                            "revision_id": {
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "requirement_id",
+                            "revision_id"
+                          ],
+                          "type": "object"
+                        },
+                        "maxItems": 200,
+                        "type": "array"
                       },
                       "scope": {
                         "enum": [
@@ -6115,6 +6199,26 @@
         },
         "intent": {
           "type": "object"
+        },
+        "requirement_refs": {
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "requirement_id": {
+                "type": "string"
+              },
+              "revision_id": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "requirement_id",
+              "revision_id"
+            ],
+            "type": "object"
+          },
+          "maxItems": 200,
+          "type": "array"
         },
         "submission_id": {
           "minLength": 1,

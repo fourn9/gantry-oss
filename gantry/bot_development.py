@@ -8,6 +8,7 @@ import copy
 from .contracts import register, S, A, I
 from .development import in_scope
 from .development_contracts import CAPTURE
+from .continuity_contracts import CONTEXT
 from .model import require, uid, digest
 from .persistent_bots import VERSION, FLAG
 from .requirement_traceability import REFS, selected_refs, stale_refs
@@ -42,7 +43,7 @@ register('get_bot_task', {'task_id': S}, ['task_id'])
 register('claim_bot_task', {'task_id': S, 'version': I, 'runtime_fence': S}, ['task_id', 'version', 'runtime_fence'])
 register('check_bot_task', {'task_id': S, 'fence': S}, ['task_id', 'fence'])
 register('checkpoint_bot_task', {'task_id': S, 'fence': S, 'snapshot': S, 'summary': S,
-    'rationale': S, 'unfinished': A, 'capture': CAPTURE},
+    'rationale': S, 'unfinished': A, 'capture': CAPTURE, 'context': CONTEXT},
     ['task_id', 'fence', 'snapshot', 'summary', 'rationale', 'unfinished', 'capture'])
 register('finish_bot_task', {'task_id': S, 'fence': S, 'report': {
     'type': 'object', 'properties': REPORT, 'required': list(REPORT), 'additionalProperties': False}},
@@ -173,6 +174,7 @@ class BotDevelopmentMixin:
             require(all(in_scope(path, old['write_scope']) for path in a['write_scope']),
                     'scope_denied', 'Child scope exceeds this assignment')
             if old.get('candidate_id'): a.setdefault('candidate_id', old['candidate_id'])
+            a.setdefault('requirement_refs', copy.deepcopy(old.get('requirement_refs', [])))
             require(old['session_id'] == d['id'] and old['status'] == 'running', 'invalid_state', 'Parent must be running')
             require(not self._bd_subordinate(s, bot['id'], old['bot_id']) or bot['id'] == old['bot_id'],
                     'invalid_input', 'Child work cannot be assigned to a parent manager')
@@ -216,6 +218,7 @@ class BotDevelopmentMixin:
         for ident in task['after_tasks']:
             dep = self._dev_get(s, 'bot_tasks', ident)
             require(dep['status'] == 'completed', 'dependency_pending', 'Required task has not completed')
+            require(not stale_refs(s, dep.get('requirement_refs', [])), 'stale_basis', 'Dependency requirements changed; reassess upstream work')
             dependencies.append([ident, dep['version']])
         ancestors = []; parent = bot['parent_bot_id']
         while parent:
@@ -284,6 +287,14 @@ class BotDevelopmentMixin:
     def cmd_checkpoint_bot_task(self, s, actor, a, fx, n, con):
         task = self._bd_checked(s, actor, a, con); self.allowed(actor, 'record')
         require(task['write_scope'], 'scope_denied', 'This assignment has no file write scope')
+        if 'context' in a:
+            current = self._continuity_state(s, actor, task.get('output_state', task['state_id']))
+            def fixed_context(context):
+                fixed = copy.deepcopy(context)
+                fixed.get('environment', {}).pop('engineering', None)
+                return fixed
+            require(fixed_context(a['context']) == fixed_context(current['context']),
+                    'scope_denied', 'Bot evidence checkpoint cannot change goals or constraints; request reassessment and new assignment')
         if not task.get('change_id'):
             change = self.cmd_begin_change(s, actor, {'state_id': task['state_id'], 'title': task['title'],
                 'purpose': task['title'], 'write_scope': task['write_scope'], 'dependencies': task['dependencies'],
@@ -291,7 +302,8 @@ class BotDevelopmentMixin:
             task['change_id'] = change['id']
         change = self._dev_get(s, 'dev_changes', task['change_id'])
         result = self.cmd_checkpoint_change(s, actor, {'change_id': change['id'], 'version': change['version'],
-            **{k: a[k] for k in ('snapshot', 'summary', 'rationale', 'unfinished', 'capture')}, 'work_status': 'working'}, fx, n, con)
+            **{k: a[k] for k in ('snapshot', 'summary', 'rationale', 'unfinished', 'capture')},
+            **({'context': a['context']} if 'context' in a else {}), 'work_status': 'working'}, fx, n, con)
         task.update(output_state=result['state']['id'], version=task['version'] + 1)
         self._dev_save(s, fx, 'bot_tasks', task)
         return result

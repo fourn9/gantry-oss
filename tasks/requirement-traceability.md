@@ -38,3 +38,46 @@ Validation on 2026-11-02:
 Tests use synthetic declarations and saved files; no real robot or CAD measurement was certified.
 The new UI component was checked by rendering tests, not a production browser deployment.
 Feature is on feature/requirement-traceability; no public release or live ledger migration performed.
+
+## Follow-up: complete operational handoff
+
+Acceptance: frozen physical plans carry explicit requirement revisions into reports/checkpoints;
+missing/mismatched report requirement bindings cannot pass. CAD screening emits these bindings.
+Mentor's review-work and inferred checks retain the explicit requirement subset. Crew child tasks,
+consultations and checkpoints retain scope. Requirement changes hold delegated work; recorded
+historical results remain available. A new state/assignment after reassessment can resume.
+Validate using real local CAD screening plus synthetic report/identity fixtures; no paid inference,
+commercial CAD connection, public release or customer ledger mutation is implied.
+
+### Follow-up outcome (2026-11-02)
+
+Completed operational handoff:
+- Physical plans/reports/checkpoints retain pinned requirement references. Missing/mismatched
+  report bindings remain unknown. Mentor-inferred checks can be explicitly mapped by frozen
+  source_check provenance, without overwriting unrelated check definitions.
+- Review-work preserves the change subset; inferred checks preserve their own explicit links.
+  Pending/reviewed stale submissions hold until a reassessed checkpoint is submitted.
+- Crew child assignments, consultations and checkpoints retain purpose. publish_physical uses
+  Bot-scoped credentials and fenced checkpointing; no developer/admin capability is added.
+  Its context update is restricted to engineering evidence, not goals/constraints/environment.
+- Runner checks continuation before launch and while polling. Late results remain invalid for
+  current acceptance. Result reuse and completed dependency checks include requirement identity.
+
+Evidence:
+- Full regression: 682 Python tests, 1 skipped, no failures, 85.610 seconds.
+- Final focused suite after pending-review and Bot context hardening: 76 cases passed,
+  including inherited regression cases (not 76 new independent scenarios).
+- JS review/requirement rendering: 9 passed. Registered/documented schemas match; diff check clean.
+- Real CadQuery STEP geometry screening → report → Adapter checkpoint → requirement coverage
+  → Mentor context ran locally. Travel passed while absent load evidence stayed unverified.
+- Real Python child process ran, then was cancelled by Runner after requirement revision changed;
+  its result was retained invalid. Crew scoped adapter publication, stale hold, new assignment
+  resume, consultation/child scope, and replay were exercised against the real Core.
+- Review/model answers and non-geometric measurements were deterministic synthetic fixtures.
+  No production LLM reasoning, commercial CAD license, physical strength certification, live
+  customer project, browser deployment, or public release is claimed.
+
+Reproduce with the project's optional CAD runtime installed:
+  python -m unittest discover -s tests -p test_requirement_handoff.py -q
+  python -m unittest discover -s tests -p 'test_*.py' -q
+  node --test tests/test_requirements_web.mjs tests/test_review_web.mjs
