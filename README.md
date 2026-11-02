@@ -11,6 +11,12 @@ Gantry has two product areas:
 
 **Version: 3.3.0.** Local operation is the supported starting point. Human adoption, agent proposals and execution results remain separate. Gantry does not certify a design's physical safety or operate hardware by default.
 
+Selected external records can be captured with `gantry-integrations`: bounded SaaS
+readers, local workbook cells, and original-format saved exports feed immutable,
+requirement-linked checkpoints. See [supported routes and unverified native
+connections](docs/EXTERNAL-INTEGRATIONS.md). Export capture is not native CAD editing
+or automatic synchronization.
+
 **Two service entry points:** `gantry-ledger` for customer-led development
 and review, and `gantry-crew` for delegated Bot development.
 The new Bot queue operates without Mentor; existing v3.0.0 workflows remain

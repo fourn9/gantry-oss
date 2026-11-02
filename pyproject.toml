@@ -24,6 +24,7 @@ feedback = ["PyNaCl>=1.6.2,<2"]
 gantry = "gantry.cli:main"
 gantry-ledger = "gantry.cli:review_main"
 gantry-crew = "gantry.cli:bots_main"
+gantry-integrations = "gantry.integrations.__main__:main"
 # Compatibility aliases for the names used before product branding was fixed.
 gantry-review = "gantry.cli:review_main"
 gantry-bots = "gantry.cli:bots_main"
