@@ -20,7 +20,7 @@ runtime dependencies. Existing captures and native v1 plans remain readable.
   reread that component. Save/reload failure has no success receipt. Collector
   preserves original/result bytes and explicit host-reported persistence, never
   physical correctness or runtime qualification. Old in-memory plans unchanged.
-- [ ] Bounded paginated capture: Notion nested blocks and Slack selected windows
+- [x] Bounded paginated capture: Notion nested blocks and Slack selected windows
   or threads retain each raw response and source relationship. Cursor loops,
   malformed payloads and acquisition bounds cannot masquerade as completeness.
   Partial acquisition persists completed pages and a resumable pending queue.
@@ -61,3 +61,7 @@ restoration and CLI execution. No secret credentials or vendor binary fixtures.
 Slice 1: native suite 25 tests passed, including 6 persistence cases (RED first:
 missing save_format path). These are generated-script/receipt contracts, not live
 Altium execution. No installed vendor host is available.
+
+Slice 2: external integration suite 43 tests passed. Eight collection tests cover
+resume, raw page preservation, nested blocks, thread pagination, rate limits,
+cursor cycles, depth/request bounds and tampered resume scope. No account calls.

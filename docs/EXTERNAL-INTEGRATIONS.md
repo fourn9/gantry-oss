@@ -20,13 +20,13 @@ always-on sync, webhook listener or provider OAuth onboarding application.
 | Confluence Cloud | Page body in storage format and version | No attachments or child-page traversal |
 | Jira Cloud | Issue fields/status | No full history or complete comments |
 | Linear | Issue, team, workflow status and cycle via fixed GraphQL query | No creation; selected updates use the separate write path |
-| Notion | Direct child blocks, bounded page and explicit cursor | No recursion, attached binaries or page-wide atomic revision |
+| Notion | Direct child blocks; optional bounded descendant/pagination capture and resume | No attached binaries or page-wide atomic revision |
 | Google Drive | Native Google document export to text/CSV/PDF/DOCX/XLSX | Export bytes are not the native editable cloud document; no ordinary binary download |
 | Google Sheets | Explicit A1 range values | No formulas/formats or atomic revision |
 | Excel | Graph workbook range or local XLSX selected cells | No recalculation; cached formula values are marked unverified |
 | SharePoint | Graph drive item metadata and eTag | Document bytes must be supplied separately; download URLs are not followed |
 | Onshape | Part Studio mass properties at an immutable microversion | No full document/assembly editing or material validation; named parameter updates use the write path |
-| Slack | Explicit channel history window and pagination cursor | No threads, live bot mentions, slash command or replies |
+| Slack | Explicit history window or thread; optional pagination and thread capture/resume | No live bot mentions, slash commands, new message posting or attachment download |
 | Cursor | Existing `gantry connect --client cursor` / project MCP | Depends on customer's agent and client trust setup; no hosted Cursor launch |
 | Python | Saved scripts/results plus existing scoped Runner recipes | Capture does not execute imported code |
 | Relyence | Selected exports, retained in their original format | Native API schema/test tenant still required; no FMEA write-back |
@@ -95,6 +95,37 @@ follow instructions in remote text. Its output names capture limitations. For
 Notion/Slack, `source.continuation` in the inspected manifest can be supplied as
 `cursor` in a subsequent explicit request. Each page is a separate observation;
 no complete-tree or cross-page atomic-version claim is made.
+
+### Related records and resumable pagination
+
+`pull-related` follows Notion `has_children` plus cursors, or Slack history cursors
+and the reported threads. A Slack history config must specify `oldest` and `latest`;
+alternatively select one `thread_ts`. Threads use `conversations.replies`, which
+requires the customer's appropriate Slack token/scopes. It never follows links
+embedded in messages, downloads attachments or invokes a model.
+
+```sh
+gantry-integrations pull-related --config notion.json --source-id design-notes --max-requests 20 --max-depth 6 --output ./captures/notes-001
+gantry-integrations pull-related --config notion.json --source-id design-notes --resume ./captures/notes-001 --output ./captures/notes-002
+```
+
+Each response remains in `pages/NNNN.json`; `collection.json` associates it with
+the source request/depth and records the pending work. Rate limiting, malformed
+responses, cursor cycles and limits produce an explicit **partial** bundle. Resume
+uses the same source/requirement scope, rechecks the recorded traversal and avoids
+fetching completed pages. Credentials are supplied afresh and never serialized.
+Use the same `--requirements` file when resuming a linked capture.
+
+`complete_within_scope` means the selected traversal finished, not that a workspace,
+all attachments or a consistent point-in-time snapshot was acquired. The provider
+may change between requests. Limits: 90 responses/28 MiB per accumulated bundle,
+1–90 requests per invocation, depth 0–12, 1,000 pending tasks and 300 seconds plus
+the outstanding bounded request. Request/depth limits can be increased on resume;
+an exhausted aggregate bundle requires narrower new capture scopes. Originals stay
+unchanged. The normal `publish` command stores the bundle in a scoped checkpoint.
+
+Sources: [Notion children](https://developers.notion.com/reference/get-block-children),
+[Slack replies](https://docs.slack.dev/reference/methods/conversations.replies/).
 
 ### Provider configuration examples
 

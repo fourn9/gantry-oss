@@ -18,13 +18,17 @@ def main(argv=None):
     sub.add_parser('catalog')
     pull=sub.add_parser('pull',help='Read one explicit remote object/window; never remote writes')
     pull.add_argument('--config',required=True)
+    related=sub.add_parser('pull-related',help='Capture bounded Notion descendants or Slack pages/threads; resumable')
+    related.add_argument('--config',required=True);related.add_argument('--resume')
+    related.add_argument('--max-requests',type=int,default=20);related.add_argument('--max-depth',type=int,default=6)
     local=sub.add_parser('capture',help='Preserve explicitly selected saved files')
     local.add_argument('--provider',required=True); local.add_argument('--root',required=True)
     local.add_argument('--path',action='append',required=True); local.add_argument('--cells',help='JSON worksheet -> cell addresses')
-    for cmd in (pull,local):
+    for cmd in (pull,local,related):
         cmd.add_argument('--source-id',required=True); cmd.add_argument('--output',required=True)
         cmd.add_argument('--requirements',help='JSON array of requirement_id/revision_id references')
-        cmd.add_argument('--select',help='JSON filename -> JSON pointers; original bytes remain saved')
+        if cmd is not related:
+            cmd.add_argument('--select',help='JSON filename -> JSON pointers; original bytes remain saved')
     inspect=sub.add_parser('inspect'); inspect.add_argument('--bundle',required=True)
     prepare=sub.add_parser('prepare-write',help='Read a target and save a reviewable native update plan')
     for name in ('config','change','reason','credential-ref','output'): prepare.add_argument('--'+name,required=True)
@@ -70,8 +74,12 @@ def main(argv=None):
             result=publish(Client(args.url,Path(args.token_file).read_text().strip()),args.state_id,args.change_id,
                            args.version,args.bundle,args.key)
         else:
-            refs=load(args.requirements,[]); selectors=load(args.select,{})
-            if args.action=='pull':
+            refs=load(args.requirements,[]); selectors=load(getattr(args,'select',None),{})
+            if args.action=='pull-related':
+                from .collections import capture_collection
+                bundle=capture_collection(load(args.config),args.source_id,refs,max_requests=args.max_requests,
+                    max_depth=args.max_depth,resume=args.resume)
+            elif args.action=='pull':
                 from .providers import fetch
                 cap=fetch(load(args.config))
                 name='response.bin' if cap['provider']=='google-drive' else 'response.json'

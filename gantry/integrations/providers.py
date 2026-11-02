@@ -16,7 +16,7 @@ FIELDS = {
  'excel':({'item','sheet','range'},set()),
  'sharepoint':({'drive','item'},set()),
  'onshape':({'document','microversion','element'},set()),
- 'slack':({'channel'}, {'cursor','oldest','latest'})}
+ 'slack':({'channel'}, {'cursor','oldest','latest','thread_ts'})}
 COMMON = {'provider','credential_ref'}
 MISSING = {
  'github':['comments','repository files; use existing GitHub connector for PR diff and checks'],
@@ -90,6 +90,10 @@ def request_for(config):
         return ReadRequest('https://cad.onshape.com/api/partstudios/d/'+v('document')+'/m/'+v('microversion')+'/e/'+v('element')+'/massproperties')
     query={'channel':config['channel'],'limit':100}
     query.update({k:config[k] for k in ('cursor','oldest','latest') if k in config})
+    if 'thread_ts' in config:
+        require(re.fullmatch(r'[0-9]+\.[0-9]+',config['thread_ts']),'invalid_input','Slack thread timestamp required')
+        query['ts']=config['thread_ts']
+        return ReadRequest('https://slack.com/api/conversations.replies?'+urlencode(query))
     return ReadRequest('https://slack.com/api/conversations.history?'+urlencode(query))
 
 
