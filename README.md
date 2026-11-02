@@ -129,3 +129,5 @@ The optional [local hardware adapter](docs/HARDWARE-ADAPTER.md) reads/edits/writ
 STEP with CadQuery, runs static interference checks, and captures external strength,
 tolerance or prototype measurements against a frozen acceptance plan. Results stay
 bound to the evaluated files; missing evidence does not become a pass.
+
+Experimental vendor integration coverage and remaining SDK work: [vendor connectors](docs/VENDOR-CONNECTORS.md). These are not validated native connections.
