@@ -52,6 +52,23 @@ def send(request, credential_ref):
     validate_target(request.url)
     require(request.method in {'GET','POST'} and (request.method!='POST' or
             request.url=='https://api.linear.app/graphql'), 'scope_denied','Read recipe required')
+    if request.method == 'POST':
+        query = parse_json(request.body).get('query', '').strip()
+        require(query.startswith('query') and 'mutation' not in query,
+                'scope_denied', 'Read transport rejects GraphQL mutations')
+    return _exchange(request, credential_ref)
+
+
+def send_write(config, change, baseline, credential_ref):
+    # Rebuild a fixed provider recipe; callers cannot submit an arbitrary URL/method.
+    from .write_recipes import write_request
+    require(bool(credential_ref), 'credential_missing', 'Explicit write credential reference required')
+    request = write_request(config, change, baseline)
+    validate_target(request.url)
+    return _exchange(request, credential_ref)
+
+
+def _exchange(request, credential_ref):
     token=credential(credential_ref)
     require(token or urlsplit(request.url).hostname=='api.github.com', 'credential_missing','Credential reference required')
     headers={'Accept':'application/json','User-Agent':'Gantry-integrations/1',**request.headers}
@@ -60,7 +77,7 @@ def send(request, credential_ref):
         elif request.auth=='raw': value=token
         else: value='Bearer '+token
         headers['Authorization']=value
-    if request.body is not None: headers['Content-Type']='application/json'
+    if request.body is not None: headers.setdefault('Content-Type','application/json')
     opener=build_opener(ProxyHandler({}),NoRedirect())
     try:
         deadline=time.monotonic()+30
