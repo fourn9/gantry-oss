@@ -18,7 +18,7 @@ Install and qualify against a disposable project before enabling an agent to wri
 | `catia-v5` | Attach to V5 Automation; read numeric part parameter | Set writable, non-relation-driven Value, Part.Update, document.Save, read back | CATProduct, 3DEXPERIENCE APIs, automatic unit conversion |
 | `creo` | VB API asynchronous connection; read typed model parameter | Set scalar union value, regenerate, save local .prt, capture latest numbered file | Windchill, assemblies, dimensions, automatic application version detection |
 | `solidworks-electrical` | Electrical COM API; identify environment/project; read user data | Set existing project user-data field, update database, read back | Wiring/routing edits, entire project archive, unrelated editor dirty-state capture |
-| `altium` | Generate DelphiScript for the native PCB host | Existing PCB component comment; verify in memory | Automated host invocation, verified native save, schematic editing, Altium 365 API |
+| `altium` | Generate DelphiScript for the native PCB host | Existing PCB component comment; optional save/reload/readback and saved-byte capture | Automated host invocation, live runtime qualification, schematic editing, Altium 365 API |
 | `cadence` | Generate SKILL for Allegro PCB Editor | Existing string property on current design; transaction and in-memory readback | Automated host invocation, verified native save, OrCAD/Virtuoso/general Cadence support |
 | `zuken-e3` | **Blocked; no executable native driver** | None | E3.series module/version, licensed SDK member signatures and save/identity semantics |
 | `capital` | **Blocked; no executable native driver** | None | Exact Capital module/version, licensed Java/SOA SDK, identity/transaction/save contracts |
@@ -162,6 +162,28 @@ Native save is an operator step. On-disk bytes may still be the original file;
 The native-host receipt is an explicit report, not cryptographic proof against
 tampering by the OS user. Absolute local paths appear in the generated script;
 review before sharing the bundle. There is no arbitrary caller-provided script execution.
+
+### Altium optional persistence
+
+Add `--save-format 'PCB Binary'` to `script-prepare` for a new v2 plan. Run the
+generated `GantryApply` in the licensed host under exclusive editor access. This
+path checks the dirty flag and compares native bytes against the prepared baseline,
+changes the selected comment, calls `IServerDocument.DoFileSave`, reloads with
+`DoFileLoad`, reacquires the component and reads the value again. It captures the
+saved file to `native-saved.PcbDoc` before producing a `saved_and_reloaded` receipt.
+Collect rejects missing/stale captures or unchanged bytes for a reported change.
+
+This outcome means **host-reported persistence**, not a qualified Altium runtime
+or physical/electrical correctness. The script is contract-tested but has not been
+compiled/run in Altium here. Confirm the installed save format in a disposable PCB;
+other formats are intentionally rejected. The initial host command remains an
+operator step. A failure after dispatch stays unknown; no automatic rewrite or
+rollback. Original v1 scripts/receipts retain their in-memory-only semantics.
+Allegro continues to require a separately qualified save/reopen implementation.
+
+Primary save/reload contract:
+[IServerDocument](https://www.altium.com/documentation/altium-dxp-developer/iserverdocument-interface),
+[IClient document lookup](https://www.altium.com/documentation/altium-dxp-developer/iclient-interface).
 
 ## Recovery, integrity and limits
 

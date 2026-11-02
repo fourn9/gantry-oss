@@ -17,6 +17,9 @@ def literal(text,language):
 
 
 def altium(plan,fullpath,resultpath,marker):
+    if plan.get('version') == 2:
+        from .altium_persistence import render
+        return render(plan,fullpath,resultpath,marker)
     q=lambda s:literal(s,'pascal'); c=plan['target']
     result=canonical({'plan_hash':digest(plan),'status':'applied_in_memory',
                       'before':plan['expected'],'after':plan['value'],'saved':False})
@@ -101,9 +104,12 @@ procedure(gantryApply()
 '''
 
 
-def prepare_script(root,config,expected,value,reason,refs,destination):
+def prepare_script(root,config,expected,value,reason,refs,destination,*,save_format=None):
     require(isinstance(config,dict) and set(config)=={'product','document','selector','version'}
             and config['product'] in {'altium','cadence'},'unsupported','Supported native scripting product required')
+    if save_format is not None:
+        require(config['product']=='altium' and save_format=='PCB Binary','unsupported',
+                'Opt-in persistence supports Altium PCB Binary only; qualify installed save format first')
     require(isinstance(config['selector'],str) and re.fullmatch('[A-Za-z0-9_.-]{1,100}',config['selector']),
             'invalid_input','Bounded component designator or property name required')
     require(isinstance(config['version'],str) and 0<len(config['version'])<=100,'invalid_input','Declared native version required')
@@ -121,6 +127,7 @@ def prepare_script(root,config,expected,value,reason,refs,destination):
           'operator_root':root_identity(root),
           'baseline_file_hash':hashlib.sha256(raw).hexdigest(),
           'baseline_value_source':'operator_supplied_checked_in_native_script'}
+    if save_format is not None: plan.update(version=2,save_format=save_format)
     h=digest(plan);dest=Path(destination).absolute();fullpath=str(root/config['document'])
     script_name='operation.pas' if config['product']=='altium' else 'operation.il'
     render=altium if config['product']=='altium' else cadence
@@ -144,6 +151,10 @@ def collect_script(package,root):
     require(plan['operator_root']==root_identity(root),'scope_denied','Use the operator root where the script was prepared')
     require(plan['requirement_refs']==b['manifest']['requirement_refs'],'integrity_error','Requirement references differ')
     c=plan['target'];require(c['product'] in {'altium','cadence'},'unsupported','Native scripting product required')
+    persistent=plan.get('version')==2
+    require(plan.get('version') in {1,2} and (not persistent or
+            (c['product']=='altium' and plan.get('save_format')=='PCB Binary')),
+            'unsupported','Unknown native script plan version or save contract')
     script='operation.pas' if c['product']=='altium' else 'operation.il'
     render=altium if c['product']=='altium' else cadence
     expected_source=render(plan,str(root/c['document']),str(package.absolute()/'result.json'),str(package.absolute()/'started'))
@@ -154,14 +165,23 @@ def collect_script(package,root):
     require((package/'started').is_file(),'not_found','No native dispatch marker; script has not reported execution')
     read_file(package,'started')
     files=dict(b['files'])
+    current=read_file(root,c['document'])
     if (package/'result.json').exists():
         raw=read_file(package,'result.json');r=parse_json(raw)
-        require(r=={'plan_hash':h,'status':'applied_in_memory','before':plan['expected'],'after':plan['value'],'saved':False},
+        expected={'plan_hash':h,'status':'applied_in_memory','before':plan['expected'],'after':plan['value'],'saved':False}
+        if persistent: expected.update(status='saved_and_reloaded',saved=True,reloaded=True,capture='native-saved.PcbDoc')
+        require(r==expected,
                 'integrity_error','Native result does not match script contract')
-        files['native-result.json']=raw;status='applied_in_memory'
+        if persistent:
+            captured=read_file(package,'native-saved.PcbDoc')
+            require(captured==current,'stale_basis','Current native bytes differ from host save capture')
+            require(plan['expected']==plan['value'] or hashlib.sha256(captured).hexdigest()!=plan['baseline_file_hash'],
+                    'integrity_error','Changed comment reported but native bytes did not change')
+        files['native-result.json']=raw;status=r['status']
     else:status='unknown'
-    files['after/native/'+c['document']]=read_file(root,c['document'])
+    files['after/native/'+c['document']]=current
     return make_bundle(c['product'],'native-'+h[:24],files,plan['requirement_refs'],
-        source={'native_script_plan':h,'outcome':status},missing=['Native save not verified',
+        source={'native_script_plan':h,'outcome':status},missing=[
+            'Host-reported save/reload; native runtime not qualified' if status=='saved_and_reloaded' else 'Native save not verified',
             'Script runtime/version not qualified','Physical/electrical verification not performed',
             'Dependencies outside selected file not captured'])

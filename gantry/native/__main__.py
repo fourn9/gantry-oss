@@ -68,6 +68,7 @@ def main(argv=None):
     q=sub.add_parser('script-prepare')
     for n in ['root','config','expected','value','reason','output']:q.add_argument('--'+n,required=True)
     q.add_argument('--requirements')
+    q.add_argument('--save-format',choices=['PCB Binary'],help='Altium only: opt in to native save, reload and readback')
     q=sub.add_parser('script-collect')
     for n in ['root','package','output']:q.add_argument('--'+n,required=True)
     q=sub.add_parser('publish')
@@ -91,7 +92,7 @@ def main(argv=None):
         elif command=='script-prepare':
             from .scripts import prepare_script
             result=prepare_script(a['root'],load(a['config']),parse_json(a['expected']),parse_json(a['value']),a['reason'],
-                load(a['requirements']) if a.get('requirements') else [],a['output'])
+                load(a['requirements']) if a.get('requirements') else [],a['output'],save_format=a.get('save_format'))
         elif command=='script-collect':
             from .scripts import collect_script
             write_bundle(a['output'],collect_script(a['package'],a['root']));result={'bundle':a['output']}
