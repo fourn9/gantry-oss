@@ -32,3 +32,17 @@ class MonthlyTests(unittest.TestCase):
             Path(root,'inference.json').write_text(json.dumps({'phase':'started','context':{},'schema':{}}))
             with self.assertRaises(Fault) as error:infer_monthly({}, {}, root)
             self.assertEqual(error.exception.code,'outcome_unknown')
+    def test_explicit_model_and_effort_are_pinned_to_receipt(self):
+        commands=[]
+        class Process:
+            returncode=0
+            pid=99999999
+            def __init__(self,argv,**kw):
+                commands.append(argv); self.output=Path(argv[argv.index('-o')+1])
+            def communicate(self,prompt,timeout): self.output.write_text('{}')
+        with tempfile.TemporaryDirectory() as root, patch('gantry.monthly_codex.subprocess.run',return_value=SimpleNamespace(returncode=0,stdout='ChatGPT',stderr='')), patch('gantry.monthly_codex.subprocess.Popen',Process):
+            out=infer_monthly({}, {}, root, model='explicit-model', reasoning_effort='low')
+            self.assertEqual(commands[0][commands[0].index('--model')+1],'explicit-model')
+            self.assertIn('model_reasoning_effort="low"',commands[0])
+            self.assertEqual(out['provider']['model'],'explicit-model')
+            with self.assertRaises(Fault): infer_monthly({}, {}, root, model='different', reasoning_effort='low')

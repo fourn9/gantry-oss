@@ -10,13 +10,19 @@ from .runner import persist, stop_process
 from .monthly_recovery import rate_limit_state, rate_limit_fault
 
 
-def infer_monthly(context,schema,directory,timeout_seconds=180):
+def infer_monthly(context,schema,directory,timeout_seconds=180,*,model=None,reasoning_effort=None):
+    require(model is None or (isinstance(model,str) and model.strip() and '\x00' not in model),
+            'invalid_input','Explicit model must be a nonempty string')
+    require(reasoning_effort is None or reasoning_effort in {'minimal','low','medium','high','xhigh'},
+            'invalid_input','Unsupported reasoning effort')
+    settings = {k:v for k,v in {'model':model,'reasoning_effort':reasoning_effort}.items() if v is not None}
     root=Path(directory).resolve();root.mkdir(parents=True,exist_ok=True,mode=0o700)
     marker=root/'inference.json'
     failures=0
     if marker.exists():
         state=json.loads(marker.read_text())
         require(state['context']==context and state['schema']==schema,'idempotency_mismatch','Inference input changed')
+        require(state.get('inference_settings',{})==settings,'idempotency_mismatch','Inference settings changed')
         if state['phase']=='completed':return state['receipt']
         failure=rate_limit_state(root,state)
         if failure:raise rate_limit_fault(failure)
@@ -35,12 +41,14 @@ def infer_monthly(context,schema,directory,timeout_seconds=180):
         'Assess only the stated stage and acceptance. Propose concrete code/CAD source edits when warranted. '
         'Unavailable CAD/physics evidence must remain unverified. Internal reasoning is not requested; provide concise rationale.\n'+canonical(context))
     started={'phase':'started','context':context,'schema':schema,'failures':failures}
+    if settings: started['inference_settings']=settings
     persist(marker,started)
     with open(root/'events.jsonl','w') as events,open(root/'stderr.log','w') as errors:
         disabled=['shell_tool','unified_exec','view_image','browser_use','browser_use_external','computer_use',
                   'in_app_browser','image_generation','apps','plugins','hooks','multi_agent','multi_agent_v2','skill_search','skill_mcp_dependency_install']
         tool_flags=[arg for feature in disabled for arg in ('--disable',feature)]
-        proc=subprocess.Popen(['codex','exec','--ignore-user-config',*tool_flags,'-c','web_search="disabled"',
+        model_flags=(['--model',model] if model else []) + (['-c','model_reasoning_effort='+json.dumps(reasoning_effort)] if reasoning_effort else [])
+        proc=subprocess.Popen(['codex','exec','--ignore-user-config',*tool_flags,*model_flags,'-c','web_search="disabled"',
             '-c','mcp_servers={}','-c','features.skip_host_skill_discovery=true','-c','forced_login_method="chatgpt"',
             '-c','approval_policy="never"','--sandbox','read-only','--skip-git-repo-check','--ephemeral',
             '--json','--output-schema',str(schema_path),'-o',str(root/'answer.json'),'-'],
@@ -60,6 +68,8 @@ def infer_monthly(context,schema,directory,timeout_seconds=180):
             event=json.loads(line)
             if event.get('type')=='turn.completed':usage=event.get('usage')
         except ValueError:pass
-    receipt={'output':output,'provider':{'kind':'codex_subscription','usage':usage,'model':'CLI default'}}
-    persist(marker,{'phase':'completed','context':context,'schema':schema,'receipt':receipt})
+    receipt={'output':output,'provider':{'kind':'codex_subscription','usage':usage,'model':model or 'CLI default',
+        **({'reasoning_effort':reasoning_effort} if reasoning_effort else {})}}
+    persist(marker,{'phase':'completed','context':context,'schema':schema,'receipt':receipt,
+        **({'inference_settings':settings} if settings else {})})
     return receipt
