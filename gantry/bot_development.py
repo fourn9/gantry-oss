@@ -264,6 +264,7 @@ class BotDevelopmentMixin:
         result['candidates_truncated'] = bool(pending)
         if self._binding_access(s, actor, self._bd_binding(s, task['session_id'], task['bot_id'])):
             result['memory'] = self._persistent_memory_page(s, actor, bot, org, {'limit': 30}, con, recent=True)
+            result['learning_plan'] = self._learning_context(s, actor, task)
         result.update(self._crew_context(s, actor, task, con))
         return result
 
@@ -368,6 +369,7 @@ class BotDevelopmentMixin:
         org = s['organizations'][s['persistent_bots'][task['bot_id']]['organization_id']]
         if org.get('share_reflections'):
             self._bd_share_memory(s, actor, org, memory, fx)
+        self._learning_enqueue(s, actor, task, fx)
         self._bd_wake_parent(s, task, fx, n, con)
         if task['status'] in TERMINAL: self._crew_return_response(s, task, fx, n)
         return {'task': self._bd_public(task), 'memory_id': memory['id'], 'formal_adoption': False}

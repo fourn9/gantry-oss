@@ -22,6 +22,7 @@ def environment_manifest(config):
     """Commit public local configuration, not credentials, in the runtime declaration."""
     fields = ('backend', 'command', 'executable_hash', 'cad_python', 'verification', 'environment_definition')
     if 'workflow' in config: fields += ('workflow',)
+    if config.get('experience_learning'): fields += ('experience_learning',)
     if config.get('agent_loop'): fields += ('agent_loop', 'local_tools', 'tool_runtime', 'sandbox')
     return {'name': config['name'], 'backend': config['backend'], 'tools': config.get('tools', []),
             'definition': digest({k: config.get(k) for k in fields})}
@@ -68,6 +69,9 @@ class BotWorker:
     def __init__(self, client, config, journal, infer_fn=None):
         require(config.get('workflow') in (None, 'bot_development', 'legacy_review'),
                 'invalid_input', 'Unknown Bot runtime workflow')
+        require(isinstance(config.get('experience_learning', False), bool), 'invalid_input', 'experience_learning must be boolean')
+        require(not config.get('experience_learning') or config.get('workflow') == 'bot_development',
+                'invalid_input', 'Experience learning belongs to independent Bot development')
         self.client, self.config = client, config
         self.bot_id = config['bot_id']
         self.root = Path(journal) / digest(self.bot_id)
@@ -111,6 +115,9 @@ class BotWorker:
         require(self.runtime and not self.lost.is_set(), 'runtime_offline', 'Reconnect the stopped runtime first')
         self.client.call('heartbeat_bot_runtime', {'bot_id': self.bot_id, 'fence': self.runtime['fence']})
         results = []; after = None
+        if self.config.get('experience_learning'):
+            from .bot_learning_runtime import drain_reflections
+            results.extend(drain_reflections(self.client, self.bot_id, self.infer, self.root/'learning'))
         while True:
             page = self.client.call('bot_inbox', {'bot_id': self.bot_id, **({'after': after} if after else {})})
             for job in page['jobs']:
@@ -133,6 +140,8 @@ class BotWorker:
                     result = {'job_id': job['id'], 'status': 'held',
                               'reason': exc.code if isinstance(exc, Fault) else type(exc).__name__}
                 results.append(result)
+                if self.config.get('experience_learning'):
+                    results.extend(drain_reflections(self.client, self.bot_id, self.infer, self.root/'learning'))
             after = page['next_cursor']
             if not after: break
         persist(self.root/'last-tick.json', {'bot_id': self.bot_id, 'results': results})

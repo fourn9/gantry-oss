@@ -197,3 +197,9 @@ Bot reasoning and exact-state tool checks. General planning quality, development
 toolchains need their own integration validation. No automatic optimal-organization
 learning, arbitrary process-memory restoration or cross-service live-job transfer
 is claimed.
+
+## Experience across tasks
+
+The optional [learning loop](BOT_LEARNING.md) adds explicit recall, planning and
+post-report reflection to this execution path. Existing workers remain unchanged
+until the customer enables `experience_learning` in their approved environment.

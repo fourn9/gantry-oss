@@ -30,6 +30,9 @@ def _input(context, workspace):
         'error': a['details'].get('result', {}).get('error') if isinstance(a['details'].get('result'), dict) else None,
         'detail_reference': {'operation': 'get_bot_records', 'kind': 'actions', 'task_id': a['task_id']}}
         for a in context.get('actions', [])]
+    if context.get('learning_plan'):
+        from .bot_learning_recall import planning_view
+        context['learning_plan'] = planning_view(context['learning_plan'])
     manifest = context['development'].pop('manifest')
     context['development'].pop('diffs', None)
     # Restore receipts contain one hash per file and are proof of transfer, not
@@ -120,6 +123,10 @@ def process_bot_task(client, queued, root, infer_fn, runtime_fence, recovered=No
                            initial_fingerprint=safe_fingerprint(workspace))
             persist(marker, journal)
         if journal['phase'] == 'inference':
+            if loop_config and loop_config.get('experience_learning'):
+                from .bot_learning_runtime import plan_task
+                journal['input']['learning_plan'] = plan_task(client, ref, journal['input'], infer_fn, directory/'learning')
+                persist(marker, journal)
             if loop_config and loop_config.get('agent_loop'):
                 from .crew_runtime import run_actions
                 receipt = run_actions(client, journal['input'], ref, infer_fn, loop_config, directory/'actions')
