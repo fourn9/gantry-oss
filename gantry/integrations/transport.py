@@ -73,6 +73,8 @@ def _exchange(request, credential_ref):
     require(token or urlsplit(request.url).hostname=='api.github.com', 'credential_missing','Credential reference required')
     headers={'Accept':'application/json','User-Agent':'Gantry-integrations/1',**request.headers}
     if token:
+        require(token not in request.url and token.encode() not in (request.body or b''),
+                'credential_detected','Configured credential found in request data')
         if request.auth=='basic': value='Basic '+base64.b64encode(token.encode()).decode()
         elif request.auth=='raw': value=token
         else: value='Bearer '+token

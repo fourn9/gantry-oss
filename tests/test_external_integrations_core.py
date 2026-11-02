@@ -58,3 +58,21 @@ class PublicationTests(unittest.TestCase):
         cp=publish(self.client,state['id'],c['id'],c['version'],path,'history')
         view=self.call('get_development_state',{'state_id':cp['state']['id']})
         self.assertEqual(view['requirement_coverage']['items'][0]['status'],'needs_review')
+
+    def test_native_update_evidence_flows_into_core(self):
+        from gantry.integrations.writes import prepare,apply,evidence
+        from test_external_writes import CONFIG,CHANGE,FakeGithub
+        state,old_change,unused,ref=self.prepare();remote=FakeGithub()
+        planpath=self.root/'native-plan';journal=self.root/'native-journal'
+        plan=prepare(CONFIG,CHANGE,'Requirement-linked controller update',[ref],planpath,'GANTRY_CONNECTOR_TEST',remote)
+        applied=apply(planpath,plan['plan_hash'],journal,'GANTRY_CONNECTOR_TEST',transport=remote)
+        self.assertEqual(applied['status'],'verified')
+        bundle=evidence(planpath,journal);path=self.root/'native-evidence';write_bundle(path,bundle)
+        source=bundle['manifest']['source_id'];change=self.begin(state,['imports/'+source+'/'])
+        result=publish(self.client,state['id'],change['id'],change['version'],path,'native-evidence')
+        view=self.call('get_development_state',{'state_id':result['state']['id']})
+        self.assertIn('imports/'+source+'/payload/after.json',view['manifest'])
+        self.assertEqual(view['requirement_coverage']['items'][0]['status'],'unverified')
+        self.assertEqual(view['status']['adoption'],'unadopted')
+        self.assertEqual(view['state']['context']['environment']['external_sources'][source]['requirement_refs'],[ref])
+        self.assertTrue(self.call('replay')['matched'])

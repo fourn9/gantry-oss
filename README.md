@@ -14,8 +14,9 @@ Gantry has two product areas:
 Selected external records can be captured with `gantry-integrations`: bounded SaaS
 readers, local workbook cells, and original-format saved exports feed immutable,
 requirement-linked checkpoints. See [supported routes and unverified native
-connections](docs/EXTERNAL-INTEGRATIONS.md). Export capture is not native CAD editing
-or automatic synchronization.
+connections](docs/EXTERNAL-INTEGRATIONS.md). Selected native objects can also be
+updated through [reviewable write plans and readback verification](docs/EXTERNAL-WRITES.md).
+Export capture is not native CAD editing or automatic synchronization.
 
 **Two service entry points:** `gantry-ledger` for customer-led development
 and review, and `gantry-crew` for delegated Bot development.

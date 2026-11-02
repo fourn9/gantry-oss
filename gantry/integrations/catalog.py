@@ -18,17 +18,21 @@ API = {'confluence','excel','github','gitlab','google-drive','google-sheets','ji
 
 
 def catalog():
+    from .write_recipes import OPERATIONS, ATOMIC
     rows=[]
     for group,names in [('listed',CURRENT),('coming_soon',COMING),('home_logo_only',HOME_ONLY)]:
         for ident,name in names.items():
             routes=['saved_export']
             if ident in API: routes.append('scoped_api_read')
+            if ident in OPERATIONS: routes.append('planned_native_update')
             if ident=='excel': routes.append('local_xlsx_cells')
             if ident=='cursor': routes.append('existing_project_mcp')
             if ident=='python': routes.append('existing_scoped_runner')
             rows.append({'id':ident,'name':name,'reference_status':group,'routes':routes,
-                'native_write':False,'live_account_verified':False,
-                'limitation':('API request/response contract tested; live credentials not tested.' if ident in API else
+                'native_write':ident in OPERATIONS,'native_write_operations':sorted(OPERATIONS.get(ident,[])),
+                'write_concurrency':{op:('provider_condition' if (ident,op) in ATOMIC else 'preflight_only')
+                                     for op in sorted(OPERATIONS.get(ident,[]))},'live_account_verified':False,
+                'limitation':('Selected read/update API contracts tested; live credentials not tested; see operation scope.' if ident in API else
                     'Saved export capture is not native synchronization or native editing.'),
                 'source':SOURCE if group!='home_logo_only' else 'https://www.flowengineering.com/',
                 'reviewed_at':REVIEWED})

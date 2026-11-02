@@ -26,6 +26,18 @@ def main(argv=None):
         cmd.add_argument('--requirements',help='JSON array of requirement_id/revision_id references')
         cmd.add_argument('--select',help='JSON filename -> JSON pointers; original bytes remain saved')
     inspect=sub.add_parser('inspect'); inspect.add_argument('--bundle',required=True)
+    prepare=sub.add_parser('prepare-write',help='Read a target and save a reviewable native update plan')
+    for name in ('config','change','reason','credential-ref','output'): prepare.add_argument('--'+name,required=True)
+    prepare.add_argument('--requirements',help='JSON requirement/revision references')
+    apply=sub.add_parser('apply-write',help='Apply an exact plan once and read back the selected fields')
+    apply.add_argument('--expect-plan',required=True,help='Exact plan_hash returned by prepare-write')
+    apply.add_argument('--allow-nonatomic',action='store_true',help='Acknowledge preflight-only concurrency protection')
+    reconcile=sub.add_parser('reconcile-write',help='Read an uncertain result again; never resend the write')
+    export=sub.add_parser('export-write',help='Export before/after/write evidence for Core publication')
+    export.add_argument('--output',required=True)
+    for cmd in (apply,reconcile,export):
+        cmd.add_argument('--plan',required=True); cmd.add_argument('--journal',required=True)
+    for cmd in (apply,reconcile): cmd.add_argument('--credential-ref',required=True)
     pub=sub.add_parser('publish')
     for name in ('bundle','url','token-file','state-id','change-id','key'): pub.add_argument('--'+name,required=True)
     pub.add_argument('--version',type=int,required=True)
@@ -35,6 +47,23 @@ def main(argv=None):
             from .catalog import catalog
             result=catalog()
         elif args.action=='inspect': result=read_bundle(args.bundle)['manifest']
+        elif args.action=='prepare-write':
+            from .writes import prepare
+            result=prepare(load(args.config),load(args.change),args.reason,load(args.requirements,[]),
+                           args.output,args.credential_ref)
+        elif args.action=='apply-write':
+            from .writes import apply
+            result=apply(args.plan,args.expect_plan,args.journal,args.credential_ref,args.allow_nonatomic)
+            # Full native bodies stay in private evidence, not terminal logs.
+            result={k:v for k,v in result.items() if k not in {'response','after'}}
+        elif args.action=='reconcile-write':
+            from .writes import reconcile
+            result=reconcile(args.plan,args.journal,args.credential_ref)
+            result={k:v for k,v in result.items() if k not in {'response','after'}}
+        elif args.action=='export-write':
+            from .writes import evidence
+            bundle=evidence(args.plan,args.journal);write_bundle(args.output,bundle)
+            result={'bundle':str(Path(args.output).absolute()),'outcome':bundle['manifest']['source']['outcome'],'published':False}
         elif args.action=='publish':
             from ..client import Client
             from .publication import publish

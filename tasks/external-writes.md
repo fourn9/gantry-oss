@@ -33,10 +33,10 @@ API credentials are supplied separately for each invocation, never included in p
 
 ## Plan / task list
 
-- [ ] GitHub file vertical slice: plan, conditional write, verification and durable retry.
-- [ ] Remaining provider recipes with strict native targets and selected fields.
-- [ ] CLI + evidence publication roundtrip; no silent pass/adoption.
-- [ ] Security/negative cases, full tests, build, capability and usage documentation.
+- [x] GitHub file vertical slice: plan, conditional write, verification and durable retry.
+- [x] Remaining provider recipes with strict native targets and selected fields.
+- [x] CLI + evidence publication roundtrip; no silent pass/adoption.
+- [x] Security/negative cases, full tests, build, capability and usage documentation.
 
 ## Threat boundaries and limitations
 
@@ -49,4 +49,42 @@ No OAuth onboarding, continuous sync or licensed desktop SDK automation in this 
 No live remote mutation, paid service, customer data or parent checkout change.
 
 Commands: `python -m unittest discover -s tests -p 'test_external*.py' -v`;
-`python -m unittest discover -s tests -p 'test_*.py' -q`; `python -m build --wheel`.
+`python -m unittest discover -s tests -p 'test_*.py' -q`; `python -m pip wheel . --no-deps --no-build-isolation --wheel-dir /tmp/gantry-native-write-dist`.
+
+## Review findings addressed
+
+- Read-only GraphQL transport now rejects mutations. Native write transport reconstructs
+  allowlisted requests rather than accepting arbitrary URLs/methods.
+- Partially failed GraphQL/native responses after dispatch are unknown, not assumed
+  unapplied. Durable receipts prohibit redispatch and support read-only reconciliation.
+- Plans are checked against original observations; server-normalized mismatches are
+  retained, not silently labeled verified. Onshape preserves untouched native fields.
+- Decoded repository content is screened for configured credential echoes as well as
+  known secret patterns. Single-source size bounds protect local journals/bundles.
+- CLI output omits raw response/readback bodies. Full evidence stays in owner-only
+  capture/journal files for explicitly authorized Core publication.
+- Fresh explicit preparations have distinct intent IDs; retries reuse the saved plan.
+  No deduplication across independently created plans or journal stores is claimed.
+
+No database migration, parent-checkout change, mandatory dependency or live write.
+Native persistence is not engineering acceptance. Core execution authorization is
+still the caller's existing work-contract path; this CLI is not a new public write API.
+
+## Final evidence (2026-11-03)
+
+- 18 added tests (17 native-write tests and one real Core evidence/publication test).
+  Native fixtures cover all 12 providers / 13 operations, not live tenant acceptance.
+- External-integration suite: 34 tests passed.
+- Full Python suite: 717 cases, one skipped, no failures (85.163 seconds).
+- Wheel built with pip's existing setuptools backend, installed outside this checkout;
+  the 17 native-write tests, including CLI prepare/apply/reconcile/export, passed against
+  the installed package. `python -m build` was unavailable; no dependency was added.
+- Core test retained pinned requirement links and before/after/request evidence while
+  requirement coverage remained unverified and adoption remained unadopted. Replay matched.
+- Checked stale baselines, permission/conflict refusals, mismatching readback, no-op,
+  GraphQL partial errors, crash/lost response, concurrent dispatch, payload/host bounds,
+  plan tampering and configured credentials hidden inside base64 repository content.
+- Documentation and catalog distinguish metadata-only updates, preflight-only operations,
+  unsupported vendor tools and untested live accounts. No remote service was mutated.
+- No public push/release or parent-thread merge; package version remains the branch's
+  existing 3.3.0 metadata, not a claim that this is the published release artifact.

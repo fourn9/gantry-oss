@@ -4,11 +4,12 @@ This local CLI captures selected external records into Gantry development states
 It preserves original bytes and publishes an explicit requirement-linked checkpoint;
 importing a result does not prove a requirement, run a solver, or adopt a design.
 
-The implementation is an initial acquisition layer, **not feature parity with all
+The implementation provides selected acquisition and planned updates, **not feature parity with all
 advertised Flow integrations**. Cloud endpoints have request/response contract tests,
 not authenticated vendor-account acceptance. No vendor credentials were supplied.
-No always-on sync, webhook listener, provider OAuth application, outbound messages,
-remote issue edits or native CAD writes were added by this module.
+Selected native writes now have a separate prepare/apply/readback path; see
+[write operations, concurrency and limitations](EXTERNAL-WRITES.md). There is no
+always-on sync, webhook listener or provider OAuth onboarding application.
 
 ## What can be used
 
@@ -18,13 +19,13 @@ remote issue edits or native CAD writes were added by this module.
 | GitLab | One immutable commit on gitlab.com | No diff/pipeline acquisition or self-hosted endpoint yet |
 | Confluence Cloud | Page body in storage format and version | No attachments or child-page traversal |
 | Jira Cloud | Issue fields/status | No full history or complete comments |
-| Linear | Issue, team, workflow status and cycle via fixed GraphQL query | No issue creation/update |
+| Linear | Issue, team, workflow status and cycle via fixed GraphQL query | No creation; selected updates use the separate write path |
 | Notion | Direct child blocks, bounded page and explicit cursor | No recursion, attached binaries or page-wide atomic revision |
 | Google Drive | Native Google document export to text/CSV/PDF/DOCX/XLSX | Export bytes are not the native editable cloud document; no ordinary binary download |
 | Google Sheets | Explicit A1 range values | No formulas/formats or atomic revision |
 | Excel | Graph workbook range or local XLSX selected cells | No recalculation; cached formula values are marked unverified |
 | SharePoint | Graph drive item metadata and eTag | Document bytes must be supplied separately; download URLs are not followed |
-| Onshape | Part Studio mass properties at an immutable microversion | No native document editing, assembly constraints or material validation |
+| Onshape | Part Studio mass properties at an immutable microversion | No full document/assembly editing or material validation; named parameter updates use the write path |
 | Slack | Explicit channel history window and pagination cursor | No threads, live bot mentions, slash command or replies |
 | Cursor | Existing `gantry connect --client cursor` / project MCP | Depends on customer's agent and client trust setup; no hosted Cursor launch |
 | Python | Saved scripts/results plus existing scoped Runner recipes | Capture does not execute imported code |
@@ -184,7 +185,8 @@ spreadsheet or Onshape is evidence, not automatically a passing physical check.
 ## Security and operational limits
 
 - HTTPS to fixed public SaaS hosts; no arbitrary URL, redirects, inherited proxy,
-  automatic command execution, or outbound writes. Existing GitHub/cloud features
+  automatic command execution, or implicit writes. Native updates require the explicit
+  planned-write path. Existing GitHub/cloud features
   outside this CLI are unchanged.
 - One bounded request per pull; 8 MiB response, 15-second socket timeout and a checked
   30-second acquisition deadline (a blocked read may take up to one socket timeout
@@ -205,9 +207,9 @@ spreadsheet or Onshape is evidence, not automatically a passing physical check.
 Native Relyence needs a versioned API contract and a licensed test tenant. The
 coming-soon/home-only products need exact product/modules, supported versions,
 authorization and SDK/API access; generic exports do not resolve these gaps.
-Next steps are authenticated read acceptance, complete pagination/nested-content
-capture, explicit write-back proposals with concurrency checks, and source-specific
-webhook/synchronization paths. None is labeled complete by the current catalog.
+Next steps are authenticated read/write acceptance, complete pagination/nested-content
+capture, broader native editing, and source-specific webhook/synchronization paths.
+Planned updates cover only the operations explicitly listed in the catalog.
 
 ## Primary API references
 
