@@ -1,4 +1,4 @@
-"""Customer-local native API CLI. Use --help; no vendor application is installed or launched."""
+"""Customer-local native API CLI. Explicit script-run may launch a pinned Altium host."""
 import argparse
 import json
 import subprocess
@@ -71,6 +71,14 @@ def main(argv=None):
     q.add_argument('--save-format',choices=['PCB Binary'],help='Altium only: opt in to native save, reload and readback')
     q=sub.add_parser('script-collect')
     for n in ['root','package','output']:q.add_argument('--'+n,required=True)
+    q=sub.add_parser('script-run',help='Dispatch an exact Altium v2 script once to a pinned local X2.EXE')
+    for n in ['root','package','expect-plan','executable','expect-executable']:q.add_argument('--'+n,required=True)
+    q.add_argument('--exclusive',action='store_true')
+    q=sub.add_parser('script-status',help='Read/reconcile native receipt; never launch or repeat a write')
+    for n in ['root','package']:q.add_argument('--'+n,required=True)
+    q.add_argument('--writer-stopped',action='store_true',help='Confirm native script has finished before releasing target hold')
+    q=sub.add_parser('script-evidence',help='Export frozen CLI-dispatched native result for publication')
+    for n in ['root','package','output']:q.add_argument('--'+n,required=True)
     q=sub.add_parser('publish')
     for n in ['bundle','url','token-file','state','change','key']:q.add_argument('--'+n,required=True)
     q.add_argument('--version',type=int,required=True)
@@ -96,13 +104,23 @@ def main(argv=None):
         elif command=='script-collect':
             from .scripts import collect_script
             write_bundle(a['output'],collect_script(a['package'],a['root']));result={'bundle':a['output']}
+        elif command=='script-run':
+            from .launcher import run_script
+            result=run_script(a['package'],a['root'],a['expect_plan'],a['executable'],a['expect_executable'],exclusive=a['exclusive'])
+        elif command=='script-status':
+            from .launcher import script_status
+            result=script_status(a['package'],a['root'],writer_stopped=a['writer_stopped'])
+        elif command=='script-evidence':
+            from .launcher import script_evidence
+            write_bundle(a['output'],script_evidence(a['package'],a['root']));result={'bundle':a['output']}
         else:
             from ..client import Client
             from ..integrations.publication import publish
             token=Path(a['token_file']).resolve()
             require(not token.is_relative_to(Path(a['bundle']).resolve()),'credential_detected','Token must be outside capture')
             result=publish(Client(a['url'],token.read_text().strip()),a['state'],a['change'],a['version'],a['bundle'],a['key'])
-        print(json.dumps(result,indent=2));return 0
+        print(json.dumps(result,indent=2))
+        return 1 if command in {'script-run','script-status'} and result.get('status')=='unknown' else 0
     except Fault as exc:print(canonical({'error':exc.as_dict()}));return 1
     except (OSError,ValueError,KeyError,TypeError):
         print(canonical({'error':{'code':'invalid_input_or_io','message':'Check local paths and input; no blind write retry'}}));return 1

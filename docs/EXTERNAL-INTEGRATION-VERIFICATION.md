@@ -5,6 +5,11 @@ This report records local and contract evidence, not full vendor qualification.
 No customer credentials, licensed Windows hosts, paid services or remote writes
 were used. Existing ledger data and the separate Bot checkout were not changed.
 
+Subsequent Altium CLI host dispatch/recovery work is tracked in
+[native host completion](../tasks/native-host-completion.md) and documented in
+[Native desktop operations](NATIVE-DESKTOP.md). It does not change the absence of
+licensed-runtime acceptance recorded here.
+
 ## Completed changes
 
 | Area | Change | Evidence |

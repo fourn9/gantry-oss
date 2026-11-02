@@ -18,7 +18,7 @@ Install and qualify against a disposable project before enabling an agent to wri
 | `catia-v5` | Attach to V5 Automation; read numeric part parameter | Set writable, non-relation-driven Value, Part.Update, document.Save, read back | CATProduct, 3DEXPERIENCE APIs, automatic unit conversion |
 | `creo` | VB API asynchronous connection; read typed model parameter | Set scalar union value, regenerate, save local .prt, capture latest numbered file | Windchill, assemblies, dimensions, automatic application version detection |
 | `solidworks-electrical` | Electrical COM API; identify environment/project; read user data | Set existing project user-data field, update database, read back | Wiring/routing edits, entire project archive, unrelated editor dirty-state capture |
-| `altium` | Generate DelphiScript for the native PCB host | Existing PCB component comment; optional save/reload/readback and saved-byte capture | Automated host invocation, live runtime qualification, schematic editing, Altium 365 API |
+| `altium` | Generate DelphiScript; explicit CLI dispatch to pinned X2.EXE | Existing PCB component comment; optional save/reload/readback and saved-byte capture | Live runtime qualification, automatic document opening, schematic editing, Altium 365 API |
 | `cadence` | Generate SKILL for Allegro PCB Editor | Existing string property on current design; transaction and in-memory readback | Automated host invocation, verified native save, OrCAD/Virtuoso/general Cadence support |
 | `zuken-e3` | **Blocked; no executable native driver** | None | E3.series module/version, licensed SDK member signatures and save/identity semantics |
 | `capital` | **Blocked; no executable native driver** | None | Exact Capital module/version, licensed Java/SOA SDK, identity/transaction/save contracts |
@@ -143,7 +143,8 @@ The quoting above is shell syntax for passing JSON strings; use the correspondin
 quoting for your shell. Open and review `operation.pas` or `operation.il`. In Altium,
 add the `.pas` to a script project and run `GantryApply`. In Allegro, load `.il` in
 the native SKILL host and call `gantryApply()`. These steps require a human/operator
-and have not been run here. Nothing executes on `script-prepare`.
+and have not been run here. Nothing executes on `script-prepare`. Altium v2 plans
+also have the explicit CLI dispatch path below.
 
 The script checks native document identity, existence and old field value before
 editing. It writes `started` before attempting the operation and `result.json`
@@ -177,14 +178,63 @@ Collect rejects missing/stale captures or unchanged bytes for a reported change.
 This outcome means **host-reported persistence**, not a qualified Altium runtime
 or physical/electrical correctness. The script is contract-tested but has not been
 compiled/run in Altium here. Confirm the installed save format in a disposable PCB;
-other formats are intentionally rejected. The initial host command remains an
-operator step. A failure after dispatch stays unknown; no automatic rewrite or
+other formats are intentionally rejected. The initial host command can be
+dispatched by the CLI below, or run manually. A failure after dispatch stays unknown; no automatic rewrite or
 rollback. Original v1 scripts/receipts retain their in-memory-only semantics.
 Allegro continues to require a separately qualified save/reopen implementation.
 
 Primary save/reload contract:
 [IServerDocument](https://www.altium.com/documentation/altium-dxp-developer/iserverdocument-interface),
 [IClient document lookup](https://www.altium.com/documentation/altium-dxp-developer/iclient-interface).
+
+### Explicit Altium CLI dispatch and recovery
+
+Use a disposable, already open and clean PCB in the declared installed Altium
+version. Prepare a v2 package with `--save-format 'PCB Binary'`, inspect the generated
+script, and supply its exact plan hash. The CLI does not install Altium, open a
+board, acquire a license, or authorize unrelated operations. A first-time user
+must qualify command parsing and the save format against the installed release.
+
+Obtain the SHA-256 of the installed `X2.EXE`, for example with PowerShell's
+`Get-FileHash -Algorithm SHA256`, and pass it in lowercase. Pinning checks the local
+binary; it is not Authenticode verification or protection against a malicious
+process running as the same OS user. Keep the executable in its protected install
+directory and restrict access to the operator root/capture directory.
+
+```sh
+gantry-native script-run --root C:/work/disposable --package C:/captures/pcb-001 --expect-plan EXACT_PLAN_HASH --executable "C:/Program Files/Altium/AD26/X2.EXE" --expect-executable LOWERCASE_SHA256 --exclusive
+gantry-native script-status --root C:/work/disposable --package C:/captures/pcb-001
+# After confirming the native script has finished:
+gantry-native script-status --root C:/work/disposable --package C:/captures/pcb-001 --writer-stopped
+gantry-native script-evidence --root C:/work/disposable --package C:/captures/pcb-001 --output C:/captures/pcb-result-001
+```
+
+`AD26` is an example path, not a qualified product version. Dispatch is Windows-only
+and accepts the generated Altium v2 operation, not caller-supplied scripts. The
+launch command uses a subprocess argument array with `shell=False`; process
+delimiters in the script path are rejected. `GANTRY_*` environment variables are
+not forwarded. The CAD process is neither waited on indefinitely nor killed.
+
+A persistent document hold and `dispatching` receipt are committed before process
+creation. Repeating `script-run` returns the existing record without relaunching,
+even after client interruption. `dispatched`, process exit, and a PID never mean
+the edit succeeded: Altium may hand the command to an existing instance. A failed
+launch remains uncertain and does not automatically release the document hold.
+
+`script-status` performs no native writes. After explicit stopped-writer
+confirmation it checks the native receipt and saved byte capture, freezes the
+evidence, then releases the hold atomically. Invalid/missing evidence retains the
+hold. `script-evidence` exports this frozen result, unaffected by subsequent PCB
+changes. The existing `publish` command sends it through the scoped Core path.
+Only a host-reported save/reload is recorded; engineering verification remains
+unverified and formal adoption remains separate. Keep the local journal and
+prepared package; deleting either defeats recovery guarantees.
+
+Dispatch combines Altium's documented command-line process mechanism with its
+documented `ScriptingSystem:RunScriptFile(FileName=...|ProcName=...)` process. No
+licensed host was available to validate the combination:
+[command-line automation](https://resources.altium.com/p/continuous-integration-implementation-using-altium-designer),
+[RunScriptFile](https://www.altium.com/documentation/altium-designer/scripting/running-scripts).
 
 ## Recovery, integrity and limits
 

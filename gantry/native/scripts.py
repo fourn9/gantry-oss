@@ -1,4 +1,4 @@
-"""Inspectable, single-use native host scripts. No unattended host launch or saved-pass claim."""
+"""Inspectable, single-use native host scripts and bounded receipt collection."""
 import hashlib
 import json
 import re
@@ -144,13 +144,19 @@ def prepare_script(root,config,expected,value,reason,refs,destination,*,save_for
     return {'plan_hash':h,'script':script_name,'native_write':False,'status':'awaiting_native_host_execution'}
 
 
-def collect_script(package,root):
+def validated_script(package,root):
     root=root_path(root);package=Path(package);b=read_bundle(package)
     plan=parse_json(b['files']['plan.json']);h=digest(plan)
+    fields={'version','intent_id','target','expected','value','reason','requirement_refs',
+            'operator_root','baseline_file_hash','baseline_value_source'}
+    require(set(plan)==(fields|{'save_format'} if plan.get('version')==2 else fields),
+            'integrity_error','Unexpected script plan fields')
     require(b['manifest']['source']=={'native_script_plan':h},'integrity_error','Script plan changed')
     require(plan['operator_root']==root_identity(root),'scope_denied','Use the operator root where the script was prepared')
     require(plan['requirement_refs']==b['manifest']['requirement_refs'],'integrity_error','Requirement references differ')
     c=plan['target'];require(c['product'] in {'altium','cadence'},'unsupported','Native scripting product required')
+    require(set(c)=={'product','document','selector','version'},'integrity_error','Invalid script target')
+    safe_file(c['document'])
     persistent=plan.get('version')==2
     require(plan.get('version') in {1,2} and (not persistent or
             (c['product']=='altium' and plan.get('save_format')=='PCB Binary')),
@@ -162,6 +168,12 @@ def collect_script(package,root):
     require(hashlib.sha256(b['files']['before/native/'+c['document']]).hexdigest()==plan['baseline_file_hash'],
             'integrity_error','Native baseline bytes differ')
     require(read_file(package,script)==b['files'][script],'integrity_error','Executed script copy changed')
+    return plan,h,b
+
+
+def collect_script(package,root):
+    root=root_path(root);package=Path(package)
+    plan,h,b=validated_script(package,root);c=plan['target'];persistent=plan['version']==2
     require((package/'started').is_file(),'not_found','No native dispatch marker; script has not reported execution')
     read_file(package,'started')
     files=dict(b['files'])
