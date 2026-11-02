@@ -1,5 +1,12 @@
 # Implementation checklist
 
+## Personal Bot continuity (2026-11-03)
+
+- [x] Versioned working context and cross-task retrieval.
+- [x] Conditional procedure/action/outcome links.
+- [x] Explicit standing delegation and selective wake/restart.
+- [x] Runtime integration, security/replay regressions, real-model evidence and docs.
+
 ## Bot-owned organization loop
 
 - [x] Record directed consultation, attributed decisions, candidate identity and lessons.

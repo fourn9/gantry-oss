@@ -134,6 +134,7 @@ def main(service=None):
     bot_worker.add_argument('--interval', type=int, default=10)
     bot_worker.add_argument('--manifest', action='store_true', help='Print the public environment manifest for owner approval; do not execute')
     bot_worker.add_argument('--recover-job', help='Explicitly recover and finish one interrupted job')
+    bot_worker.add_argument('--recover-reflection', help='Recover one held reflection from its original private journal')
     bot_worker.add_argument('--confirm-stopped', help='Reason confirming old processes have stopped')
     bot_worker.add_argument('--retry-inference', action='store_true')
     bot_worker.add_argument('--collect-interrupted-verification', action='store_true')
@@ -287,8 +288,12 @@ def main(service=None):
                 if config.get('workflow') not in (None, 'bot_development'):
                     raise Fault('scope_denied', 'This runtime belongs to another workflow; keep its original entry point')
                 config['workflow'] = 'bot_development'
+            if args.recover_job and args.recover_reflection: raise Fault('invalid_input', 'Choose one recovery target')
             if args.manifest:
                 result = environment_manifest(config)
+            elif args.recover_reflection:
+                with BotWorker(configured_client(config), config, args.journal) as worker:
+                    result = worker.recover_reflection(args.recover_reflection, args.confirm_stopped, args.retry_inference)
             elif args.recover_job:
                 with BotWorker(configured_client(config), config, args.journal) as worker:
                     result = worker.recover(args.recover_job, args.confirm_stopped,

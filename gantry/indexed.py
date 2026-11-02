@@ -37,6 +37,7 @@ def schema(con):
       CREATE INDEX IF NOT EXISTS evidence_by_subject ON records(collection,state_id,subject_id,id);
       CREATE INDEX IF NOT EXISTS evidence_by_profile ON records(collection,state_id,profile,id);
       CREATE INDEX IF NOT EXISTS records_by_subject ON records(collection,subject_id,id);
+      CREATE INDEX IF NOT EXISTS records_by_subject_recent ON records(collection,subject_id,created_seq DESC,id DESC);
       CREATE INDEX IF NOT EXISTS records_job_dispatch ON records(session_id,
         COALESCE(json_extract(body,'$.value.role'),json_extract(body,'$.role')),
         COALESCE(json_extract(body,'$.value.principal_id'),json_extract(body,'$.principal_id')),

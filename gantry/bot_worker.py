@@ -22,6 +22,8 @@ def environment_manifest(config):
     """Commit public local configuration, not credentials, in the runtime declaration."""
     fields = ('backend', 'command', 'executable_hash', 'cad_python', 'verification', 'environment_definition')
     if 'workflow' in config: fields += ('workflow',)
+    if config.get('experience_learning'): fields += ('experience_learning',)
+    if config.get('personal_continuity'): fields += ('personal_continuity',)
     if config.get('agent_loop'): fields += ('agent_loop', 'local_tools', 'tool_runtime', 'sandbox')
     return {'name': config['name'], 'backend': config['backend'], 'tools': config.get('tools', []),
             'definition': digest({k: config.get(k) for k in fields})}
@@ -68,6 +70,12 @@ class BotWorker:
     def __init__(self, client, config, journal, infer_fn=None):
         require(config.get('workflow') in (None, 'bot_development', 'legacy_review'),
                 'invalid_input', 'Unknown Bot runtime workflow')
+        require(isinstance(config.get('experience_learning', False), bool), 'invalid_input', 'experience_learning must be boolean')
+        require(not config.get('experience_learning') or config.get('workflow') == 'bot_development',
+                'invalid_input', 'Experience learning belongs to independent Bot development')
+        require(isinstance(config.get('personal_continuity', False), bool), 'invalid_input', 'personal_continuity must be boolean')
+        require(not config.get('personal_continuity') or config.get('workflow') == 'bot_development',
+                'invalid_input', 'Personal continuity belongs to independent Bot development')
         self.client, self.config = client, config
         self.bot_id = config['bot_id']
         self.root = Path(journal) / digest(self.bot_id)
@@ -111,6 +119,18 @@ class BotWorker:
         require(self.runtime and not self.lost.is_set(), 'runtime_offline', 'Reconnect the stopped runtime first')
         self.client.call('heartbeat_bot_runtime', {'bot_id': self.bot_id, 'fence': self.runtime['fence']})
         results = []; after = None
+        if self.config.get('personal_continuity'):
+            cursor = None; wakes = []
+            while True:
+                page = self.client.call('poll_bot_continuations', {'bot_id': self.bot_id,
+                    'runtime_fence': self.runtime['fence'], **({'after': cursor} if cursor else {})})
+                wakes.extend(page['items']); cursor = page['next_cursor']
+                if not cursor: break
+            persist(self.root/'continuations.json', {'items': wakes})
+            results.extend(item for item in wakes if item['status'] == 'blocked')
+        if self.config.get('experience_learning'):
+            from .bot_learning_runtime import drain_reflections
+            results.extend(drain_reflections(self.client, self.bot_id, self.infer, self.root/'learning'))
         while True:
             page = self.client.call('bot_inbox', {'bot_id': self.bot_id, **({'after': after} if after else {})})
             for job in page['jobs']:
@@ -133,10 +153,19 @@ class BotWorker:
                     result = {'job_id': job['id'], 'status': 'held',
                               'reason': exc.code if isinstance(exc, Fault) else type(exc).__name__}
                 results.append(result)
+                if self.config.get('experience_learning'):
+                    results.extend(drain_reflections(self.client, self.bot_id, self.infer, self.root/'learning'))
             after = page['next_cursor']
             if not after: break
         persist(self.root/'last-tick.json', {'bot_id': self.bot_id, 'results': results})
         return results
+
+    def recover_reflection(self, reflection_id, reason, retry_inference=False):
+        require(self.runtime and not self.lost.is_set(), 'runtime_offline', 'Runtime is offline')
+        require(self.config.get('experience_learning'), 'mode_disabled', 'Enable experience learning first')
+        from .bot_reflection_recovery import recover_reflection
+        return recover_reflection(self.client, self.bot_id, reflection_id, self.infer,
+                                  self.root/'learning', reason, retry_inference)
 
     def recover(self, job_id, reason, retry_inference=False, collect_interrupted_verification=False):
         require(self.runtime and not self.lost.is_set(), 'runtime_offline', 'Runtime is offline')
@@ -144,10 +173,11 @@ class BotWorker:
         require(not self.config.get('workflow') or self.config['workflow'] == workflow,
                 'scope_denied', 'Recovery belongs to another workflow; use its original worker and journal')
         if workflow == 'bot_development':
-            require(not retry_inference and not collect_interrupted_verification,
-                    'invalid_input', 'Legacy recovery overrides do not apply to independent Bot tasks')
+            require(not collect_interrupted_verification,
+                    'invalid_input', 'Legacy verification recovery does not apply to independent Bot tasks')
             from .bot_execution import recover_bot_task
-            return recover_bot_task(self.client, job_id, self.root/'jobs', self.runtime['fence'], self.infer, reason, loop_config=self.config)
+            return recover_bot_task(self.client, job_id, self.root/'jobs', self.runtime['fence'], self.infer, reason,
+                                    loop_config=self.config, retry_inference=retry_inference)
         from .mentor_recovery import recover_job
         from .mentor_daemon import process_job
         result = recover_job(self.client, job_id, self.root/'jobs', reason,

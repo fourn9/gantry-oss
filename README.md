@@ -119,6 +119,10 @@ Core tests use the standard library. Optional NumPy and CAD tests skip when depe
 
 MIT. The published source, including Core and Mentor orchestration, may be used, modified and redistributed under [LICENSE](LICENSE). Third-party tools and models have their own licenses and terms.
 
+Opt-in [conditional Bot experience](docs/BOT_LEARNING.md) links recalled lessons to
+explicit plans, actual reports and outcome reflections using the customer model.
+This preserves engineering unknowns and does not imply measured speedup.
+
 Persistent organizational and personal Bots, customer-owned workspaces, automatic
 PR-triggered workers and opt-in user services: [Persistent Bots](docs/PERSISTENT_BOTS.md).
 No inference provider is enabled by default; each customer supplies its own agent.
@@ -136,3 +140,6 @@ Link versioned requirements to development states, changes, Crew tasks and engin
 checks. See what remains unverified, fails, or needs review after a requirement change,
 without confusing work completion with adoption. Existing free-text notes stay unlinked.
 See [setup, API contracts and limits](docs/REQUIREMENT_TRACEABILITY.md).
+
+Persistent Bot work, conditional experience and selective continuation: see
+[the continuity guide](docs/BOT_CONTINUITY.md).

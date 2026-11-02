@@ -147,11 +147,15 @@ class BotDevelopmentMixin:
         return self._dev_save(s, fx, 'bot_bindings', dict(a, id=key, role=role, workflow='bot_development',
             subject_id=bot['id'], version=a['version'] + 1, created_seq=s['seq'] + 1))
 
-    def _bd_assign(self, s, actor, a, fx, n, con, consultation=False):
+    def _bd_assign(self, s, actor, a, fx, n, con, consultation=False, standing=None):
         p, d = self._bd_project(s, actor, a['session_id']); self.allowed(actor, 'work')
         b = self._bd_binding(s, d['id'], a['bot_id']); bot, org = self._persistent_identity(s, a['bot_id'])
         require(b['enabled'] and bot['enabled'] and org['id'] == p['organization_id'], 'mode_disabled', 'Assignee disabled')
-        if not self._bd_owner(actor, p):
+        if standing is not None:
+            self._continuation_valid(s, actor, standing)
+            require(standing['bot_id'] == a['bot_id'] and standing['session_id'] == a['session_id'],
+                    'unauthorized', 'Standing responsibility cannot assign another Bot')
+        elif not self._bd_owner(actor, p):
             sender, _, _, _ = self._bd_actor(s, actor, d['id'], a.get('requested_by_bot'))
             require(consultation or sender['can_assign'] and self._bd_subordinate(s, sender['bot_id'], b['bot_id']),
                     'unauthorized', 'Assignment exceeds the manager delegation')
@@ -182,6 +186,7 @@ class BotDevelopmentMixin:
             status='pending', version=1, attempt=0, generation=d['generation'], discussion_version=0,
             dependency_hashes={path: manifest[path]['hash'] for path in a['dependencies']},
             children=[], reports=[], created_seq=s['seq'] + 1, created_at=self.clock(), author=actor['id'])
+        if parent: self._inherit_continuation(old, task)
         task['requirement_refs'] = selected_refs(s, state['context'], a.get('requirement_refs'))
         self._dev_save(s, fx, 'bot_tasks', task)
         n.append({'type': 'bot_assignment', 'target': d['id'], 'session_id': d['id'], 'task_id': task['id'], 'zones': [d['zone']]})
@@ -206,6 +211,7 @@ class BotDevelopmentMixin:
                 'next_cursor': rows[limit-1][0] if len(rows) > limit else None}
 
     def _bd_stamp(self, s, actor, task, con):
+        self._check_continuation_task(s, actor, task)
         b, bot, p, d = self._bd_actor(s, actor, task['session_id'], task['bot_id'])
         require(d['mode'] == 'execute', 'mode_disabled', 'Bot execution is not delegated')
         require(d['generation'] == task['generation'], 'stale_basis', 'Project baseline changed; assign a new task')
@@ -264,6 +270,8 @@ class BotDevelopmentMixin:
         result['candidates_truncated'] = bool(pending)
         if self._binding_access(s, actor, self._bd_binding(s, task['session_id'], task['bot_id'])):
             result['memory'] = self._persistent_memory_page(s, actor, bot, org, {'limit': 30}, con, recent=True)
+            result['learning_plan'] = self._learning_context(s, actor, task)
+        result['working_state'] = self._working_context(s, actor, task)
         result.update(self._crew_context(s, actor, task, con))
         return result
 
@@ -368,6 +376,8 @@ class BotDevelopmentMixin:
         org = s['organizations'][s['persistent_bots'][task['bot_id']]['organization_id']]
         if org.get('share_reflections'):
             self._bd_share_memory(s, actor, org, memory, fx)
+        self._working_report(s, actor, task, fx)
+        self._learning_enqueue(s, actor, task, fx)
         self._bd_wake_parent(s, task, fx, n, con)
         if task['status'] in TERMINAL: self._crew_return_response(s, task, fx, n)
         return {'task': self._bd_public(task), 'memory_id': memory['id'], 'formal_adoption': False}

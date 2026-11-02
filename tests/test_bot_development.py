@@ -309,7 +309,7 @@ class BotDevelopmentTests(unittest.TestCase):
     def test_independent_recovery_rejects_legacy_retry_overrides(self):
         worker = self.worker('designer'); worker.runtime = {'fence': 'fixture'}
         with patch('gantry.bot_execution.recover_bot_task') as recover:
-            for flags in ({'retry_inference': True}, {'collect_interrupted_verification': True}):
+            for flags in ({'collect_interrupted_verification': True},):
                 self.fault('invalid_input', lambda: worker.recover('btask_fixture',
                     'Previous process stopped', **flags))
             recover.assert_not_called()

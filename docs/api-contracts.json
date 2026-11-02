@@ -1490,6 +1490,239 @@
       "type": "object"
     }
   },
+  "complete_bot_reflection": {
+    "description": "complete bot reflection",
+    "schema": {
+      "additionalProperties": false,
+      "properties": {
+        "basis": {
+          "type": "object"
+        },
+        "intent": {
+          "type": "object"
+        },
+        "output": {
+          "additionalProperties": false,
+          "properties": {
+            "feedback": {
+              "items": {
+                "additionalProperties": false,
+                "properties": {
+                  "evidence": {
+                    "items": {
+                      "maxLength": 4000,
+                      "minLength": 1,
+                      "type": "string"
+                    },
+                    "maxItems": 40,
+                    "minItems": 1,
+                    "type": "array"
+                  },
+                  "memory_id": {
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "outcome": {
+                    "enum": [
+                      "helpful",
+                      "harmful",
+                      "unknown"
+                    ]
+                  },
+                  "reason": {
+                    "maxLength": 4000,
+                    "minLength": 1,
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "memory_id",
+                  "outcome",
+                  "reason",
+                  "evidence"
+                ],
+                "type": "object"
+              },
+              "maxItems": 40,
+              "type": "array"
+            },
+            "lessons": {
+              "items": {
+                "additionalProperties": false,
+                "properties": {
+                  "contradicts": {
+                    "items": {
+                      "maxLength": 4000,
+                      "minLength": 1,
+                      "type": "string"
+                    },
+                    "maxItems": 40,
+                    "type": "array"
+                  },
+                  "evidence": {
+                    "items": {
+                      "maxLength": 4000,
+                      "minLength": 1,
+                      "type": "string"
+                    },
+                    "maxItems": 40,
+                    "minItems": 1,
+                    "type": "array"
+                  },
+                  "kind": {
+                    "enum": [
+                      "procedure",
+                      "failure",
+                      "preference",
+                      "coordination"
+                    ]
+                  },
+                  "observation": {
+                    "maxLength": 4000,
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "paths": {
+                    "items": {
+                      "maxLength": 4000,
+                      "minLength": 1,
+                      "type": "string"
+                    },
+                    "maxItems": 40,
+                    "type": "array"
+                  },
+                  "procedure_steps": {
+                    "items": {
+                      "maxLength": 4000,
+                      "minLength": 1,
+                      "type": "string"
+                    },
+                    "maxItems": 40,
+                    "type": [
+                      "array",
+                      "null"
+                    ]
+                  },
+                  "strategy": {
+                    "maxLength": 4000,
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "supersedes": {
+                    "items": {
+                      "maxLength": 4000,
+                      "minLength": 1,
+                      "type": "string"
+                    },
+                    "maxItems": 40,
+                    "type": "array"
+                  },
+                  "tags": {
+                    "items": {
+                      "maxLength": 4000,
+                      "minLength": 1,
+                      "type": "string"
+                    },
+                    "maxItems": 40,
+                    "type": "array"
+                  },
+                  "when_not_to_use": {
+                    "items": {
+                      "maxLength": 4000,
+                      "minLength": 1,
+                      "type": "string"
+                    },
+                    "maxItems": 40,
+                    "type": "array"
+                  },
+                  "when_to_use": {
+                    "maxLength": 4000,
+                    "minLength": 1,
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "kind",
+                  "observation",
+                  "strategy",
+                  "when_to_use",
+                  "when_not_to_use",
+                  "paths",
+                  "tags",
+                  "evidence",
+                  "supersedes",
+                  "contradicts"
+                ],
+                "type": "object"
+              },
+              "maxItems": 10,
+              "type": "array"
+            },
+            "self_assessment": {
+              "additionalProperties": false,
+              "properties": {
+                "concerns": {
+                  "items": {
+                    "maxLength": 4000,
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "maxItems": 40,
+                  "type": "array"
+                },
+                "needs_independent_check": {
+                  "type": "boolean"
+                },
+                "reason": {
+                  "maxLength": 4000,
+                  "minLength": 1,
+                  "type": "string"
+                }
+              },
+              "required": [
+                "needs_independent_check",
+                "concerns",
+                "reason"
+              ],
+              "type": [
+                "object",
+                "null"
+              ]
+            },
+            "unknowns": {
+              "items": {
+                "maxLength": 4000,
+                "minLength": 1,
+                "type": "string"
+              },
+              "maxItems": 40,
+              "type": "array"
+            }
+          },
+          "required": [
+            "lessons",
+            "feedback",
+            "unknowns"
+          ],
+          "type": "object"
+        },
+        "reflection_id": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "version": {
+          "minimum": 1,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "reflection_id",
+        "version",
+        "output"
+      ],
+      "type": "object"
+    }
+  },
   "complete_change_review": {
     "description": "complete change review",
     "schema": {
@@ -2187,6 +2420,73 @@
         "parent_bot_id",
         "profile",
         "enabled"
+      ],
+      "type": "object"
+    }
+  },
+  "configure_bot_continuation": {
+    "description": "configure bot continuation",
+    "schema": {
+      "additionalProperties": false,
+      "properties": {
+        "basis": {
+          "type": "object"
+        },
+        "bot_id": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "completion": {
+          "items": {
+            "maxLength": 4000,
+            "minLength": 1,
+            "type": "string"
+          },
+          "maxItems": 40,
+          "minItems": 1,
+          "type": "array"
+        },
+        "dependencies": {
+          "items": {
+            "maxLength": 4000,
+            "minLength": 1,
+            "type": "string"
+          },
+          "maxItems": 40,
+          "type": "array"
+        },
+        "enabled": {
+          "type": "boolean"
+        },
+        "intent": {
+          "type": "object"
+        },
+        "session_id": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "version": {
+          "minimum": 0,
+          "type": "integer"
+        },
+        "write_scope": {
+          "items": {
+            "maxLength": 4000,
+            "minLength": 1,
+            "type": "string"
+          },
+          "maxItems": 40,
+          "type": "array"
+        }
+      },
+      "required": [
+        "session_id",
+        "bot_id",
+        "version",
+        "enabled",
+        "write_scope",
+        "dependencies",
+        "completion"
       ],
       "type": "object"
     }
@@ -4153,6 +4453,28 @@
       "type": "object"
     }
   },
+  "get_bot_learning_plan": {
+    "description": "get bot learning plan",
+    "schema": {
+      "additionalProperties": false,
+      "properties": {
+        "basis": {
+          "type": "object"
+        },
+        "intent": {
+          "type": "object"
+        },
+        "plan_id": {
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "required": [
+        "plan_id"
+      ],
+      "type": "object"
+    }
+  },
   "get_bot_project": {
     "description": "get bot project",
     "schema": {
@@ -4202,7 +4524,8 @@
         "kind": {
           "enum": [
             "actions",
-            "decisions"
+            "decisions",
+            "learning_uses"
           ]
         },
         "limit": {
@@ -4218,6 +4541,28 @@
       "required": [
         "task_id",
         "kind"
+      ],
+      "type": "object"
+    }
+  },
+  "get_bot_reflection": {
+    "description": "get bot reflection",
+    "schema": {
+      "additionalProperties": false,
+      "properties": {
+        "basis": {
+          "type": "object"
+        },
+        "intent": {
+          "type": "object"
+        },
+        "reflection_id": {
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "required": [
+        "reflection_id"
       ],
       "type": "object"
     }
@@ -4262,6 +4607,33 @@
       },
       "required": [
         "proposal_id"
+      ],
+      "type": "object"
+    }
+  },
+  "get_bot_working_state": {
+    "description": "get bot working state",
+    "schema": {
+      "additionalProperties": false,
+      "properties": {
+        "basis": {
+          "type": "object"
+        },
+        "bot_id": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "intent": {
+          "type": "object"
+        },
+        "session_id": {
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "required": [
+        "session_id",
+        "bot_id"
       ],
       "type": "object"
     }
@@ -5004,6 +5376,37 @@
       "type": "object"
     }
   },
+  "list_bot_reflections": {
+    "description": "list bot reflections",
+    "schema": {
+      "additionalProperties": false,
+      "properties": {
+        "after": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "basis": {
+          "type": "object"
+        },
+        "bot_id": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "intent": {
+          "type": "object"
+        },
+        "limit": {
+          "maximum": 100,
+          "minimum": 1,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "bot_id"
+      ],
+      "type": "object"
+    }
+  },
   "list_bot_tasks": {
     "description": "list bot tasks",
     "schema": {
@@ -5619,6 +6022,78 @@
       "required": [
         "before_map",
         "after_map"
+      ],
+      "type": "object"
+    }
+  },
+  "poll_bot_continuations": {
+    "description": "poll bot continuations",
+    "schema": {
+      "additionalProperties": false,
+      "properties": {
+        "after": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "basis": {
+          "type": "object"
+        },
+        "bot_id": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "intent": {
+          "type": "object"
+        },
+        "limit": {
+          "maximum": 100,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "runtime_fence": {
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "required": [
+        "bot_id",
+        "runtime_fence"
+      ],
+      "type": "object"
+    }
+  },
+  "prepare_bot_learning": {
+    "description": "prepare bot learning",
+    "schema": {
+      "additionalProperties": false,
+      "properties": {
+        "after": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "basis": {
+          "type": "object"
+        },
+        "fence": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "intent": {
+          "type": "object"
+        },
+        "limit": {
+          "maximum": 40,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "task_id": {
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "required": [
+        "task_id",
+        "fence"
       ],
       "type": "object"
     }
@@ -6699,6 +7174,61 @@
         "limitations",
         "evidence",
         "used_memories"
+      ],
+      "type": "object"
+    }
+  },
+  "record_bot_learning_use": {
+    "description": "record bot learning use",
+    "schema": {
+      "additionalProperties": false,
+      "properties": {
+        "action_ids": {
+          "items": {
+            "maxLength": 4000,
+            "minLength": 1,
+            "type": "string"
+          },
+          "maxItems": 40,
+          "minItems": 1,
+          "type": "array"
+        },
+        "basis": {
+          "type": "object"
+        },
+        "change": {
+          "maxLength": 4000,
+          "minLength": 1,
+          "type": "string"
+        },
+        "condition_check": {
+          "maxLength": 4000,
+          "minLength": 1,
+          "type": "string"
+        },
+        "fence": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "intent": {
+          "type": "object"
+        },
+        "memory_id": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "task_id": {
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "required": [
+        "task_id",
+        "fence",
+        "memory_id",
+        "action_ids",
+        "change",
+        "condition_check"
       ],
       "type": "object"
     }
@@ -8601,6 +9131,116 @@
       "type": "object"
     }
   },
+  "submit_bot_learning_plan": {
+    "description": "submit bot learning plan",
+    "schema": {
+      "additionalProperties": false,
+      "properties": {
+        "basis": {
+          "type": "object"
+        },
+        "fence": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "intent": {
+          "type": "object"
+        },
+        "output": {
+          "additionalProperties": false,
+          "properties": {
+            "consult_bot_ids": {
+              "items": {
+                "maxLength": 4000,
+                "minLength": 1,
+                "type": "string"
+              },
+              "maxItems": 40,
+              "type": "array"
+            },
+            "decisions": {
+              "items": {
+                "additionalProperties": false,
+                "properties": {
+                  "memory_id": {
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "reason": {
+                    "maxLength": 4000,
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "use": {
+                    "enum": [
+                      "apply",
+                      "recheck",
+                      "reject"
+                    ]
+                  }
+                },
+                "required": [
+                  "memory_id",
+                  "use",
+                  "reason"
+                ],
+                "type": "object"
+              },
+              "maxItems": 40,
+              "type": "array"
+            },
+            "rationale": {
+              "maxLength": 4000,
+              "minLength": 1,
+              "type": "string"
+            },
+            "steps": {
+              "items": {
+                "maxLength": 4000,
+                "minLength": 1,
+                "type": "string"
+              },
+              "maxItems": 40,
+              "minItems": 1,
+              "type": "array"
+            },
+            "unknowns": {
+              "items": {
+                "maxLength": 4000,
+                "minLength": 1,
+                "type": "string"
+              },
+              "maxItems": 40,
+              "type": "array"
+            }
+          },
+          "required": [
+            "decisions",
+            "steps",
+            "consult_bot_ids",
+            "unknowns",
+            "rationale"
+          ],
+          "type": "object"
+        },
+        "plan_id": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "task_id": {
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "required": [
+        "task_id",
+        "fence",
+        "plan_id",
+        "output"
+      ],
+      "type": "object"
+    }
+  },
   "submit_change_review": {
     "description": "submit change review",
     "schema": {
@@ -8826,6 +9466,102 @@
       },
       "required": [
         "subscription_id"
+      ],
+      "type": "object"
+    }
+  },
+  "update_bot_working_state": {
+    "description": "update bot working state",
+    "schema": {
+      "additionalProperties": false,
+      "properties": {
+        "basis": {
+          "type": "object"
+        },
+        "commitments": {
+          "items": {
+            "maxLength": 4000,
+            "minLength": 1,
+            "type": "string"
+          },
+          "maxItems": 40,
+          "type": "array"
+        },
+        "due_at": {
+          "minimum": 1,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "fence": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "focus": {
+          "maxLength": 4000,
+          "minLength": 1,
+          "type": "string"
+        },
+        "intent": {
+          "type": "object"
+        },
+        "next_steps": {
+          "items": {
+            "maxLength": 4000,
+            "minLength": 1,
+            "type": "string"
+          },
+          "maxItems": 40,
+          "type": "array"
+        },
+        "task_id": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "unknowns": {
+          "items": {
+            "maxLength": 4000,
+            "minLength": 1,
+            "type": "string"
+          },
+          "maxItems": 40,
+          "type": "array"
+        },
+        "version": {
+          "minimum": 0,
+          "type": "integer"
+        },
+        "watch_paths": {
+          "items": {
+            "maxLength": 4000,
+            "minLength": 1,
+            "type": "string"
+          },
+          "maxItems": 40,
+          "type": "array"
+        },
+        "watch_tasks": {
+          "items": {
+            "maxLength": 4000,
+            "minLength": 1,
+            "type": "string"
+          },
+          "maxItems": 40,
+          "type": "array"
+        }
+      },
+      "required": [
+        "task_id",
+        "fence",
+        "version",
+        "focus",
+        "next_steps",
+        "commitments",
+        "unknowns",
+        "watch_paths",
+        "watch_tasks",
+        "due_at"
       ],
       "type": "object"
     }

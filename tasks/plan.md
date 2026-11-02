@@ -1,5 +1,11 @@
 # Organization and personal Bot foundations
 
+## Current extension: personal Bot continuity
+
+The owner approved continuing the memory/skills/continuity direction on 2026-11-03.
+Build and verify the additive slices in [bot-personal-continuity.md](bot-personal-continuity.md).
+Preserve the historical checklist and optional migrations below.
+
 ## Current implementation: Bot-owned organization loop
 
 User approved the architecture and implementation on 2026-10-06. Follow

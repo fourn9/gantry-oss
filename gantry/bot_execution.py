@@ -30,6 +30,9 @@ def _input(context, workspace):
         'error': a['details'].get('result', {}).get('error') if isinstance(a['details'].get('result'), dict) else None,
         'detail_reference': {'operation': 'get_bot_records', 'kind': 'actions', 'task_id': a['task_id']}}
         for a in context.get('actions', [])]
+    if context.get('learning_plan'):
+        from .bot_learning_recall import planning_view
+        context['learning_plan'] = planning_view(context['learning_plan'])
     manifest = context['development'].pop('manifest')
     context['development'].pop('diffs', None)
     # Restore receipts contain one hash per file and are proof of transfer, not
@@ -120,6 +123,10 @@ def process_bot_task(client, queued, root, infer_fn, runtime_fence, recovered=No
                            initial_fingerprint=safe_fingerprint(workspace))
             persist(marker, journal)
         if journal['phase'] == 'inference':
+            if loop_config and loop_config.get('experience_learning'):
+                from .bot_learning_runtime import plan_task
+                journal['input']['learning_plan'] = plan_task(client, ref, journal['input'], infer_fn, directory/'learning')
+                persist(marker, journal)
             if loop_config and loop_config.get('agent_loop'):
                 from .crew_runtime import run_actions
                 receipt = run_actions(client, journal['input'], ref, infer_fn, loop_config, directory/'actions')
@@ -174,7 +181,7 @@ def process_bot_task(client, queued, root, infer_fn, runtime_fence, recovered=No
         raise
 
 
-def recover_bot_task(client, task_id, root, runtime_fence, infer_fn, reason, loop_config=None):
+def recover_bot_task(client, task_id, root, runtime_fence, infer_fn, reason, loop_config=None, retry_inference=False):
     view = client.call('get_bot_task', {'task_id': task_id}); task = view['task']
     directory = Path(root)/'development'/digest(task_id)/str(task['attempt'])
     marker = directory/'task.json'
@@ -183,16 +190,17 @@ def recover_bot_task(client, task_id, root, runtime_fence, infer_fn, reason, loo
     if journal['phase'] == 'done': return journal['result']
     # A locally known running tool/model must not be launched twice. Unknown
     # remote effects still require the caller's explicit stopped assertion.
-    import os
-    for receipt_path in [directory/'model'/'inference.json', *directory.glob('actions/*/model/inference.json')]:
+    from .monthly_recovery import ensure_stopped, prepare_retry
+    for receipt_path in [directory/'model'/'inference.json', directory/'learning'/'inference'/'model'/'inference.json',
+                         *directory.glob('actions/*/model/inference.json')]:
         if receipt_path.exists():
             receipt = json.loads(receipt_path.read_text())
-            pid = receipt.get('pid')
-            if pid and receipt.get('phase') != 'completed':
-                try: os.kill(pid, 0)
-                except ProcessLookupError: pass
-                except PermissionError: raise Fault('outcome_unknown', 'Previous provider process may still be running')
-                else: raise Fault('outcome_unknown', 'Stop the previous provider process before recovery')
+            ensure_stopped(receipt)
+    retry_path = None
+    if retry_inference:
+        from .bot_inference_recovery import pending_inference
+        retry_path = pending_inference(directory, journal, loop_config or {})
+        if retry_path: prepare_retry(retry_path, reason, check_only=True)
     # A completed return may have lost its response. Reconcile it before any retry.
     if journal['phase'] == 'returning':
         try:
@@ -208,6 +216,7 @@ def recover_bot_task(client, task_id, root, runtime_fence, infer_fn, reason, loo
                          'confirm_stopped': reason}, 'key': journal['key'] + ':recover:' + digest(runtime_fence)[:16]}
         persist(recovery_path, saved)
     recovered = client.call('recover_bot_task', saved['args'], saved['key'])
+    if retry_path: prepare_retry(retry_path, reason)
     if journal['phase'] == 'new':
         # Lost claim acknowledgement: no workspace or inference has started.
         journal['phase'] = 'claimed'
