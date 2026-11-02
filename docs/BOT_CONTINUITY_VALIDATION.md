@@ -87,7 +87,7 @@ the task already required that check. Consequently this live run has no
 tests. This distinction prevents a completed task from being counted as evidence
 of learning efficacy.
 
-## Follow-up that remains incomplete
+## Initial follow-up hold
 
 A fresh task was then started to reuse the newly saved procedure. Its frozen
 planning input contained the current working note and recalled experience, but
@@ -96,10 +96,65 @@ returned `held` after 2.693 seconds, preserved its state/journal, and did not sw
 to a paid provider. Replay still matched. There was no completed planning response
 or subsequent tool execution for this follow-up.
 
-Therefore the next-task reuse path is verified with deterministic Core/worker
-tests, but this particular second real-model cycle is **not completed**. After
-subscription capacity is available, inspect and reconcile the stopped attempt
-through the existing task recovery path before attempting another model call.
+At that point the next-task reuse path had deterministic Core/worker coverage,
+but the second real-model cycle had not completed. The explicit follow-up below
+advanced that same saved task rather than creating replacement history.
+
+## Explicit real-model follow-up, 2026-11-03
+
+Source revision: `cf40e035e81023ecd000c0645bc6e4390e4e0c27`.
+CLI: `codex-cli 0.154.0`, existing ChatGPT subscription, CLI-default model.
+No product code or model answers were changed for this follow-up.
+
+An operator inspected the prior terminal 429, confirmed the process was stopped
+and no completed response existed, archived the failed provider files, and used
+the original fenced task recovery API. This was manual recovery preparation,
+not an automatic retry policy. The saved task, planning input, ledger and previous
+successful work were retained. Each model response used a fresh ephemeral CLI
+context populated by Gantry.
+
+Three real model responses then succeeded:
+
+| Stage | Observed result |
+| --- | --- |
+| Plan from saved experience | The model selected `apply` for the previous real reflection's procedure because dependency hashes and acceptance matched. It rejected synthetic seed evidence and marked incompletely captured memories `recheck`. It explicitly said the old pass did not satisfy the new task's execution requirement. |
+| Execute | The model chose `check_interface`; the sandboxed Python tool actually ran once, returned exit 0 and `interface_values 1 1 equal True`. |
+| Persist ongoing work | The model updated the working note from version 4 to 5 with the new action/output references, remaining commitments, dependency watches and physical unknowns. |
+
+The next action response failed with terminal HTTP 429. Two bounded, explicit
+retries, including a 45-second pause before the last, also received 429. Prior
+responses/effects were retained and the completed tool was **not executed again**.
+There were six model invocation attempts in this follow-up: three successful
+responses and three failures. Successful receipts reported 63,582 input tokens
+and 1,000 output tokens; usage for failed requests was not available. No API-key
+fallback or credit purchase was used. The desktop usage snapshot reported
+ordinary usage allowed, so these errors do not establish that the entire
+subscription allowance was exhausted.
+
+The three harness runs took 56.714, 2.560 and 3.075 seconds, excluding manual
+inspection and waiting. These are not full development elapsed time or a speed
+comparison. Inspection of the final ledger confirmed:
+
+- Task remains `held`; there is no final completion report for this task.
+- Exactly one tool action and one working-state action were saved.
+- The plan contains the chosen real procedure, but **no `experience_use` receipt**
+  was committed before the hold. A plan-to-action causal benefit is not established.
+- No new outcome reflection was created because reporting did not complete.
+- Event replay matched. No source edits, integration or formal adoption occurred.
+
+This demonstrates real-model retrieval, conditional procedure selection, actual
+tool execution and cross-task working-context updates. It does **not** complete
+the second report/reflection cycle. The prepared changed-input negative scenario
+was not executed because the preceding cycle remained held. Its deterministic
+test coverage remains separate from real-model evidence.
+
+Remaining operational gap: known failed action/planning inference still required
+manual provider-journal archival before the existing task recovery command could
+make an explicit new request. Unknown effects remain protected against blind
+retry, but a unified explicit recovery operation would make this less error-prone.
+No unattended worker was left running. Resume from the preserved task and journals
+when the subscription inference endpoint accepts requests; do not repeat completed
+tool effects or replace failures with manufactured model responses.
 
 Next assess held-out tasks with and without experience, changed-condition
 rejection, repeated mistakes, independent correctness and full time/token cost.
