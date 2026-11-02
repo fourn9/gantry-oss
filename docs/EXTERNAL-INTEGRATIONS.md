@@ -43,12 +43,15 @@ It lists the fifteen providers above without a coming-soon badge. Its coming-soo
 entries are Altium 365, Ansys, Duro, Epsilon 3, Exotrail, First Resonance ION,
 Fusion 360, Fusion by Stoke, Manufacturo, Matlab, Microsoft Teams, SimScale,
 Siemens NX and SolidWorks. These have export capture only in this module.
+The separate `gantry-native` CLI adds bounded desktop API operations for selected
+products, including SOLIDWORKS (not a full assembly editor). Its capability list
+and runtime limitations are in [Native desktop connectors](NATIVE-DESKTOP.md).
 
 The [home page](https://www.flowengineering.com/) additionally shows Dassault,
 Outlook, Abaqus, LabVIEW, TestStand and dSPACE. A Dassault logo does not identify
 which product/API is intended. These are catalogued separately as home-only logos;
 no native support is implied. The separate experimental vendor-connector branch is
-not included in this implementation.
+not merged here; the new desktop API module is independently implemented.
 
 Run `gantry-integrations catalog` (or `python -m gantry.integrations catalog`) for
 machine-readable routes and explicit `native_write` / `live_account_verified` flags.

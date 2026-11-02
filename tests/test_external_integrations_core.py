@@ -76,3 +76,26 @@ class PublicationTests(unittest.TestCase):
         self.assertEqual(view['status']['adoption'],'unadopted')
         self.assertEqual(view['state']['context']['environment']['external_sources'][source]['requirement_refs'],[ref])
         self.assertTrue(self.call('replay')['matched'])
+
+    def test_desktop_api_write_capture_roundtrips_requirement_linked_state(self):
+        from gantry.native.workflow import prepare,apply,evidence
+        from gantry.native.drivers import SolidWorks
+        from test_native_desktop import Part
+        from types import SimpleNamespace
+        import base64
+        state,_,_,ref=self.prepare()
+        native=self.root/'native';native.mkdir();part=native/'bracket.SLDPRT';part.write_bytes(b'original')
+        doc=Part(part);driver=SolidWorks(SimpleNamespace(ActiveDoc=doc,RevisionNumber=lambda:'34'),lambda d:d.save())
+        config={'product':'solidworks','document':part.name,'selector':'D1@Sketch1','unit':'SI','version':'34'}
+        plan=prepare(native,config,0.03,'Reach requirement',[ref],native/'plan',driver)
+        result=apply(native/'plan',plan['plan_hash'],native,driver,exclusive=True)
+        self.assertEqual(result['status'],'verified')
+        bundle=evidence(native/'plan',native);path=self.root/'desktop-capture';write_bundle(path,bundle)
+        source=bundle['manifest']['source_id'];change=self.begin(state,['imports/'+source+'/'])
+        cp=publish(self.client,state['id'],change['id'],change['version'],path,'desktop-evidence')
+        view=self.call('get_development_state',{'state_id':cp['state']['id']})
+        self.assertEqual(view['requirement_coverage']['items'][0]['status'],'unverified')
+        self.assertEqual(view['status']['adoption'],'unadopted')
+        self.assertIn('imports/'+source+'/payload/after/native/bracket.SLDPRT',view['manifest'])
+        self.assertEqual(view['state']['context']['environment']['external_sources'][source]['requirement_refs'],[ref])
+        self.assertTrue(self.call('replay')['matched'])

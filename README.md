@@ -17,6 +17,11 @@ requirement-linked checkpoints. See [supported routes and unverified native
 connections](docs/EXTERNAL-INTEGRATIONS.md). Selected native objects can also be
 updated through [reviewable write plans and readback verification](docs/EXTERNAL-WRITES.md).
 Export capture is not native CAD editing or automatic synchronization.
+Experimental desktop API operations are available through `gantry-native`:
+SOLIDWORKS/CATIA/Creo part parameters and SOLIDWORKS Electrical project user data,
+plus generated Altium/Allegro editor scripts. See [exact coverage and native-runtime
+qualification still required](docs/NATIVE-DESKTOP.md). Zuken and Capital SDK
+implementation remains blocked; none of these eight products has a verified live run.
 
 **Two service entry points:** `gantry-ledger` for customer-led development
 and review, and `gantry-crew` for delegated Bot development.

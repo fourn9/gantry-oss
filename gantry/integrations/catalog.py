@@ -40,4 +40,5 @@ def catalog():
 
 
 def known(provider):
-    return provider in CURRENT or provider in COMING or provider in HOME_ONLY
+    from ..native.catalog import PRODUCTS
+    return provider in CURRENT or provider in COMING or provider in HOME_ONLY or provider in PRODUCTS
