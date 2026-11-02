@@ -138,6 +138,19 @@ def main(service=None):
     bot_worker.add_argument('--confirm-stopped', help='Reason confirming old processes have stopped')
     bot_worker.add_argument('--retry-inference', action='store_true')
     bot_worker.add_argument('--collect-interrupted-verification', action='store_true')
+    evaluation = sub.add_parser('evaluate-learning', help='Paired isolated Bot experience experiment (uses your ChatGPT login)')
+    evaluation.add_argument('--case', required=True, help='Trusted experiment JSON; selected source and acceptance verifier')
+    evaluation.add_argument('--output', required=True, help='New private directory, outside the source project')
+    evaluation.add_argument('--model', required=True)
+    evaluation.add_argument('--reasoning-effort', required=True, choices=['minimal','low','medium','high','xhigh'])
+    evaluation.add_argument('--max-calls', required=True, type=int, help='Per-arm inference calls including planning/reflection')
+    evaluation.add_argument('--seconds', required=True, type=int, help='Per-arm total wall-clock limit, setup excluded')
+    evaluation.add_argument('--repetitions', type=int, default=1)
+    evaluation.add_argument('--seed', type=int, default=0)
+    evaluation.add_argument('--live-codex', action='store_true', required=True,
+        help='Explicitly send selected inputs to official Codex using ChatGPT subscription; no API-key fallback')
+    evaluation_report = sub.add_parser('learning-evaluation-report', help='Regenerate paired report without inference')
+    evaluation_report.add_argument('directory')
     recover_mentor = sub.add_parser('recover-mentor-job', help='Recover a stopped worker from its private journal; never blindly rerun a tool')
     recover_mentor.add_argument('--job-id', required=True)
     recover_mentor.add_argument('--journal', required=True)
@@ -175,7 +188,7 @@ def main(service=None):
     if service:
         common = {'init', 'serve', 'call', 'mcp', 'agent-config', 'agent-request', 'credential',
                   'export', 'restore-backup', 'capture-workspace', 'restore-development-state', 'restore-artifact'}
-        allowed = common | ({'bot-worker', 'bot-service'} if service == 'bots' else
+        allowed = common | ({'bot-worker', 'bot-service', 'evaluate-learning', 'learning-evaluation-report'} if service == 'bots' else
             {'connect', 'disconnect', 'project', 'project-mcp', 'mentor-worker', 'recover-mentor-job'})
         for name in list(sub.choices):
             if name not in allowed: del sub.choices[name]
@@ -184,7 +197,15 @@ def main(service=None):
         config.set_defaults(profile='bot' if service == 'bots' else 'review')
     args = parser.parse_args()
     try:
-        if args.command == 'connect':
+        if args.command == 'evaluate-learning':
+            from .learning_evaluation import run_evaluation
+            report = run_evaluation(args.case, args.output, model=args.model, reasoning_effort=args.reasoning_effort,
+                max_calls=args.max_calls, seconds=args.seconds, repetitions=args.repetitions, seed=args.seed)
+            result = {'report': str(Path(args.output).resolve()/'report.md'), 'summary': report['summary']}
+        elif args.command == 'learning-evaluation-report':
+            from .learning_evaluation_report import regenerate
+            result = regenerate(args.directory)['summary']
+        elif args.command == 'connect':
             from .project_connect import connect as connect_project
             commands = None
             if args.test_command:

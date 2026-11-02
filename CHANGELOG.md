@@ -7,6 +7,11 @@ This file records changes after v3.3.0. Earlier release notes remain in the
 
 ### Added
 
+- Opt-in paired Bot experience evaluation through isolated Core ledgers and
+  normal Bot execution. Frozen inputs/verifier/model settings, private journals,
+  independent candidate checks, failure-inclusive reporting and offline report
+  regeneration. The synthetic example is not evidence of engineering speedup.
+
 - Opt-in Bot experience planning and outcome reflection, with conditional lessons,
   applicability checks and preserved correction history.
 - Persistent Bot/project working notes for commitments, unknowns and next steps.
@@ -28,6 +33,11 @@ This file records changes after v3.3.0. Earlier release notes remain in the
 - No new inference provider, mandatory dependency or publisher telemetry.
 
 ### Validation
+
+- New paired evaluation smoke: both real subscription-model arms completed; the
+  supplied-experience arm took 69.28 seconds versus 66.25 seconds without it.
+  This synthetic single pair did not demonstrate time saving. See
+  [comparison evidence and limits](docs/BOT_LEARNING_EVALUATION_VALIDATION.md).
 
 - Final Python regression: 1,062 invocations, no failures, 8 skips.
 - Real subscription-model checks completed experience selection, tool execution,

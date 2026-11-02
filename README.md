@@ -143,3 +143,8 @@ See [setup, API contracts and limits](docs/REQUIREMENT_TRACEABILITY.md).
 
 Persistent Bot work, conditional experience and selective continuation: see
 [the continuity guide](docs/BOT_CONTINUITY.md).
+
+To compare the same task with and without prior experience in separate ledgers,
+use the opt-in [paired evaluation guide](docs/BOT_LEARNING_EVALUATION.md).
+It retains failures and checks saved candidates independently; the included
+synthetic example does not establish engineering speedup.
