@@ -1,0 +1,106 @@
+# Studio: shared development workspace
+
+Studio is the default authenticated web view (`#studio`) of the existing Gantry
+server. It reads real projects, immutable development states and change sets.
+It does not start agents, adopt designs or certify physics by displaying a file.
+The existing execution, integration, review and adoption screens remain under
+**Workspace tools**. There is no new UI framework or browser dependency.
+
+## Daily workflow
+
+1. Open a project in the sidebar. **Structure** shows its saved component hierarchy,
+   labelled with the source state; selecting a component shows associated work.
+   **Work** lists change sets, owners (human or agent), component scope and recorded status.
+2. Open work. Select **CAD**, **Code** or **Checks**. Choose a saved version and,
+   for CAD/code, optionally compare another version. **Version details** exposes
+   the checkpoint note, shared note, capture omissions and restore command.
+3. Edit in the external CAD/editor and save. **Import changes** accepts selected
+   saved files, lets you map destination paths, and creates an unshared checkpoint.
+   Unselected files are retained. The scope and expected work version are checked.
+   To capture a complete workspace, use the existing `checkpoint-workspace` adapter.
+4. **Share update** lists paths and before/after content hashes against the previous
+   shared version. Add a short note and share the work in progress. Sharing does
+   not complete work, pass a test or formally adopt a design. Historical views are
+   read-only for import/share; open the latest state to continue that work.
+5. Select a mesh part or code line, or open the work conversation. Mention a session
+   member/agent with the picker. Their **Inbox** opens that exact work, state,
+   artifact and selection. Old comments stay on their original version. Closing
+   the panel returns to artifact viewing. Replying uses the same immutable anchor.
+6. **Recent** / **Recent work** show work opened in the current browser tab. This
+   initial implementation does not persist browsing history across sign-out/reload.
+
+Unshared describes publication status, not an additional privacy boundary: existing
+session authorization still determines who can inspect checkpoints. The browser
+cannot see unsaved local edits. It labels imported files as saved checkpoints and
+reports what was not captured. Draft comments and tokens stay in tab memory.
+
+## Data and API contracts
+
+All commands use the existing authenticated API, transaction, event log, permission
+checks and write idempotency. They are also exposed through CLI/MCP profiles.
+Existing credentials with explicit command allowlists keep their approved scope;
+adding tools to a profile does not silently widen an issued credential.
+
+| Command | Contract |
+| --- | --- |
+| `studio_overview` | Authorized projects/hierarchy and paged change-set work list; no estimated progress |
+| `studio_work` | Work ID plus optional state ID; exact manifest, versions, check applicability, participants and conversations |
+| `studio_import_update` | Work ID, expected version, path/base64 files, summary; upload screening + immutable overlay + existing checkpoint |
+| `studio_share_update` | Work ID, expected version, exact current state, note; existing share operation, no adoption |
+| `studio_comment` | Work ID, state ID, exact anchor, optional thread ID, body, recipient IDs |
+| `studio_inbox` | Only the current recipient's accessible mentions, with exact target and cursor |
+| `studio_acknowledge` | Only the recipient can mark the request read |
+
+Anchors are `{kind: "work"}`, or `{kind: "cad", path, hash, part}`, or
+`{kind: "code", path, hash, line}`. `part` is currently the immutable mesh file path,
+not a guessed native CAD face/feature. `line` is 1-based in the saved UTF-8 bytes.
+Deleted comparison lines bind to the old state. Replies cannot change an anchor.
+Recipients must have current access to the session and referenced state.
+Mentions are internal requests; they do not send external messages, grant access,
+start inference or authorize execution.
+
+The additive `studio_threads`, `studio_messages`, `studio_notifications` projections
+are event-sourced. Existing ledgers open without rewriting history. New writes
+replay into the added tables. Existing artifact/state/change/share IDs are reused;
+no duplicate project or version model is introduced.
+
+## Supported artifacts and real connection boundaries
+
+| Capability | Implemented | Remaining connection work |
+| --- | --- | --- |
+| CAD | Actual saved STL/OBJ assembly preview, orbit/zoom, top/front/isometric, file-part selection, old-file overlay | Native CAD tessellation, stable subpart/face IDs, local tool synchronization and vendor runtime validation |
+| Native CAD source | Source download with exact version; explicit unsupported preview | Export a preview next to editable source, preserving units/coordinate frames; no native editing in browser |
+| Code | Saved UTF-8 content, exact line anchors, inline old/new diff; recorded repository/source commit when available | Git provider/adapter must supply accurate repository/revision metadata and checkpoint files; browser does not pull a repo automatically |
+| Checks | Existing engineering checks and evaluations; stale inputs/evidence and non-applicable prior results stay visible; input-bound running execution is labelled separately | Tool must return exact state/input hashes, evaluator/environment/scope and evidence; no simulated pass is generated |
+| Import | Browser file upload and existing local checkpoint adapter | Live unsaved-change detection, deletion/rename UX, continuous vendor synchronization |
+| Conversation | Version-bound selection, human/agent mentions, personal Inbox, replies | Native-feature remapping, notification delivery/agent reaction policy; no guessed carry-forward of old comments |
+
+Known limits: preview files up to 16 MiB, 40,000 triangles/file, current assemblies
+up to 12 files/80,000 triangles (larger assemblies show a selected file); previous
+selected file may add up to 40,000 triangles. Meshes share their exported coordinate
+system; no assembly transforms or unit conversion are inferred. Preview is not a
+collision checker. Code preview/anchoring is limited to 256 KiB; large diffs use
+separate panes and truncated previews with a restore path. Browser upload accepts
+1–200 files, at most 32 MiB each/48 MiB total. Full adapters can handle larger
+artifact workflows. Work/Inbox lists paginate; state history and conversations
+are not yet paginated and need further scaling for very long-lived projects.
+
+Missing artifacts show **not captured/not connected** guidance; fetching shows a
+loading state; rejected imports retain the dialog and error; unsupported formats
+show a source download and connection guidance. Existing **Connections** continues
+to show connector setup/synchronization/error status. Refresh is explicit in Studio
+so asynchronous refreshes do not discard drafts or replace a selected version.
+
+## Isolated demo and verification
+
+```sh
+PYTHONPATH=. python examples/studio-demo/run.py --output /tmp/gantry-studio-example --port 8793
+```
+
+Use a new directory. Open the printed localhost URL and load its `access.token`
+using the login file picker. The script creates an **explicit sample project**
+through actual Core APIs, with invented geometry, code and identities. It never
+runs a model or tool service. Generated tokens/ledgers are local and must not be
+committed. Normal startup never seeds this demo. Original mock data is not shipped.
+
+See [Studio verification](STUDIO_VERIFICATION.md) for the checked scenarios and limits.

@@ -53,6 +53,12 @@ gantry disconnect /path/to/your/project
 
 No server or manual principal/proposal sequence is required for this local route. First-time client trust/MCP enablement remains a client decision. See [setup and daily use](docs/AGENTS.md). If no supported command sandbox is available, tests are refused; Gantry never silently runs them unrestricted.
 
+## Shared product workspace
+
+The authenticated web UI opens Studio: product structure and team work, saved CAD/code
+versions, checks, intermediate sharing and conversations attached to exact parts or
+lines. Native editing remains in your tools. See [Studio setup and supported connections](docs/STUDIO_UI.md).
+
 ## Continue through review
 
 Read the saved goal and state → edit within scope → checkpoint unfinished work → submit a meaningful milestone → review grounded Mentor findings → correct/test → checkpoint and respond. Agents do not need another owner decision for these delegated steps. Independent candidates can start from the same state in separate workspaces. Sharing and a successful test do not formally adopt a design.

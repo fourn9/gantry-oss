@@ -1,5 +1,10 @@
 # Organization and personal Bot foundations
 
+## Current extension: shared product UI
+
+The approved artifact-first Studio implementation is tracked in [studio-ui.md](studio-ui.md).
+Existing design-loop and Bot work below is preserved.
+
 ## Current extension: design change feedback
 
 Implement the approved remaining development loop in [design-change-loop.md](design-change-loop.md).
