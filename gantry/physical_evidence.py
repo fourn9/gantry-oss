@@ -19,7 +19,7 @@ def evaluate(check, report, hashes):
                 and (not {'min','max'}<=set(c) or c['min']<=c['max']),
                 'invalid_input','Distinct metrics with finite ordered limits and units required')
         seen.add(c['metric'])
-    require(isinstance(check.get('inputs'),list) and check['inputs'] and set(check['inputs'])<=set(hashes),
+    require(isinstance(check.get('inputs'),list) and check['inputs'] and all(isinstance(p,str) for p in check['inputs']) and set(check['inputs'])<=set(hashes),
             'invalid_input','Check inputs must exist in candidate')
     for key in ('conditions','evaluator','environment'):
         require(isinstance(check.get(key),dict) and check[key],'invalid_input','Explicit '+key+' required')

@@ -17,6 +17,7 @@ Repository = "https://github.com/fourn9/gantry-oss"
 Issues = "https://github.com/fourn9/gantry-oss/issues"
 
 [project.optional-dependencies]
+cad = ["cadquery>=2.8,<2.9"]
 feedback = ["PyNaCl>=1.6.2,<2"]
 
 [project.scripts]

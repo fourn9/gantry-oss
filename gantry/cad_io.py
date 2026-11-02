@@ -55,7 +55,7 @@ def edit(root, request, destination):
                 require(isinstance(step[key],str) and step[key] in shapes,'invalid_input','Unknown earlier shape')
                 return shapes[step[key]]
             if op=='import_step':
-                require(Path(step['path']).suffix.lower() in {'.step','.stp'},'invalid_input','STEP required')
+                require(isinstance(step['path'],str) and Path(step['path']).suffix.lower() in {'.step','.stp'},'invalid_input','STEP required')
                 raw=source(root,step['path'],step['sha256'])
                 input_file=staging/(name+'.input.step'); input_file.write_bytes(raw)
                 # Freeze imported bytes before native parsing; never parse a mutable source path.

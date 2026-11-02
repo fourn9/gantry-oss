@@ -5,6 +5,7 @@ contains a complete saved-file composition, not a mutable workspace pointer.
 """
 import copy
 import difflib
+from .engineering_context import assess as engineering_assess
 from .development import in_scope
 from .model import require, uid, digest, identifier, Fault
 
@@ -109,6 +110,7 @@ class ContinuityMixin:
             diffs.append(diff)
         return {'state': state, 'manifest': manifest, 'evaluations': evaluations, 'shares': shares,
             'diffs': diffs,
+            'engineering': engineering_assess(state['context'], manifest),
             'restores': restores, 'adoptions': adoptions,
             'status': {'work': state['work_status'],
                 'sharing': 'integrated' if state.get('integrated_changes') else 'shared' if shares else 'local',

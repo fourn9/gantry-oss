@@ -1,0 +1,40 @@
+# Hardware adapter verification
+
+Verified 2026-11-02, CPython 3.12.15 / macOS arm64 / CadQuery 2.8.0.
+
+- Full Python regression run: 582 cases, no failures, one skip, 172.615 seconds.
+  An additional focused test then confirmed a captured failed solver result reaches
+  the authenticated Mentor review and prevents an OK response; changes_requested succeeds.
+- JavaScript regression tests: 7 passed.
+- Real CadQuery tests: STEP import/cut/translation/export, original preservation,
+  stale-source refusal, path/operation rejection, actual collision and separated pairs.
+- Core integration tests: immutable captured reports, unchanged acceptance plan,
+  missing/malformed/failed evidence, successful retry, retained previous states,
+  no automatic adoption and event replay.
+- Measurement tests: numerical limits; stale CAD, conditions, evaluator/environment,
+  unit mismatch, missing/nonfinite measurements never produce a pass.
+- `examples/hardware_evidence.py` executed using the patched runtime. Initial actual
+  geometry: clearance fail, strength unknown. After STEP translation: clearance pass,
+  strength unknown; adoption unadopted. Both candidate states remain in the ledger.
+- Built wheel successfully. Installed-wheel module/CLI smoke check succeeded.
+- pip-audit reported no known vulnerabilities for the resolved optional CAD/tooling
+  environment. Exact public package versions are in hardware-runtime-constraints.txt.
+  This is a point-in-time advisory match, not native-code security certification.
+
+No mock geometry was used in the CAD tests/demo. Strength observation unit tests
+use synthetic numeric fixtures; no FEA, physical prototype test or live vendor CAD
+account was executed. The demo invokes the real Service in-process; production
+publishing uses existing HTTP Client calls. No production LLM was invoked; Mentor
+review responses in the additional integration test are explicit fixtures.
+
+Security review: no model-generated Python/shell execution, unchanged Core permissions,
+plan/source hash checks, preserved raw reports, new CAD output paths, bounded JSON,
+no new server-side native parser or network fetch. CAD native operations require a
+customer-side resource-limited Runner/container for hostile files. The CLI is not
+itself an OS sandbox. Existing external measurement authenticity and completeness
+remain declared; measured criteria do not certify physical fitness.
+
+The changes are additive and require no ledger migration. Existing engineering
+context/checkpoint APIs remain authoritative; restoring previous states preserves
+old results. Revert the adapter modules/optional dependency/UI-neutral state-view
+field to roll back code; never delete stored project evidence as part of rollback.

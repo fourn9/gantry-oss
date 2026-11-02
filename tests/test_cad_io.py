@@ -40,3 +40,20 @@ class CadIOTests(unittest.TestCase):
                 with self.assertRaises(Fault):
                     edit(root, {'unit':'mm','frame':'assembly','steps':[step],'export':[step['id']]},root/'out')
                 self.assertFalse((root/'out').exists())
+
+    def test_screen_report_measures_real_collision_and_clearance(self):
+        import cadquery as cq
+        from gantry.hardware import screen_report
+        with tempfile.TemporaryDirectory() as tmp:
+            root=Path(tmp)
+            for name,offset in [('a',0),('b',5)]:cq.exporters.export(cq.Workplane().box(10,10,10).translate((offset,0,0)),str(root/(name+'.step')))
+            request={'unit':'mm','frame':'assembly','clearance':1,'overlap_tolerance':0.001,
+                'parts':[{'id':n,'path':n+'.step','sha256':hashlib.sha256((root/(n+'.step')).read_bytes()).hexdigest()} for n in ['a','b']], 'pairs':[['a','b']]}
+            check={'inputs':['a.step','b.step']}
+            report=screen_report(root,request,check)
+            self.assertEqual(report['measurements']['violating_pairs']['value'],1)
+            self.assertGreater(report['raw']['pairs'][0]['overlap_volume'],0)
+            cq.exporters.export(cq.Workplane().box(10,10,10).translate((20,0,0)),str(root/'b.step'))
+            request['parts'][1]['sha256']=hashlib.sha256((root/'b.step').read_bytes()).hexdigest()
+            report=screen_report(root,request,check)
+            self.assertEqual(report['measurements']['violating_pairs']['value'],0)

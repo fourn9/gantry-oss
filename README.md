@@ -122,3 +122,10 @@ MIT. The published source, including Core and Mentor orchestration, may be used,
 Persistent organizational and personal Bots, customer-owned workspaces, automatic
 PR-triggered workers and opt-in user services: [Persistent Bots](docs/PERSISTENT_BOTS.md).
 No inference provider is enabled by default; each customer supplies its own agent.
+
+## CAD and physical evidence
+
+The optional [local hardware adapter](docs/HARDWARE-ADAPTER.md) reads/edits/writes
+STEP with CadQuery, runs static interference checks, and captures external strength,
+tolerance or prototype measurements against a frozen acceptance plan. Results stay
+bound to the evaluated files; missing evidence does not become a pass.
