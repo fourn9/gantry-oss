@@ -168,6 +168,31 @@ committed in Core is returned without another inference. Normal task recovery us
 its existing separate `--recover-job` path. Lost transport acknowledgements still
 reconcile idempotent requests rather than masquerading as failed inference.
 
+For a confirmed terminal, answer-free **monthly Codex 429**, use the original
+worker and journal after stopping the previous runtime:
+
+```sh
+gantry-crew bot-worker --config CONFIG --journal JOURNAL \
+  --recover-job TASK_ID --retry-inference \
+  --confirm-stopped "Previous worker and provider processes are stopped"
+```
+
+Gantry reports `provider_rate_limited` and a private-journal `retry_at` (Unix
+seconds). Its local cooldown starts at 60 seconds and doubles up to 900 seconds
+across failures of that invocation. This is not the provider's reset time, and
+waiting does not guarantee capacity. Recovery archives failed provider files and
+arms only the unfinished planning/action call. It retains exact saved inputs,
+completed tools, working notes and API receipts. Polling does not retry a hold or
+switch to a paid provider. Unknown outcomes and started calls without a known
+stopped PID remain blocked. Reflection retries apply the same 429 guard.
+
+If a complete reflection response is rejected by Core, its validation error is
+saved. An explicit `--recover-reflection ... --retry-inference` presents that
+error and the previous submission to the model for correction, retaining the old
+attempt in the archive. Only accepted output updates experience; Core's evidence,
+ownership and feedback eligibility checks are unchanged. Feedback excludes
+memories rejected by the plan. A correction does not rerun the development task.
+
 Keep the original private journals to preserve local effect and inference receipts.
 Moving between machines requires transferring them securely along with the normal
 runtime setup. Core retains pending reflections, but journal-only failure details

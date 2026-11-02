@@ -128,6 +128,8 @@ class BotLearningMixin:
                 'limits': 'Plans are intent; states are saved bytes; reports and use links are executor claims. None establishes physical correctness.'},
             'observations': self._learning_observations(s, record, con),
             'experience_actions': self._learning_observations(s, record, con, 'bot_learning_uses'),
+            'feedback_rules': {'eligible_memory_ids': [d['memory_id'] for d in plan['output']['decisions'] if d['use'] != 'reject'],
+                'limits': 'Each eligible memory at most once. Reject memories are ineligible; usefulness is not causal proof.'},
             'observations_coverage': 'At most 20 action and 20 experience-use receipts from this attempt before its report; get_bot_records pages full history'}
 
     def _learning_observations(self, s, record, con, table='bot_actions'):

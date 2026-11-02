@@ -173,10 +173,11 @@ class BotWorker:
         require(not self.config.get('workflow') or self.config['workflow'] == workflow,
                 'scope_denied', 'Recovery belongs to another workflow; use its original worker and journal')
         if workflow == 'bot_development':
-            require(not retry_inference and not collect_interrupted_verification,
-                    'invalid_input', 'Legacy recovery overrides do not apply to independent Bot tasks')
+            require(not collect_interrupted_verification,
+                    'invalid_input', 'Legacy verification recovery does not apply to independent Bot tasks')
             from .bot_execution import recover_bot_task
-            return recover_bot_task(self.client, job_id, self.root/'jobs', self.runtime['fence'], self.infer, reason, loop_config=self.config)
+            return recover_bot_task(self.client, job_id, self.root/'jobs', self.runtime['fence'], self.infer, reason,
+                                    loop_config=self.config, retry_inference=retry_inference)
         from .mentor_recovery import recover_job
         from .mentor_daemon import process_job
         result = recover_job(self.client, job_id, self.root/'jobs', reason,

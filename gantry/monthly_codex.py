@@ -7,16 +7,21 @@ from .model import require, canonical, Fault
 from .contracts import validate
 from .inference import strict_schema
 from .runner import persist, stop_process
+from .monthly_recovery import rate_limit_state, rate_limit_fault
 
 
 def infer_monthly(context,schema,directory,timeout_seconds=180):
     root=Path(directory).resolve();root.mkdir(parents=True,exist_ok=True,mode=0o700)
     marker=root/'inference.json'
+    failures=0
     if marker.exists():
         state=json.loads(marker.read_text())
         require(state['context']==context and state['schema']==schema,'idempotency_mismatch','Inference input changed')
         if state['phase']=='completed':return state['receipt']
-        raise Fault('outcome_unknown','Prior Codex invocation is uncertain; inspect journal before retry')
+        failure=rate_limit_state(root,state)
+        if failure:raise rate_limit_fault(failure)
+        require(state['phase']=='retry_ready','outcome_unknown','Prior Codex invocation is uncertain; inspect journal before retry')
+        failures=state.get('failures',0)
     env={k:v for k,v in os.environ.items() if k not in {'OPENAI_API_KEY','CODEX_API_KEY','CODEX_ACCESS_TOKEN','OPENAI_BASE_URL',
         'GANTRY_TOKEN','GANTRY_TOKEN_FILE','GANTRY_URL'}}
     status=subprocess.run(['codex','login','status'],env=env,capture_output=True,text=True,timeout=15)
@@ -29,7 +34,8 @@ def infer_monthly(context,schema,directory,timeout_seconds=180):
         'Never invent measurements or promote a technical judgment to formal adoption. '
         'Assess only the stated stage and acceptance. Propose concrete code/CAD source edits when warranted. '
         'Unavailable CAD/physics evidence must remain unverified. Internal reasoning is not requested; provide concise rationale.\n'+canonical(context))
-    persist(marker,{'phase':'started','context':context,'schema':schema})
+    started={'phase':'started','context':context,'schema':schema,'failures':failures}
+    persist(marker,started)
     with open(root/'events.jsonl','w') as events,open(root/'stderr.log','w') as errors:
         disabled=['shell_tool','unified_exec','view_image','browser_use','browser_use_external','computer_use',
                   'in_app_browser','image_generation','apps','plugins','hooks','multi_agent','multi_agent_v2','skill_search','skill_mcp_dependency_install']
@@ -39,11 +45,14 @@ def infer_monthly(context,schema,directory,timeout_seconds=180):
             '-c','approval_policy="never"','--sandbox','read-only','--skip-git-repo-check','--ephemeral',
             '--json','--output-schema',str(schema_path),'-o',str(root/'answer.json'),'-'],
             cwd=root,env=env,stdin=subprocess.PIPE,stdout=events,stderr=errors,text=True,start_new_session=True)
-        persist(marker,{'phase':'started','context':context,'schema':schema,'pid':proc.pid})
+        started['pid']=proc.pid;persist(marker,started)
         try:proc.communicate(prompt,timeout=timeout_seconds)
         except subprocess.TimeoutExpired:
             stop_process(proc);raise Fault('provider_timeout','Codex timeout; saved invocation will not blindly repeat')
-    require(proc.returncode==0 and (root/'answer.json').exists(),'provider_failed','Codex failed; inspect local provider journal')
+    if proc.returncode!=0 or not (root/'answer.json').exists():
+        failure=rate_limit_state(root,started)
+        if failure:raise rate_limit_fault(failure)
+        raise Fault('provider_failed','Codex failed; inspect local provider journal')
     output=json.loads((root/'answer.json').read_text());validate(output,schema)
     usage=None
     for line in (root/'events.jsonl').read_text().splitlines():

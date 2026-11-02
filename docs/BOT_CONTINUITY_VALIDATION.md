@@ -5,6 +5,11 @@ persistent working context, experience/action links and selective continuation.
 It does not establish model-weight learning, consistently better decisions,
 engineering speedup or equivalence to another personal-agent product.
 
+**Latest status:** the held second cycle was recovered through the implemented
+command, its reflection completed, and a real-model changed-input negative check
+completed. See “Recovery closure” below. Earlier holds remain documented as
+history; they are not the final task state.
+
 ## Verified paths
 
 | Path | Evidence | Limits |
@@ -148,13 +153,72 @@ the second report/reflection cycle. The prepared changed-input negative scenario
 was not executed because the preceding cycle remained held. Its deterministic
 test coverage remains separate from real-model evidence.
 
-Remaining operational gap: known failed action/planning inference still required
+At that point, the operational gap was that known failed action/planning inference required
 manual provider-journal archival before the existing task recovery command could
 make an explicit new request. Unknown effects remain protected against blind
 retry, but a unified explicit recovery operation would make this less error-prone.
 No unattended worker was left running. Resume from the preserved task and journals
 when the subscription inference endpoint accepts requests; do not repeat completed
 tool effects or replace failures with manufactured model responses.
+
+## Recovery closure, 2026-11-03
+
+The implementation now distinguishes a terminal, answer-free 429 from an
+unknown outcome. Explicit task recovery archives only the failed inference,
+enforces a local cooldown and preserves completed effects. An independent review
+found missing process-identity and reflection-retry guard gaps; both were fixed
+and covered by regression tests. No provider credits or paid fallback were used.
+
+The original held task then resumed using `recover(..., retry_inference=True)`:
+
+1. The real model recorded one experience-use link to the already saved tool and
+   working-context actions, then reported completion.
+2. Its reflection included feedback on a memory rejected by the plan. Core
+   rejected that submission; it did not create learned experience from it.
+3. The harness now preserves the validation error and presents it with the prior
+   submission during an explicit correction. The real model corrected the
+   reflection, and Core accepted it. The original tool ran **once in total**;
+   recovery and reflection correction did not rerun it.
+
+Feedback eligibility is now explicit in the reflection packet and instructions.
+Core's same-attempt evidence and memory eligibility rules were retained. The
+correction was operator-triggered; it is not a claim of an unattended successful
+run. No model answer was edited or substituted by the operator.
+
+A separate negative task changed one saved numeric input from 1 to 2, retaining
+the other at 1. This was declared operator test setup, not an autonomous design.
+
+- Recall marked affected experience `input_changed`. The real model selected
+  `recheck`, rather than applying the old success to the new state.
+- It ran the installed check once: `interface_values 2 1 equal False`, exit 1.
+- Its report explicitly kept project acceptance unmet and compatibility
+  unresolved, recorded the new context and an experience-action link, and made
+  no edits or adoption. `completed` described the assigned **check-and-report
+  task**, not a passing design.
+- Outcome reflection completed. The failure and applicability limits were saved.
+  An idle restart made zero inference calls; event replay matched.
+
+| New run | Model calls | Harness time | Input / output tokens | Final observation |
+| --- | ---: | ---: | ---: | --- |
+| Original task recovery | 3 | 65.136 s | 68,343 / 1,664 | Report complete; reflection initially rejected |
+| Reflection correction | 1 | 26.236 s | 18,932 / 1,021 | Reflection accepted, no repeated task execution |
+| Changed-input check | 6 | 122.991 s | 159,437 / 2,727 | Mismatch recorded; report and reflection complete |
+
+Times exclude setup, code repair and operator waiting. They are not end-to-end
+engineering durations or evidence of speedup. All three final replay checks
+matched, and idle polls generated no calls. The CLI used the existing subscription
+and its default model; this is a functional test, not a pinned-model benchmark.
+
+Final regression: **1,062 test invocations in 120.079 seconds, no failures,
+8 skips** (includes inherited unittest cases). The wheel built successfully.
+The focused suite and independent review also exercised unknown/live-process
+holds, repeated rate limits, unchanged saved inputs and corrected-reflection
+acknowledgement loss. Provider availability is external: later 429s can still
+occur, but no longer require hand-moving task inference journals.
+
+This closes the observed recovery and second-cycle functional gaps. It still
+does not establish causal learning benefit, physical correctness, or faster
+engineering. Those require held-out comparisons and domain validation.
 
 Next assess held-out tasks with and without experience, changed-condition
 rejection, repeated mistakes, independent correctness and full time/token cost.

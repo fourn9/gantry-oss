@@ -159,11 +159,14 @@ report from overwriting a task's own saved edits.
 - Recovery enforces the same workflow filter as normal dispatch. A Bot-only worker
   cannot recover a legacy Mentor job, and an explicitly legacy-only worker cannot
   recover a Bot assignment. Use the original worker and journal for that workflow.
-  Legacy retry/verification overrides are rejected for independent Bot recovery.
+  The legacy interrupted-verification override is rejected for independent Bots.
 - Recovery reconciles lost claim/checkpoint/finish acknowledgements and reuses
   saved answers. An uncertain model/tool result without a saved receipt is held;
-  the new path has no automatic retry-inference override. Investigate and explicitly
-  create a new task if another execution is needed. Known active provider processes
+  it is not repeated automatically. A confirmed answer-free monthly Codex 429 can
+  be retried with `--retry-inference` on this same recovery command after the local
+  cooldown. Only the pending planning/action inference is armed; completed actions
+  and exact inputs are preserved. The previous worker must be stopped. Unknown
+  outcomes, missing process identity and known active provider processes
   block recovery. Changed scope, baseline, hierarchy or discussion needs a new task.
 - Disable a Bot project with `configure_bot_project`, or stop a task using
   `cancel_bot_task`. Old output cannot commit. Already-started customer processes

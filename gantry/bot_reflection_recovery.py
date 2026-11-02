@@ -6,7 +6,7 @@ from pathlib import Path
 from .model import Fault, require, uid
 from .runner import persist
 
-HELD_CODES = {'provider_failed', 'provider_timeout', 'outcome_unknown', 'context_limit', 'invalid_input'}
+HELD_CODES = {'provider_failed', 'provider_rate_limited', 'provider_timeout', 'outcome_unknown', 'context_limit', 'invalid_input'}
 
 
 def attempt_reflection(client, item, infer, root):
@@ -39,16 +39,29 @@ def recover_reflection(client, bot_id, reflection_id, infer, root, reason, retry
     saved = json.loads(marker.read_text())
     receipt = directory/'inference'/'receipt.json'
     provider = directory/'inference'/'model'/'inference.json'
+    from .monthly_recovery import ensure_stopped, prepare_retry
+    provider_state = json.loads(provider.read_text()) if provider.is_file() else None
+    if provider_state: ensure_stopped(provider_state)
     known = ('receipt' in saved or receipt.is_file() or
              provider.is_file() and json.loads(provider.read_text()).get('phase') == 'completed')
     require(known or retry_inference, 'outcome_unknown', 'No complete receipt; explicitly choose a new inference attempt')
+    monthly_retry = False
+    if retry_inference and provider_state and provider_state.get('phase') != 'completed':
+        prepare_retry(provider.parent, reason)
+        monthly_retry = True
     archive = directory/'recoveries'/uid('recovery'); archive.mkdir(parents=True, mode=0o700)
     persist(archive/'recovery.json', {'reason': reason, 'retry_inference': retry_inference})
     shutil.copy2(marker, archive/'reflection.json')
     # A new inference is explicit, including an invalid earlier structured answer.
     # Without this flag, reconcile a known receipt instead of spending again.
-    if retry_inference:
+    if retry_inference and not monthly_retry:
         if (directory/'inference').exists(): (directory/'inference').rename(archive/'inference')
+        if saved.get('validation_error') and saved.get('receipt'):
+            saved['input'] = {**saved['input'], 'previous_submission': saved['receipt']['output'],
+                'validation_feedback': saved.pop('validation_error'),
+                'correction_instruction': 'Correct the rejected structured submission using the saved evidence. '
+                    'Feedback may cite only unique memory IDs marked apply or recheck in plan.output.decisions. '
+                    'Do not weaken requirements or invent evidence to satisfy validation.'}
         saved.pop('receipt', None); saved.pop('result', None); persist(marker, saved)
     if (directory/'held.json').exists(): (directory/'held.json').rename(archive/'held.json')
     return attempt_reflection(client, item, infer, root)

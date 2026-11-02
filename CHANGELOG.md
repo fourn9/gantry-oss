@@ -14,6 +14,10 @@ This file records changes after v3.3.0. Earlier release notes remain in the
 - Selective continuation after watched inputs or task reports change, or a due
   time arrives, within explicit owner standing delegation.
 - Explicit recovery of held reflections using saved inference receipts.
+- Explicit recovery of confirmed monthly Codex 429 failures during Bot planning
+  or actions, preserving completed effects and enforcing a local cooldown.
+- Reflection correction receives Core's validation error and the prior rejected
+  submission; rejected output does not update learned experience.
 
 ### Security and compatibility
 
@@ -25,10 +29,11 @@ This file records changes after v3.3.0. Earlier release notes remain in the
 
 ### Validation
 
-- Python regression: 865 invocations, no failures, 8 skips; subsequent focused
-  verification: 182 passed.
-- Real subscription-model checks reached experience selection, tool execution and
-  working-note updates. The follow-up report/reflection cycle remains held by
-  provider HTTP 429. Learning efficacy and development speedup are not established.
+- Final Python regression: 1,062 invocations, no failures, 8 skips.
+- Real subscription-model checks completed experience selection, tool execution,
+  working-note updates, experience/action links, report and outcome reflection.
+  A changed-input check recorded a real failure without reusing the previous pass.
+  Recovery included operator intervention; learning efficacy and engineering
+  speedup are not established.
 - See [operation](docs/BOT_CONTINUITY.md) and
   [runtime evidence and limits](docs/BOT_CONTINUITY_VALIDATION.md).
