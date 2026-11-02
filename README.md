@@ -148,3 +148,9 @@ To compare the same task with and without prior experience in separate ledgers,
 use the opt-in [paired evaluation guide](docs/BOT_LEARNING_EVALUATION.md).
 It retains failures and checks saved candidates independently; the included
 synthetic example does not establish engineering speedup.
+
+To turn saved changes into the next correction or test, use the
+[design assessment and development loop](docs/DESIGN_CHANGE_LOOP.md). It connects
+cumulative changes, declared impact and requirement evidence to normal Bot inputs
+and retained reports. A native CAD/subscription-model example demonstrates two
+successive tasks; broader physical validity remains explicitly unverified.

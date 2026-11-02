@@ -161,6 +161,16 @@ class DevelopmentMixin:
         if d.get('active_state'):
             result['development'] = self.cmd_get_development_state(s, actor, {'state_id': d['active_state']}, effects, notices, con)
             result['parallel_changes'] = [c for c in s.get('dev_changes', {}).values() if c['session_id'] == d['id']]
+            state = result['development']['state']
+            candidates = [c for c in result['parallel_changes'] if c['head'] == state['id']]
+            baseline = candidates[0]['base_state'] if len(candidates) == 1 else (state['parents'] or [state['id']])[0]
+            # Incoming sessions may retain an external parent as provenance.
+            # Compare from their own imported state; never read another project
+            # implicitly while assembling this session's model input.
+            if self._dev_get(s, 'dev_states', baseline)['session_id'] != state['session_id']:
+                baseline = state['id']
+            result['design_assessment'] = self.cmd_get_design_assessment(s, actor, {
+                'baseline_state_id': baseline, 'state_id': state['id']}, effects, notices, con)
             result['reflections'] = [v for v in s.get('dev_reflections', {}).values() if v['session_id'] == d['id']]
             result['evidence_views'] = self.cmd_query_evidence(s,actor,{'state_id':d['active_state'],'limit':50},effects,notices,con)
             result['evidence_views'].pop('as_of_seq',None)  # Only evidence changes invalidate Mentor, not unrelated event appends.

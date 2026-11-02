@@ -21,7 +21,8 @@ def publish(client, state_id, change_id, version, root, plan_path, key):
     require(change and change['head']==state_id and change['version']==version,
             'stale_basis','Change head/version differs; restore the intended state')
     session=client.call('development_state',{'session_id':state['session_id']})['session']
-    args=_physical_checkpoint(client,before,root,session['zone'],plan_path,key)
+    baseline=client.call('get_development_state',{'state_id':change['base_state']})
+    args=_physical_checkpoint(client,before,root,session['zone'],plan_path,key,baseline)
     return client.call('checkpoint_change',{'change_id':change_id,'version':version,**args},key+':checkpoint')
 
 
@@ -30,19 +31,20 @@ def publish_bot(client, task_id, fence, root, plan_path, key):
     ref={'task_id':task_id,'fence':fence}
     client.call('check_bot_task',ref)
     context=client.call('get_bot_task',{'task_id':task_id})
-    args=_physical_checkpoint(client,context['development'],root,context['zone'],plan_path,key)
+    baseline=client.call('get_development_state',{'state_id':context['task']['state_id']})
+    args=_physical_checkpoint(client,context['development'],root,context['zone'],plan_path,key,baseline)
     args.pop('work_status')
     return client.call('checkpoint_bot_task',{**ref,**args},key+':checkpoint')
 
 
-def _physical_checkpoint(client, before, root, zone, plan_path, key):
+def _physical_checkpoint(client, before, root, zone, plan_path, key, baseline):
     Store.safe_name(plan_path)
     state=before['state']
     artifact,missing=capture_workspace(client,root,key,zone)
     manifest=artifact['data']['files']; hashes={p:v['hash'] for p,v in manifest.items()}
-    require(plan_path in before['manifest'] and plan_path in manifest
-            and before['manifest'][plan_path]['hash']==hashes[plan_path],
-            'stale_basis','Acceptance plan must already be saved in the input state and remain unchanged')
+    require(plan_path in baseline['manifest'] and plan_path in before['manifest'] and plan_path in manifest
+            and baseline['manifest'][plan_path]['hash']==before['manifest'][plan_path]['hash']==hashes[plan_path],
+            'stale_basis','Acceptance plan must match the assignment/change baseline; reassess and start new work for a new plan')
     def read(name):
         Store.safe_name(name)
         require(name in manifest and manifest[name]['size']<=1024**2,'invalid_input','JSON evidence exceeds 1 MiB or is absent')

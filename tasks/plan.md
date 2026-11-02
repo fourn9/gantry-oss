@@ -1,5 +1,10 @@
 # Organization and personal Bot foundations
 
+## Current extension: design change feedback
+
+Implement the approved remaining development loop in [design-change-loop.md](design-change-loop.md).
+Existing unrelated checklists and historical work below are preserved.
+
 ## Current extension: personal Bot continuity
 
 The owner approved continuing the memory/skills/continuity direction on 2026-11-03.

@@ -150,6 +150,8 @@ class ChangeReviewMixin:
         result['applicable'] = current
         result['server_time'] = self.clock()
         result['development'] = self.cmd_get_development_state(s, actor, {'state_id': r['state_id']}, fx, n, con)
+        result['design_assessment'] = self.cmd_get_design_assessment(s, actor, {
+            'baseline_state_id': r['base_state'], 'state_id': r['state_id']}, fx, n, con)
         result['baseline'] = self._continuity_state(s, actor, r['base_state'])
         result['team'] = team
         own_roles = [m['role'] for m in team['members'] if m['principal_id'] == actor['id']]
@@ -208,6 +210,9 @@ class ChangeReviewMixin:
         refs = s['dev_states'][r['state_id']]['context'].get('requirement_refs', [])
         if refs: basis.append([[ref, s['entries'][ref['requirement_id']]['revision_id']] for ref in refs])
         if change.get('discussion_version'): basis.append(change['discussion_version'])
+        from .design_assessment import map_fingerprint
+        maps = map_fingerprint(self, s, [r['base_state'], r['state_id']])
+        if maps is not None: basis.append(maps)
         return digest(basis)
 
     def _response_evidence(self, s, response):
@@ -308,6 +313,9 @@ class ChangeReviewMixin:
                 'review_pending', 'New required checks have not been executed')
         context = self.cmd_get_change_review(s, actor, {'submission_id': r['id']}, fx, n, con)
         require(a['context_fingerprint'] == context['context_fingerprint'], 'stale_basis', 'Review evidence changed; reread context')
+        require(output['verdict'] != 'ok' or (not context['design_assessment']['partial']
+                and not context['design_assessment']['open_checks']),
+                'review_pending', 'Changed design still has unresolved checks')
         r.update(status='completed', output=output, completed_at=self.clock(), reviewed_context_fingerprint=a['context_fingerprint'])
         if plan is not None: r['engineering_proposal'] = plan
         r.pop('fence', None)

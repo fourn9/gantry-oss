@@ -73,3 +73,8 @@ code changes were required.
 Only this sanitized summary is published. Model journals, local ledgers and
 credentials are not included in the source repository. These feature-branch
 results do not change the already published v3.1.1 release.
+
+The later [design change loop verification](DESIGN_CHANGE_LOOP_VERIFICATION.md)
+exercises actual model-chosen CAD/control corrections, revalidation and a fresh task
+after a dependency change. The earlier review-only limitation above describes that
+earlier run, not the later demonstration.
