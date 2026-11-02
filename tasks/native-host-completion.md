@@ -16,7 +16,7 @@ Apply source-driven design, explicit acceptance, incremental TDD and security re
   native bytes, retain evidence before releasing the hold, require explicit
   confirmation that the native writer stopped. Support repeat status reads and
   reject concurrent operations on the same target.
-- [ ] Run synthetic process-boundary, integrity and recovery tests plus existing
+- [x] Run synthetic process-boundary, integrity and recovery tests plus existing
   suites; package the executable CLI and document real-environment acceptance.
 - [ ] Cadence persisted write/reopen: requires authoritative version-specific
   signatures and error semantics. Forum examples alone are not a qualified API
@@ -59,4 +59,32 @@ not runtime qualification.
 
 The initial full suite passed 790 tests with the actual optional CadQuery
 interpreter configured (90.769 seconds). A final CLI nonzero-error fix and its
-test followed; final full-suite/package results will be recorded below.
+test followed. Final full-suite result: **791 tests passed, no skips, 93.338
+seconds**, with the same optional CadQuery interpreter configured. The Altium
+process boundary remains synthetic; the real CadQuery check is a different
+integration and does not qualify any proprietary desktop product.
+
+Code snapshot `835753f7bfe9bf983264f1580c066dcf9708e213` was packaged as a wheel and
+installed with no dependencies into a fresh venv. `script-run`, `script-status`
+and `script-evidence` command help, imports and capability catalog checks pass.
+Whitespace checks pass. Eight changed files were scanned for private-project,
+personal path, common credential and private-key patterns; no matches. This is
+not an independent audit or a complete secret detector.
+
+No GitHub publication, licensed native write, installation or paid service use
+occurred. The last three acceptance items remain incomplete, not waived.
+
+## Required inputs to finish native acceptance
+
+- Vendor product/module and release/build. For Zuken distinguish E3.series from
+  CR-8000; for Capital name the actual module and supported API interface.
+- The installed SDK reference for document identity, dirty-state detection,
+  selected field read/write, save/reopen and failure/return semantics. For
+  Cadence this includes Allegro's save/open APIs, not only a forum example.
+- A licensed customer-controlled Windows host and disposable native projects
+  with one agreed writable field; credentials stay on that host.
+
+On each real host, acceptance must show original bytes/value, approved plan,
+actual API call and version, persisted changed value after reopen, Gantry
+publication and restored evidence. Also test stale inputs and lost-result
+recovery without duplicate writes. A mocked receipt cannot satisfy these items.
