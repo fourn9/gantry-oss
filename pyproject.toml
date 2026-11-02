@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "gantry-ledger"
-version = "3.1.1"
+version = "3.2.0"
 description = "Versioned robot design and decision ledger"
 requires-python = ">=3.11"
 dependencies = []
@@ -17,6 +17,7 @@ Repository = "https://github.com/fourn9/gantry-oss"
 Issues = "https://github.com/fourn9/gantry-oss/issues"
 
 [project.optional-dependencies]
+cad = ["cadquery>=2.8,<2.9"]
 feedback = ["PyNaCl>=1.6.2,<2"]
 
 [project.scripts]

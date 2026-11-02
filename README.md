@@ -9,7 +9,7 @@ Gantry has two product areas:
 - **Gantry Ledger** keeps the shared development state and the history of changes, evidence, discussions, verification and human decisions. Reviewing a submitted change is an operation in Ledger.
 - **Gantry Crew** gives customer-owned agents persistent roles, scopes and experience so they can receive work, collaborate and hand off results through Ledger.
 
-**Version: 3.1.1.** Local operation is the supported starting point. Human adoption, agent proposals and execution results remain separate. Gantry does not certify a design's physical safety or operate hardware by default.
+**Version: 3.2.0.** Local operation is the supported starting point. Human adoption, agent proposals and execution results remain separate. Gantry does not certify a design's physical safety or operate hardware by default.
 
 **Two service entry points:** `gantry-ledger` for customer-led development
 and review, and `gantry-crew` for delegated Bot development.
@@ -122,3 +122,10 @@ MIT. The published source, including Core and Mentor orchestration, may be used,
 Persistent organizational and personal Bots, customer-owned workspaces, automatic
 PR-triggered workers and opt-in user services: [Persistent Bots](docs/PERSISTENT_BOTS.md).
 No inference provider is enabled by default; each customer supplies its own agent.
+
+## CAD and physical evidence
+
+The optional [local hardware adapter](docs/HARDWARE-ADAPTER.md) reads/edits/writes
+STEP with CadQuery, runs static interference checks, and captures external strength,
+tolerance or prototype measurements against a frozen acceptance plan. Results stay
+bound to the evaluated files; missing evidence does not become a pass.
