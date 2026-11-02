@@ -29,3 +29,11 @@ export function structureLayout(nodes){
   const width=Math.max(650,...levels.map(l=>l.length*220+40)),height=Math.max(330,levels.length*130+60);
   return {width,height,nodes:levels.flatMap((level,d)=>level.map((n,i)=>({...n,x:width*(i+.5)/level.length,y:50+d*130}))) };
 }
+export function primaryComponents(components){
+  const byId=new Map(components.map(c=>[c.id,c])),ancestors=new Set();
+  for(const c of components){let parent=c.parent;const seen=new Set([c.id]);while(parent&&!seen.has(parent)){seen.add(parent);ancestors.add(parent);parent=byId.get(parent)?.parent;}}
+  return components.filter(c=>!ancestors.has(c.id));
+}
+export function commentCount(detail,stateId,path,line){
+  return (detail.discussion_index||[]).filter(t=>t.state_id===stateId&&t.anchor.path===path&&(line===undefined||t.anchor.line===line)).reduce((n,t)=>n+t.message_count,0);
+}

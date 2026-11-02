@@ -53,3 +53,31 @@ state; this UI adds authenticated file import/share and versioned discussion aro
 it. Stable native CAD subpart identifiers, automatic vendor preview conversion and
 continuous external change capture still require integration work. No engineering
 performance improvement or physical correctness follows from these UI tests.
+
+
+## UX follow-up — 2026-11-03
+
+The approved follow-up keeps the same visual language and Core write contracts.
+Browser checks used the same isolated anonymous fixture, never a customer project.
+
+- File selector, selected mesh and amber comparison target now agree. Top view/zoom
+  survived opening and closing the discussion; current-version mesh comment count
+  remained attached to the saved file-part.
+- Conversation index showed baseline vs viewing version. Opening the baseline
+  code-line thread selected the correct saved code/line and its comment marker.
+- Revision note and changed-file modal displayed actual saved notes and diff paths.
+- While a browser draft was open, a second fixture identity appended a comment via
+  Core. The 15-second poll showed a notice without changing the view. Load updates
+  retained the baseline selection and unsent text, displayed the reply and updated
+  the line count. This was a manually driven fixture identity, not autonomous AI.
+- 320/768/1024px: no horizontal document overflow, conversation focus/scroll and
+  Back to artifact worked. 1440px: separate conversation column; CAD view retained.
+- Work columns showed assignee, leaf component scope and recorded status; no
+  inferred progress or verification was added.
+
+Regression: **1,142 Python tests passed, 8 skipped, 128.901 seconds**; **30 Node
+checks passed**. Focused Studio tests were rerun after the final activity/auth
+changes. Wheel build passed and includes the activity module. Static asset coverage
+caught a missing server allowlist entry; it was fixed before final verification.
+Permission/state checks and escaping were reviewed; update polling never invokes a
+write, Mentor or agent. Existing CAD/vendor and scaling limits still apply.

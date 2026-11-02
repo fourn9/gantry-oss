@@ -21,6 +21,24 @@ class StudioDiscussionMixin:
             t['messages']=sorted(messages[t['id']],key=lambda m:(m['at'],m['id']))
         return sorted(threads,key=lambda t:(t['at'],t['id']))
 
+    def _studio_discussion_index(self,s,actor,change):
+        allowed={}
+        result=[]
+        messages={}
+        for m in s.get('studio_messages',{}).values():
+            messages.setdefault(m['thread_id'],[]).append((m['at'],m['id']))
+        for t in s.get('studio_threads',{}).values():
+            if t['work_id']!=change['id']: continue
+            sid=t['state_id']
+            if sid not in allowed:
+                try: self._studio_state(s,actor,change,sid); allowed[sid]=True
+                except Fault: allowed[sid]=False
+            if not allowed[sid]: continue
+            ids=sorted(messages.get(t['id'],[]))
+            result.append({'id':t['id'],'state_id':sid,'anchor':t['anchor'],
+                'message_count':len(ids),'last_message_id':ids[-1][1] if ids else None})
+        return sorted(result,key=lambda t:t['id'])
+
     def cmd_studio_comment(self,s,actor,a,fx,n,con):
         self.allowed(actor,'record'); c,d=self._studio_work(s,actor,a['work_id'])
         state=self._studio_state(s,actor,c,a['state_id']); anchor=a['anchor']; kind=anchor['kind']

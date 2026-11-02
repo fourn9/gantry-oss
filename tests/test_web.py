@@ -1,4 +1,5 @@
 import json
+from pathlib import Path
 from urllib.request import urlopen
 import unittest
 import test_interfaces as fixtures
@@ -9,7 +10,8 @@ class WebTests(unittest.TestCase):
     tearDown = fixtures.InterfaceTests.tearDown
 
     def test_web_assets_have_content_security_policy_and_no_credentials(self):
-        for path, mime in [('/', 'text/html'), ('/app.js', 'text/javascript'), ('/review_views.js', 'text/javascript'), ('/style.css', 'text/css')]:
+        assets=[('/', 'text/html')]+[('/'+p.name,'text/javascript' if p.suffix=='.js' else 'text/css') for p in (Path(__file__).parents[1]/'gantry'/'web').iterdir() if p.suffix in {'.js','.css'}]
+        for path,mime in assets:
             with urlopen(self.url + path) as response:
                 text = response.read().decode()
                 self.assertIn(mime, response.headers['Content-Type'])

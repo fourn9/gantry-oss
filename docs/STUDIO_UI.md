@@ -13,7 +13,8 @@ The existing execution, integration, review and adoption screens remain under
    **Work** lists change sets, owners (human or agent), component scope and recorded status.
 2. Open work. Select **CAD**, **Code** or **Checks**. Choose a saved version and,
    for CAD/code, optionally compare another version. **Version details** exposes
-   the checkpoint note, shared note, capture omissions and restore command.
+   the capture omissions and restore command. The shared update note (or checkpoint
+   note) stays visible beside an expandable changed-file summary.
 3. Edit in the external CAD/editor and save. **Import changes** accepts selected
    saved files, lets you map destination paths, and creates an unshared checkpoint.
    Unselected files are retained. The scope and expected work version are checked.
@@ -26,6 +27,8 @@ The existing execution, integration, review and adoption screens remain under
    member/agent with the picker. Their **Inbox** opens that exact work, state,
    artifact and selection. Old comments stay on their original version. Closing
    the panel returns to artifact viewing. Replying uses the same immutable anchor.
+   **Browse conversations** lists targets and versions, including older conversations.
+   File/mesh markers and code-line counts only include comments on the displayed version.
 6. **Recent** / **Recent work** show work opened in the current browser tab. This
    initial implementation does not persist browsing history across sign-out/reload.
 
@@ -44,7 +47,7 @@ adding tools to a profile does not silently widen an issued credential.
 | Command | Contract |
 | --- | --- |
 | `studio_overview` | Authorized projects/hierarchy and paged change-set work list; no estimated progress |
-| `studio_work` | Work ID plus optional state ID; exact manifest, versions, check applicability, participants and conversations |
+| `studio_work` | Work ID plus optional state ID; exact manifest, versions, check applicability, participants, versioned discussion index and activity token. `activity_only: true` returns only the token after the same authorization checks |
 | `studio_import_update` | Work ID, expected version, path/base64 files, summary; upload screening + immutable overlay + existing checkpoint |
 | `studio_share_update` | Work ID, expected version, exact current state, note; existing share operation, no adoption |
 | `studio_comment` | Work ID, state ID, exact anchor, optional thread ID, body, recipient IDs |
@@ -88,8 +91,25 @@ are not yet paginated and need further scaling for very long-lived projects.
 Missing artifacts show **not captured/not connected** guidance; fetching shows a
 loading state; rejected imports retain the dialog and error; unsupported formats
 show a source download and connection guidance. Existing **Connections** continues
-to show connector setup/synchronization/error status. Refresh is explicit in Studio
-so asynchronous refreshes do not discard drafts or replace a selected version.
+to show connector setup/synchronization/error status.
+
+Visible Studio pages check for activity every 15 seconds while authenticated. Work
+polls return a fingerprint without rebuilding artifact manifests/diffs; they track
+work, shares, discussions and related execution context. Other pages use their
+existing overview/Inbox reads. This is a read-only poll, not a push service or a
+new external-tool synchronization path. A small notice offers **Load updates**;
+the selected work version, camera and unsent comment stay in place. **Open latest**
+explicitly switches to the newer version. An unavailable poll offers a retry;
+navigation and sign-out invalidate pending notices. History/conversation scans
+still need indexing/pagination before claiming large-project scaling.
+
+The artifact-file selector and mesh selection identify the same file-part for
+comparison and discussion. Opening/closing a conversation preserves the view and
+zoom for that work/version (within this tab). Use the zoom buttons or Alt+wheel;
+ordinary wheel input scrolls the page. On narrow screens, opening a discussion
+moves focus to its panel; **Back to artifact** returns to the preview. Conversation
+headers stay visible below the workspace header. Work lists align name, assignee,
+leaf component and status; ancestor components remain in the saved hierarchy.
 
 ## Isolated demo and verification
 

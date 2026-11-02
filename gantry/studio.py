@@ -5,12 +5,12 @@ Studio never adopts or certifies a design. All writes use the same Core transact
 import copy
 from .contracts import register, S, I
 from .development import in_scope
-from .model import Fault, require, uid
+from .model import Fault, require, uid, digest
 from .studio_discussion import StudioDiscussionMixin
 
 LIMIT = {'type':'integer','minimum':1,'maximum':100}
 register('studio_overview', {'after':S, 'limit':LIMIT})
-register('studio_work', {'work_id':S,'state_id':S}, ['work_id'])
+register('studio_work', {'work_id':S,'state_id':S,'activity_only':{'type':'boolean'}}, ['work_id'])
 register('studio_import_update', {'work_id':S,'version':I,'files':{'type':'object','additionalProperties':{'type':'string'}},
     'summary':{'type':'string','minLength':1,'maxLength':1000}}, ['work_id','version','files','summary'])
 register('studio_share_update', {'work_id':S,'version':I,'state_id':S,'note':{'type':'string','maxLength':1000}},
@@ -35,7 +35,7 @@ class StudioMixin(StudioDiscussionMixin):
         owner = s['principals'].get(change['assignee'], {})
         return {**{k:change[k] for k in ('id','title','purpose','session_id','version','base_state','head','status','sharing','assignee')},
             'project_id':project_id,'owner':{'id':change['assignee'],'kind':owner.get('kind','unknown')},
-            'components':[{'id':h['id'],'title':h['title']} for h in state['hierarchy']
+            'components':[{'id':h['id'],'title':h['title'],'parent':h.get('parent')} for h in state['hierarchy']
                 if any(in_scope(p,change['write_scope']) for p in h['paths']) or
                    any(in_scope(p,h['paths']) for p in change['write_scope'])],
             'task_status':task['status'] if task else None, 'updated_at':state['created_at']}
@@ -69,6 +69,15 @@ class StudioMixin(StudioDiscussionMixin):
     def cmd_studio_work(self, s, actor, a, fx, n, con):
         c,d=self._studio_work(s,actor,a['work_id']); sid=a.get('state_id',c['head'])
         state=self._studio_state(s,actor,c,sid)
+        discussions=self._studio_discussion_index(s,actor,c)
+        state_ids=set(self._studio_states(s,c))
+        activity=digest({'work':c,'discussions':discussions,
+            'shares':[x for x in s.get('dev_shares',{}).values() if x['change_id']==c['id']],
+            'execution_context':{table:[x for x in s.get(table,{}).values() if x.get('session_id')==d['id']]
+                for table in ('dev_executions','dev_evaluations','dev_contracts','bot_tasks')},
+            'adoptions':[e for e in s['entries'].values() if e['type']=='design_document'
+                and e['data'].get('development_state') in state_ids]})
+        if a.get('activity_only'): return {'activity_token':activity}
         project=s.get('product_sessions',{}).get(d['id'],{}).get('project_id')
         shares=[x for x in s.get('dev_shares',{}).values() if x['change_id']==c['id']]
         versions=[]
@@ -92,6 +101,7 @@ class StudioMixin(StudioDiscussionMixin):
             'selected':self.cmd_get_development_state(s,actor,{'state_id':sid},fx,n,con),
             'versions':versions,'participants':participants,
             'threads':self._studio_threads(s,c['id'],sid),
+            'discussion_index':discussions,'activity_token':activity,
             'can_update':permitted('studio_import_update') and permitted('studio_share_update') and ('admin' in actor['permissions'] or (actor['id'] in {c['assignee'],c['author']} and {'work','record'} <= set(actor['permissions']))) and c['sharing']!='integrated',
             'can_comment':permitted('studio_comment') and ('record' in actor['permissions'] or 'admin' in actor['permissions']),
             'capture':state['capture']}

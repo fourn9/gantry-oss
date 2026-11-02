@@ -28,11 +28,12 @@ export function parseMesh(bytes,path){
   }else throw new Error('This format needs a saved STL or OBJ preview.');
   if(!triangles.length)throw new Error('No triangles in this preview.');return triangles;
 }
-export function mountMesh(canvas,meshes,onSelect,initial='iso'){
+export function mountMesh(canvas,meshes,onSelect,initial='iso',comments={}){
   const ctx=canvas.getContext('2d');if(!ctx)throw new Error('Canvas preview is unavailable.');
   let yaw=-.65,pitch=.75,zoom=1,pressed=null,frame=0,selected='',faces=[],closed=false;
   let min=[Infinity,Infinity,Infinity],max=[-Infinity,-Infinity,-Infinity];
   for(const mesh of meshes)for(const tri of mesh.triangles)for(const v of tri)for(let i=0;i<3;i++){min[i]=Math.min(min[i],v[i]);max[i]=Math.max(max[i],v[i]);}
+  const markers=meshes.filter(m=>!m.previous&&comments[m.path]).map(m=>{const lo=[Infinity,Infinity,Infinity],hi=[-Infinity,-Infinity,-Infinity];for(const t of m.triangles)for(const v of t)for(let i=0;i<3;i++){lo[i]=Math.min(lo[i],v[i]);hi[i]=Math.max(hi[i],v[i]);}return {path:m.path,at:lo.map((v,i)=>(v+hi[i])/2)};});
   const center=min.map((n,i)=>(n+max[i])/2),span=Math.max(...min.map((n,i)=>max[i]-n),1e-6);
   function point(v){let [x,y,z]=v.map((n,i)=>(n-center[i])/span);const X=x*Math.cos(yaw)-y*Math.sin(yaw),Y=x*Math.sin(yaw)+y*Math.cos(yaw);return [X,Y*Math.sin(pitch)-z*Math.cos(pitch),Y*Math.cos(pitch)+z*Math.sin(pitch)];}
   function draw(){
@@ -41,6 +42,7 @@ export function mountMesh(canvas,meshes,onSelect,initial='iso'){
     for(const mesh of meshes)for(const tri of mesh.triangles){const p=tri.map(point);faces.push({p:p.map(v=>[w/2+v[0]*scale,h/2+v[1]*scale]),z:p.reduce((n,v)=>n+v[2],0)/3,mesh,shade:Math.abs((p[1][0]-p[0][0])*(p[2][1]-p[0][1])-(p[1][1]-p[0][1])*(p[2][0]-p[0][0]))});}
     faces.sort((a,b)=>a.z-b.z);
     for(const f of faces){ctx.beginPath();f.p.forEach((v,i)=>i?ctx.lineTo(...v):ctx.moveTo(...v));ctx.closePath();const old=f.mesh.previous,chosen=f.mesh.path===selected;ctx.fillStyle=old?'#ac815744':chosen?'#91b3a9':'#d8dde3';ctx.strokeStyle=old?'#ac815799':chosen?'#52796d':'#a1a9b4';ctx.lineWidth=old?.7:.4;ctx.fill();ctx.stroke();}
+    for(const m of markers){const p=point(m.at),x=w/2+p[0]*scale,y=h/2+p[1]*scale;ctx.beginPath();ctx.arc(x,y,10,0,2*Math.PI);ctx.fillStyle='#fff';ctx.fill();ctx.strokeStyle='#477c70';ctx.stroke();ctx.fillStyle='#31594e';ctx.font='11px system-ui';ctx.textAlign='center';ctx.fillText(String(comments[m.path]),x,y+4);ctx.textAlign='left';}
     ctx.fillStyle='#6d737d';ctx.font='11px system-ui';ctx.fillText('Drag to orbit · Alt + scroll to zoom',14,h-15);
   }
   const schedule=()=>{cancelAnimationFrame(frame);frame=requestAnimationFrame(draw);};

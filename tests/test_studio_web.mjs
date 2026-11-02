@@ -22,3 +22,14 @@ test('comments and code labels escape text and retain the old-version identity',
  const html=view.conversation({work:{head:'new'},threads:[{state_id:'old',anchor:{kind:'work'},id:'t',messages:[{author:'<img>',body:'<script>alert(1)</script>',at:0,mentions:[]}]}],can_comment:false},{anchor:{kind:'work'},state_id:'old',thread_id:'t'},'',[]);
  assert.ok(html.includes('Previous version'));assert.ok(html.includes('&lt;script&gt;'));assert.ok(!html.includes('<script>'));
 });
+test('work scope omits ancestor components but keeps the independently changed leaves',()=>{
+ assert.deepEqual(model.primaryComponents([{id:'robot',title:'Robot'},{id:'wrist',title:'Wrist',parent:'robot'},{id:'bracket',title:'Bracket',parent:'wrist'},{id:'control',title:'Control',parent:'wrist'}]).map(x=>x.id),['bracket','control']);
+});
+test('conversation markers never carry between versions or code lines',()=>{
+ const detail={discussion_index:[{state_id:'old',anchor:{kind:'code',path:'a.py',line:2},message_count:3},{state_id:'new',anchor:{kind:'code',path:'a.py',line:5},message_count:1}]};
+ assert.equal(model.commentCount(detail,'new','a.py',2),0);assert.equal(model.commentCount(detail,'old','a.py',2),3);
+});
+test('conversation index labels historical discussions instead of implying current relevance',()=>{
+ const html=view.discussionList({selected:{state:{id:'new'}},versions:[{id:'old',number:1,sharing:'shared'}],discussion_index:[{id:'t',state_id:'old',anchor:{kind:'cad',path:'part.stl'},message_count:2}]});
+ assert.ok(html.includes('Previous version'));assert.ok(html.includes('v1'));assert.ok(html.includes('2 comments'));
+});

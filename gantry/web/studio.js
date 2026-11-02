@@ -1,7 +1,8 @@
 import {$,esc as e,short,icon,download} from './ui.js';
 import * as view from './studio_views.js';
-import {cadFile,meshFile,codeFile,versionLabel,fileChanges,lineDiff,linesOf,relatedWorks} from './studio_model.js';
+import {cadFile,meshFile,codeFile,versionLabel,fileChanges,lineDiff,linesOf,relatedWorks,commentCount} from './studio_model.js';
 import {parseMesh,mountMesh} from './studio_mesh.js';
+import {createActivityMonitor} from './studio_activity.js';
 
 export function createStudio({api,modal,toast,fail}){
   let overview,detail,project,node,viewEpoch=0,artifactEpoch=0,mesh,tab='cad',compare=false,compareState='',file='',selectedPart='',conversation=null,lastWork='',draft='',mentions=[],threadDetail;
@@ -9,32 +10,33 @@ export function createStudio({api,modal,toast,fail}){
   const route=()=>location.hash.slice(1).split('/').map(x=>decodeURIComponent(x));
   const handles=()=>['studio','studio-work','studio-inbox','studio-recent'].includes(route()[0]||'studio');
   const a=view.action;
-  function reset(){viewEpoch++;artifactEpoch++;disposeMesh();cache.clear();drafts.clear();cameras.clear();overview=detail=undefined;recent=[];lastWork='';conversation=null;threadDetail=null;draft='';mentions=[];}
+  const activity=createActivityMonitor({api,notice:text=>{const el=$('#studio-live-notice');if(el){el.hidden=!text;el.querySelector('span').textContent=text;}}});
+  function reset(){activity.clear();viewEpoch++;artifactEpoch++;disposeMesh();cache.clear();drafts.clear();cameras.clear();overview=detail=undefined;recent=[];lastWork='';conversation=null;threadDetail=null;draft='';mentions=[];}
   function disposeMesh(){if(mesh){if(mesh.camera)cameras.set(meshKey,mesh.camera());mesh.destroy();mesh=null;while(cameras.size>50)cameras.delete(cameras.keys().next().value);}}
   function chooseFile(path){file=path;selectedPart=path;selectConversation(null);threadDetail=null;drawWork();}
   function remember(){if(conversation)drafts.set(JSON.stringify([detail.work.id,conversation]),{draft,mentions:[...mentions]});}
   function selectConversation(value){remember();conversation=value;const saved=drafts.get(JSON.stringify([detail.work.id,value]));draft=saved?.draft||'';mentions=saved?.mentions||[];}
   function sidebar(){const side=view.sidebar(overview,recent,{project:project?.id});$('#nav').innerHTML=side.nav;$('#sidebar-projects').innerHTML=side.projects;$('#recent-sessions').innerHTML=side.recent;}
   async function render(){
-    remember();const current=++viewEpoch,parts=route(),kind=parts[0]||'studio';artifactEpoch++;disposeMesh();
+    remember();activity.clear();const current=++viewEpoch,parts=route(),kind=parts[0]||'studio';artifactEpoch++;disposeMesh();
     document.body.classList.add('studio-mode');$('#main').className='studio-main';
     $('#main').innerHTML=view.hint('Loading workspace…');
-    const loaded=await api('studio_overview');if(current!==viewEpoch||!handles())return;overview=loaded;
+    const loaded=await api('studio_overview');if(current!==viewEpoch||!handles())return;overview=loaded;activity.set('studio_overview',{},loaded);
     if(kind==='studio-work'){
       const value=await api('studio_work',{work_id:parts[1],...(parts[2]?{state_id:parts[2]}:{})});if(current!==viewEpoch||!handles())return;
       if(lastWork!==value.work.id){conversation=null;threadDetail=null;draft='';mentions=[];tab='cad';compare=false;file='';selectedPart='';lastWork=value.work.id;}
-      detail=value;project=overview.projects.find(p=>p.id===detail.work.project_id);node=null;
+      detail=value;activity.set('studio_work',{work_id:value.work.id,activity_only:true},value);project=overview.projects.find(p=>p.id===detail.work.project_id);node=null;
       recent=[detail.work,...recent.filter(w=>w.id!==detail.work.id)].slice(0,30);
       if(parts[3]){const thread=value.threads.find(t=>t.id===parts[3]);threadDetail=null;if(thread){tab=thread.anchor.kind==='code'?'code':'cad';file=thread.anchor.path||'';selectedPart=thread.anchor.part||'';selectConversation({anchor:thread.anchor,state_id:thread.state_id,thread_id:thread.id});}}
       if(conversation&&conversation.state_id!==value.selected.state.id&&!parts[3]){selectConversation(null);threadDetail=null;}
       sidebar();$('#breadcrumb').innerHTML=project?view.projectHeader(project,null,'work'):'Work';
-      drawWork();
+      await drawWork();if(current!==viewEpoch)return;if(parts[3])focusConversation();
       if(parts[4]&&detail.can_comment)api('studio_acknowledge',{notification_id:parts[4]}).catch(fail);
       return;
     }
     project=overview.projects.find(p=>p.id===parts[1])||overview.projects[0];node=project?.hierarchy.find(n=>n.id===parts[2]);sidebar();
     if(kind==='studio-inbox'){
-      const inbox=await api('studio_inbox');if(current!==viewEpoch)return;$('#breadcrumb').textContent='Inbox';$('#main').innerHTML=view.inbox(inbox.items)+(inbox.next?a('more-inbox','Load more',inbox.next,'class="studio-more"'):'');return;
+      const inbox=await api('studio_inbox');if(current!==viewEpoch)return;activity.set('studio_inbox',{},inbox);$('#breadcrumb').textContent='Inbox';$('#main').innerHTML=view.inbox(inbox.items)+(inbox.next?a('more-inbox','Load more',inbox.next,'class="studio-more"'):'');return;
     }
     if(kind==='studio-recent'){$('#breadcrumb').textContent='Recent';$('#main').innerHTML='<div class="studio-page-title"><h1>Recent</h1><span class="studio-small">Work opened in this tab</span></div>'+view.workList(recent,'No recently opened work.');return;}
     if(!project){$('#breadcrumb').textContent='Projects';$('#main').innerHTML=view.hint('Start a shared project','Create a project, import saved files, then start work.')+'<div class="studio-empty"><button data-action="new-project">Create project</button></div>';return;}
@@ -49,7 +51,7 @@ export function createStudio({api,modal,toast,fail}){
     if(!versions.some(v=>v.id===compareState&&v.id!==detail.selected.state.id))compareState=versions[Math.max(0,index-1)]?.id;
     if(index===0)compare=false;
     $('#main').innerHTML=view.workDetail(detail,{tab,compare,compareState,conversation});
-    drawConversation();const epoch=viewEpoch;const load=loadArtifact();const request=artifactEpoch;load.catch(error=>{if(epoch===viewEpoch&&request===artifactEpoch&&$('#studio-artifact'))$('#studio-artifact').innerHTML=view.hint('Unable to load artifact',error.message);});
+    drawConversation();const epoch=viewEpoch;const load=loadArtifact();const request=artifactEpoch;return load.catch(error=>{if(epoch===viewEpoch&&request===artifactEpoch&&$('#studio-artifact'))$('#studio-artifact').innerHTML=view.hint('Unable to load artifact',error.message);});
   }
   function drawConversation(){if(conversation&&$('#studio-conversation'))$('#studio-conversation').innerHTML=view.conversation(threadDetail||detail,conversation,draft,mentions);}
   async function bytes(state,path,max=16*1024*1024){
@@ -61,7 +63,7 @@ export function createStudio({api,modal,toast,fail}){
     const raw=new Uint8Array(await new Blob(pieces).arrayBuffer());if(await hash(raw)!==info.hash)throw new Error('Artifact integrity check failed.');
     while([...cache.values()].reduce((n,x)=>n+x.length,0)+raw.length>32*1024*1024&&cache.size)cache.delete(cache.keys().next().value);cache.set(info.hash,raw);return raw;
   }
-  const options=(paths,selected)=>paths.map(p=>`<option value="${e(p)}" ${p===selected?'selected':''}>${e(p)}</option>`).join('');
+  const options=(paths,selected)=>paths.map(p=>{const count=commentCount(detail,detail.selected.state.id,p);return `<option value="${e(p)}" ${p===selected?'selected':''}>${e(p)}${count?' · '+count+' comment'+(count===1?'':'s'):''}</option>`;}).join('');
   async function loadArtifact(){
     const current=++artifactEpoch;disposeMesh();downloadState=null;const target=$('#studio-artifact'),v=detail.selected;
     if(tab==='checks'){target.innerHTML=view.checks(detail);return;}
@@ -79,15 +81,15 @@ export function createStudio({api,modal,toast,fail}){
       for(const p of previewPaths){const t=parseMesh(await bytes(v,p),p);triangles+=t.length;if(triangles>80000)throw new Error('Assembly preview is too large. Export a lighter mesh.');meshes.push({path:p,triangles:t});}
       if(old?.manifest[file])meshes.push({path:file,previous:true,triangles:parseMesh(await bytes(old,file),file)});
       if(current!==artifactEpoch)return;
-      body.innerHTML=`<div class="studio-mesh-tools"><span class="studio-small">Selected part: ${e(file)}</span><div>${a('orientation','Isometric','iso')}${a('orientation','Top','top')}${a('orientation','Front','front')}${a('zoom','−','0.8','aria-label="Zoom out"')}${a('zoom','+','1.25','aria-label="Zoom in"')}</div></div><div class="studio-cad"><canvas id="studio-canvas" aria-label="Saved 3D mesh preview" tabindex="0"></canvas></div><div class="studio-caption"><span>${compare?'Current assembly · Amber: previous '+file:'Saved mesh preview · Coordinates and units as exported'}</span>${a('part-conversation',icon('sessions')+'Discuss this part')}</div>${!v.manifest[file]?'<p class="studio-small">This file was deleted in the selected version. Amber geometry is from the previous version.</p>':''}`;
+      body.innerHTML=`<div class="studio-mesh-tools"><span class="studio-small">Selected part: ${e(file)}</span><div>${a('orientation','Isometric','iso')}${a('orientation','Top','top')}${a('orientation','Front','front')}${a('zoom','−','0.8','aria-label="Zoom out"')}${a('zoom','+','1.25','aria-label="Zoom in"')}</div></div><div class="studio-cad"><canvas id="studio-canvas" aria-label="Saved 3D mesh preview" tabindex="0"></canvas></div><div class="studio-caption"><span>${e(compare?'Current assembly · Amber: previous '+file:'Saved mesh preview · Coordinates and units as exported')}</span>${a('part-conversation',icon('sessions')+'Discuss this part'+(commentCount(detail,v.state.id,file)?' · '+commentCount(detail,v.state.id,file):''),'',!v.manifest[file]?'disabled':'')}</div>${!v.manifest[file]?'<p class="studio-small">This file was deleted in the selected version. Amber geometry is from the previous version.</p>':''}`;
       selectedPart=previewPaths.includes(file)?file:'';
-      meshKey=detail.work.id+':'+v.state.id;mesh=mountMesh($('#studio-canvas'),meshes,chooseFile,cameras.get(meshKey));mesh.select(selectedPart);return;
+      meshKey=detail.work.id+':'+v.state.id;mesh=mountMesh($('#studio-canvas'),meshes,chooseFile,cameras.get(meshKey),Object.fromEntries(previewPaths.map(p=>[p,commentCount(detail,v.state.id,p)])));mesh.select(selectedPart);return;
     }
     const read=async(st,p)=>st?.manifest[p]?new TextDecoder('utf-8',{fatal:true}).decode(await bytes(st,p,262144)):'';
     const text=await read(v,file),before=await read(old,file);if(current!==artifactEpoch)return;
     if(text.includes('\0')||before.includes('\0'))throw new Error('This file is binary. Use the external editor.');
     const rows=compare?lineDiff(before,text):linesOf(text).map((t,i)=>({text:t,after:i+1,kind:'same'}));
-    const line=(r,side)=>`<button class="studio-code-line ${r.kind}" data-studio="line" data-value="${r.after||r.before}" data-side="${side||(!r.after?'before':'after')}"><span>${r.before||''}</span><span>${r.after||''}</span><span>${r.kind==='add'?'+':r.kind==='remove'?'−':' '}</span><code>${e(r.text)||' '}</code></button>`;
+    const line=(r,side)=>`<button class="studio-code-line ${r.kind}" data-studio="line" data-value="${r.after||r.before}" data-side="${side||(!r.after?'before':'after')}"><span>${r.before||''}</span><span>${r.after||''}</span><span>${r.kind==='add'?'+':r.kind==='remove'?'−':' '}</span><code>${e(r.text)||' '}</code>${commentCount(detail,r.after?v.state.id:old?.state.id,file,r.after||r.before)?`<span class="studio-line-comments" title="Comments on this line">${icon('sessions')}${commentCount(detail,r.after?v.state.id:old?.state.id,file,r.after||r.before)}</span>`:''}</button>`;
     body.innerHTML=`<div class="studio-code-source studio-small">${e(detail.source?.repository||'Repository not recorded')}${detail.source?.commit?' · Source commit '+e(short(detail.source.commit)):''}</div><div class="studio-code" aria-label="Code and line comments">${rows?rows.slice(0,4000).map(r=>line(r)).join(''):`<p class="studio-small">Large comparison: separate versions</p><h2>Before</h2>${linesOf(before).slice(0,2000).map((text,i)=>line({text,before:i+1,kind:'remove'},'before')).join('')}<h2>After</h2>${linesOf(text).slice(0,2000).map((text,i)=>line({text,after:i+1,kind:'add'},'after')).join('')}`}</div><div class="studio-caption"><span>${compare?e(short(old.state.id))+' → ':''}${e(short(v.state.id))} · ${e(file)}</span><span>Select a line to discuss</span></div>${(rows?.length>4000||!rows)?'<p class="studio-small">Preview is limited; restore files to inspect the complete change.</p>':''}`;
     if(conversation?.anchor.kind==='code'&&conversation.anchor.path===file){const side=conversation.state_id===v.state.id?'after':'before';const row=body.querySelector(`[data-studio=line][data-side=${side}][data-value="${conversation.anchor.line}"]`);row?.classList.add('selected');row?.scrollIntoView({block:'nearest'});}
   }
@@ -97,7 +99,19 @@ export function createStudio({api,modal,toast,fail}){
     if(epoch!==viewEpoch||artifact!==artifactEpoch||detail.work.id!==wid||!handles())return;
     threadDetail=older;const source=threadDetail||detail;
     const t=source.threads.find(t=>JSON.stringify(Object.entries(t.anchor).sort())===JSON.stringify(Object.entries(anchor).sort()));
-    selectConversation({anchor,state_id:stateId,...(t?{thread_id:t.id}:{})});drawWork();$('#studio-draft')?.focus();
+    selectConversation({anchor,state_id:stateId,...(t?{thread_id:t.id}:{})});await drawWork();if(epoch!==viewEpoch)return;focusConversation();
+  }
+  function focusConversation(){const panel=$('#studio-conversation');if(!panel)return;if(globalThis.innerWidth<=1024)panel.scrollIntoView({block:'start'});panel.focus({preventScroll:true});}
+  async function closeConversation(){selectConversation(null);threadDetail=null;const epoch=viewEpoch;await drawWork();if(epoch!==viewEpoch)return;const target=$('#studio-canvas')||$('#studio-artifact');if(globalThis.innerWidth<=1024)target?.scrollIntoView({block:'start'});target?.focus({preventScroll:true});}
+  async function loadUpdates(){
+    if(route()[0]!=='studio-work')return render();
+    const epoch=viewEpoch,artifact=artifactEpoch,wid=detail.work.id,sid=detail.selected.state.id;
+    const current=()=>epoch===viewEpoch&&artifact===artifactEpoch;
+    const value=await api('studio_work',{work_id:wid,state_id:sid});
+    if(!current())return;
+    const old=conversation&&conversation.state_id!==sid?await api('studio_work',{work_id:wid,state_id:conversation.state_id}):null;
+    if(!current())return;
+    remember();detail=value;threadDetail=old;activity.set('studio_work',{work_id:wid,activity_only:true},value);drawWork();
   }
   async function share(){
     const epoch=viewEpoch,wid=detail.work.id,selectedId=detail.selected.state.id;
@@ -125,9 +139,15 @@ export function createStudio({api,modal,toast,fail}){
     conversation:()=>openConversation({kind:'work'}),
     'part-conversation':()=>{if(!selectedPart||!detail.selected.manifest[selectedPart])throw new Error('Select a current saved mesh part.');return openConversation({kind:'cad',path:selectedPart,part:selectedPart,hash:detail.selected.manifest[selectedPart].hash});},
     line:async(value,el)=>{const epoch=viewEpoch,artifact=artifactEpoch,path=file,stateId=el.dataset.side==='before'?compareState:detail.selected.state.id;const state=stateId===detail.selected.state.id?detail.selected:await api('get_development_state',{state_id:stateId});if(epoch!==viewEpoch||artifact!==artifactEpoch)return;return openConversation({kind:'code',path,hash:state.manifest[path].hash,line:Number(value)},stateId);},
-    'close-conversation':()=>{selectConversation(null);threadDetail=null;drawWork();},
+    'close-conversation':closeConversation,
+    'back-to-artifact':closeConversation,
     unmention:value=>{mentions=mentions.filter(x=>x!==value);drawConversation();},
     import:importFiles,share,
+    'load-updates':loadUpdates,
+    latest:()=>{selectConversation(null);file='';const url='#'+view.workURL(detail.work.id);if(location.hash===url)return render();location.hash=url;},
+    discussions:()=>modal('Conversations',view.discussionList(detail),null),
+    'open-thread':id=>{const t=detail.discussion_index.find(t=>t.id===id);if(!t)return;$('#dialog').close();const url='#'+view.workURL(detail.work.id,t.state_id,t.id);if(location.hash===url)return render();location.hash=url;},
+    changes:()=>modal('Changed files',`<p>Compared with the previous checkpoint.</p><div class="studio-share-files">${detail.selected.diffs.map(d=>`<div><span>${e(d.path)}</span><span>${e(d.kind)}</span></div>`).join('')||'<p>No file changes in this checkpoint.</p>'}</div>`,null),
     'download-file':async path=>download(path.split('/').pop(),await bytes(downloadState,path,32*1024*1024),'application/octet-stream'),
     'import-help':()=>modal('Connect your tools',`<p>Native editing stays in your CAD tool or editor. Save a checkpoint through the Gantry local adapter, or import selected files here.</p><pre>gantry checkpoint-workspace --help</pre><p>Use this work’s change ID: <code>${e(detail?.work.id||'Select work first')}</code>. Save editable CAD sources plus STL/OBJ previews. Git and tool connections are managed under Connections.</p>`,null),
     details:()=>modal('Saved version',`<dl class="context-list"><dt>State</dt><dd>${e(detail.selected.state.id)}</dd><dt>Checkpoint note</dt><dd>${e(detail.selected.state.summary)}</dd><dt>Shared update notes</dt><dd>${e((detail.versions.find(v=>v.id===detail.selected.state.id)?.notes||[]).join(' · ')||'No note')}</dd><dt>Snapshot</dt><dd>${e(detail.selected.state.snapshot)}</dd><dt>Work</dt><dd>${e(detail.selected.status.work)}</dd><dt>Sharing</dt><dd>${e(detail.selected.status.sharing)}</dd><dt>Verification</dt><dd>${e(detail.selected.status.verification)}</dd><dt>Adoption</dt><dd>${e(detail.selected.status.adoption)}</dd><dt>Not captured</dt><dd>${e(detail.capture.missing.join(', ')||'No omissions declared')}</dd></dl><p>Restore this saved version into a new directory:</p><pre>gantry restore-development-state ${e(detail.selected.state.id)} --destination ./continued-work --key resume-unique-key</pre>${view.link('session/'+detail.work.session_id,'Open execution and review tools')}`,null),
@@ -155,9 +175,10 @@ export function createStudio({api,modal,toast,fail}){
       if(!sameTarget())return;
       if(draft===body){draft='';mentions=[];}const fresh=await api('studio_work',{work_id:wid,state_id:target.state_id});
       if(!sameTarget())return;
-      if(target.state_id===detail.selected.state.id)detail=fresh;else threadDetail=fresh;
-      conversation.thread_id=result.thread_id;remember();drawConversation();toast('Comment saved');
+      if(target.state_id===detail.selected.state.id)detail=fresh;else{threadDetail=fresh;detail={...detail,discussion_index:fresh.discussion_index,activity_token:fresh.activity_token};}
+      activity.set('studio_work',{work_id:wid,activity_only:true},fresh);
+      conversation.thread_id=result.thread_id;remember();await drawWork();toast('Comment saved');
     }catch(err){if(sameTarget()&&$('#studio-comment-error'))$('#studio-comment-error').textContent=err.message;else fail(err);}finally{submit.disabled=false;}
   });
-  return {handles,render,reset,leave:()=>{remember();viewEpoch++;artifactEpoch++;disposeMesh();document.body.classList.remove('studio-mode');$('#main').className='';}};
+  return {handles,render,reset,checkUpdates:()=>handles()&&!document.hidden?activity.check():undefined,leave:()=>{activity.clear();remember();viewEpoch++;artifactEpoch++;disposeMesh();document.body.classList.remove('studio-mode');$('#main').className='';}};
 }

@@ -75,13 +75,22 @@ Source revision and skills remain the same as above; no migration or external se
    file list; aligned work/owner/leaf-scope/status; 12px key metadata; narrow conversation
    scroll/focus and a return-to-artifact action.
 
-- [ ] Slice 1: reproduce camera loss, fix selection/camera and scroll, focused Node tests.
-- [ ] Slice 2: authorized discussion summaries and non-destructive updates; backend and
+- [x] Slice 1: reproduce camera loss, fix selection/camera and scroll, focused Node tests.
+- [x] Slice 2: authorized discussion summaries and non-destructive updates; backend and
       delayed-response tests (navigation, sign-out, draft retention).
-- [ ] Slice 3: notes, changed files, list hierarchy, narrow navigation; browser verification.
-- [ ] Review permissions/escaping/state anchors, targeted regression, build, documentation.
+- [x] Slice 3: notes, changed files, list hierarchy, narrow navigation; browser verification.
+- [x] Review permissions/escaping/state anchors, targeted regression, build, documentation.
 
 Commands: `node --test tests/test_studio*.mjs`; `PYTHONPATH=. python3 -m unittest
  discover -s tests -p 'test_studio.py'`; build with `python3 -m pip wheel . --no-deps`.
 Run the existing regression suite once after integration. Use isolated anonymous ledger
 and browser inspection; preserve historical data and public/private source boundaries.
+
+
+Follow-up evidence: actual saved meshes and baseline/v1/v2 on the isolated fixture.
+Verified camera retention, one selected part, file comparisons, older line discussion,
+changed-file modal, aligned work rows, and 320/768/1024/1440px layouts. An independent
+fixture identity added a reply while a browser draft was open: notice appeared,
+Load updates retained the baseline/draft and displayed the reply/count. Focused
+regressions cover deferred replies, sign-out, stale polls and missing static assets.
+Python 1,142 tests passed (8 skips); Node 30 passed; wheel packaged. No public push.
