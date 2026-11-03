@@ -122,6 +122,8 @@ Gantry preserves original captured data. It does not infer complete cross-tool d
 
 ## Documentation
 
+[Browse all guides](docs/README.md) · [Examples](examples/README.md) · [Verification records](docs/VERIFICATION.md)
+
 | I want to… | Read |
 | --- | --- |
 | Connect an agent and review a change | [Agent setup](docs/AGENTS.md) |

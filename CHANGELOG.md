@@ -3,6 +3,14 @@
 This file records changes after v3.3.0. Earlier release notes remain in the
 [GitHub releases](https://github.com/fourn9/gantry-oss/releases).
 
+## Unreleased
+
+- Guided project onboarding in Studio and CLI: preview saved-file scope, preserve
+  answers and corrections, and open unfinished work. Optional customer-agent
+  proposals retain exact source evidence and do not execute or adopt a design.
+- Reorganized documentation, examples and historical release records. Updated the
+  command-schema reference to include the current registered operations.
+
 ## 3.4.0 — Shared workspaces and connected engineering
 
 - Artifact-first Studio with version-bound CAD/code discussions, unfinished sharing,

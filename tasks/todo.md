@@ -1,5 +1,7 @@
 # Implementation checklist
 
+> Historical implementation record. “Current” and completion claims below refer to the recorded work, not the latest release or an active assignment. See the [record index](README.md), [current usage guides](../docs/README.md) and [verification index](../docs/VERIFICATION.md). Open items are retained.
+
 ## Personal Bot continuity (2026-11-03)
 
 - [x] Versioned working context and cross-task retrieval.
