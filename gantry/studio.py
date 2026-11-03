@@ -8,6 +8,7 @@ from .development import in_scope
 from .model import Fault, require, uid, digest
 from .studio_discussion import StudioDiscussionMixin
 from .studio_workspace import StudioWorkspaceMixin
+from .onboarding import OnboardingMixin
 
 LIMIT = {'type':'integer','minimum':1,'maximum':100}
 register('studio_overview', {'after':S, 'limit':LIMIT})
@@ -18,7 +19,7 @@ register('studio_share_update', {'work_id':S,'version':I,'state_id':S,'note':{'t
     ['work_id','version','state_id','note'])
 
 
-class StudioMixin(StudioDiscussionMixin, StudioWorkspaceMixin):
+class StudioMixin(StudioDiscussionMixin, StudioWorkspaceMixin, OnboardingMixin):
     def _studio_work(self, s, actor, wid):
         change = self._dev_get(s, 'dev_changes', wid)
         session = self._dev_session(s, actor, change['session_id'])

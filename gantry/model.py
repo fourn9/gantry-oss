@@ -66,6 +66,7 @@ DEVELOPMENT_TABLES += ('bot_decisions', 'bot_actions', 'bot_team_proposals')
 DEVELOPMENT_TABLES += ('bot_learning_plans', 'bot_reflections', 'bot_experience_feedback')
 DEVELOPMENT_TABLES += ('bot_working_states', 'bot_continuations', 'bot_learning_uses')
 DEVELOPMENT_TABLES += ('studio_threads', 'studio_messages', 'studio_notifications')
+DEVELOPMENT_TABLES += ('onboardings',)
 MANAGED = {"goal", "requirement", "design_document", "subsystem", "part_spec", "bom",
            "validation_plan", "unit", "zone", "interface", "policy", "principal", "relation"}
 RECORDED = {"hardware_rev", "software_version", "checkpoint", "calibration", "configuration",
