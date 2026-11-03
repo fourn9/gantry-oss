@@ -119,6 +119,20 @@ class BotWorker:
         require(self.runtime and not self.lost.is_set(), 'runtime_offline', 'Reconnect the stopped runtime first')
         self.client.call('heartbeat_bot_runtime', {'bot_id': self.bot_id, 'fence': self.runtime['fence']})
         results = []; after = None
+        if self.config.get('workflow') == 'bot_development':
+            cursor = None
+            while True:
+                page = self.client.call('list_bot_handoffs', {'bot_id':self.bot_id, **({'after':cursor} if cursor else {})})
+                for h in page['items']:
+                    if h['to_bot_id'] == self.bot_id and h['phase'] == 'ready':
+                        try:
+                            results.append(self.client.call('accept_bot_handoff', {'handoff_id':h['id'],
+                                'version':h['version'], 'runtime_fence':self.runtime['fence']},
+                                'handoff-accept:'+h['id']+':'+str(h['version'])))
+                        except Fault as exc:
+                            results.append({'handoff_id':h['id'],'status':'held','reason':exc.code})
+                cursor = page['next_cursor']
+                if not cursor: break
         if self.config.get('personal_continuity'):
             cursor = None; wakes = []
             while True:

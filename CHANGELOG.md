@@ -5,6 +5,12 @@ This file records changes after v3.3.0. Earlier release notes remain in the
 
 ## Unreleased
 
+- Studio Team and version-bound **Ask a Bot / Assign work**. Answers return to the
+  original selection and Inbox; edits return as separate shared candidates.
+  Existing customer runtimes execute the work; ordinary comments do not dispatch.
+- Acknowledged Bot handoffs preserve saved changes, unfinished context and
+  successor dependencies. Read-only Ask also blocks unrelated direct API writes;
+  runtime replacement cannot silently reset an active executor.
 - Guided project onboarding in Studio and CLI: preview saved-file scope, preserve
   answers and corrections, and open unfinished work. Optional customer-agent
   proposals retain exact source evidence and do not execute or adopt a design.

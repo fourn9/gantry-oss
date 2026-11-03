@@ -147,11 +147,16 @@ class BotDevelopmentMixin:
         return self._dev_save(s, fx, 'bot_bindings', dict(a, id=key, role=role, workflow='bot_development',
             subject_id=bot['id'], version=a['version'] + 1, created_seq=s['seq'] + 1))
 
-    def _bd_assign(self, s, actor, a, fx, n, con, consultation=False, standing=None):
+    def _bd_assign(self, s, actor, a, fx, n, con, consultation=False, standing=None, studio=None, handoff=None):
         p, d = self._bd_project(s, actor, a['session_id']); self.allowed(actor, 'work')
         b = self._bd_binding(s, d['id'], a['bot_id']); bot, org = self._persistent_identity(s, a['bot_id'])
         require(b['enabled'] and bot['enabled'] and org['id'] == p['organization_id'], 'mode_disabled', 'Assignee disabled')
-        if standing is not None:
+        if handoff is not None:
+            self._handoff_accept_authority(s,actor,handoff)
+        elif studio is not None:
+            self._studio_task_authority(s, actor, studio['change'], studio['mode'])
+            require(studio['change']['session_id'] == d['id'], 'scope_denied', 'Studio request belongs to another project')
+        elif standing is not None:
             self._continuation_valid(s, actor, standing)
             require(standing['bot_id'] == a['bot_id'] and standing['session_id'] == a['session_id'],
                     'unauthorized', 'Standing responsibility cannot assign another Bot')
@@ -213,6 +218,7 @@ class BotDevelopmentMixin:
     def _bd_stamp(self, s, actor, task, con):
         self._check_continuation_task(s, actor, task)
         b, bot, p, d = self._bd_actor(s, actor, task['session_id'], task['bot_id'])
+        require(not task.get('studio_request_id') or actor['kind']=='agent','unauthorized','Studio Bot execution requires an agent identity')
         require(d['mode'] == 'execute', 'mode_disabled', 'Bot execution is not delegated')
         require(d['generation'] == task['generation'], 'stale_basis', 'Project baseline changed; assign a new task')
         require(all(in_scope(path, b['write_scope']) and in_scope(path, d['write_scope']) for path in task['write_scope']),
@@ -222,10 +228,16 @@ class BotDevelopmentMixin:
         rt = self._runtime_fence(s, actor, bot['id'], task['runtime_fence'], con)
         dependencies = []
         for ident in task['after_tasks']:
-            dep = self._dev_get(s, 'bot_tasks', ident)
+            dep = self._dev_get(s, 'bot_tasks', ident); chain=[]; seen=set()
+            while True:
+                require(dep['id'] not in seen,'invalid_state','Cyclic task handoff')
+                seen.add(dep['id']); chain.append([dep['id'],dep['version']])
+                if not dep.get('successor_task_id'): break
+                dep=self._dev_get(s,'bot_tasks',dep['successor_task_id'])
+                require(dep['session_id']==task['session_id'],'scope_denied','Cross-project successor')
             require(dep['status'] == 'completed', 'dependency_pending', 'Required task has not completed')
             require(not stale_refs(s, dep.get('requirement_refs', [])), 'stale_basis', 'Dependency requirements changed; reassess upstream work')
-            dependencies.append([ident, dep['version']])
+            dependencies.append([ident, chain])
         ancestors = []; parent = bot['parent_bot_id']
         while parent:
             node = self._dev_get(s, 'persistent_bots', parent)
@@ -276,11 +288,18 @@ class BotDevelopmentMixin:
             result['learning_plan'] = self._learning_context(s, actor, task)
         result['working_state'] = self._working_context(s, actor, task)
         result.update(self._crew_context(s, actor, task, con))
+        result.update(self._studio_bot_context(s, task))
+        if task.get('handoff_from'):
+            result['handoff'] = copy.deepcopy(s['bot_handoffs'][task['handoff_from']])
+            result['predecessors'] = [self._bd_public(s['bot_tasks'][ident]) for ident in task.get('predecessor_task_ids',[])]
         return result
 
     def cmd_claim_bot_task(self, s, actor, a, fx, n, con):
         task = self._dev_get(s, 'bot_tasks', a['task_id'])
         require(task['version'] == a['version'] and task['status'] == 'pending', 'conflict', 'Task is not pending at this version')
+        others=[t for t in s.get('bot_tasks',{}).values() if t['principal_id']==actor['id'] and t['id']!=task['id'] and t['status'] in {'running','held','handoff_requested'}]
+        require(not others or task.get('studio_mode')!='ask' and not any(t.get('studio_mode')=='ask' for t in others),
+                'capacity_pending','A read-only Ask requires an exclusive executor identity')
         task['runtime_fence'] = a['runtime_fence']; task['stamp'] = self._bd_stamp(s, actor, task, con)
         d = self._dev_session(s, actor, task['session_id'])
         require(sum(t['status'] == 'running' for t in self._bd_task_rows(s, d['id'], con)) < d['max_parallel'],
@@ -331,6 +350,8 @@ class BotDevelopmentMixin:
     def cmd_finish_bot_task(self, s, actor, a, fx, n, con):
         task = self._bd_checked(s, actor, a, con); self.allowed(actor, 'record')
         report = copy.deepcopy(a['report']); b = self._bd_binding(s, task['session_id'], task['bot_id'])
+        require(task.get('studio_mode') != 'ask' or (not report['assignments'] and not report['integrate_changes']),
+                'scope_denied', 'Ask cannot delegate edits or integrate candidates')
         if report['status'] == 'completed':
             require(not any(m['blocking'] and m['status'] != 'resolved' for m in self._bd_messages(s, task, con)),
                     'dependency_pending', 'Resolve blocking discussion before completing work')
@@ -386,6 +407,7 @@ class BotDevelopmentMixin:
         self._learning_enqueue(s, actor, task, fx)
         self._bd_wake_parent(s, task, fx, n, con)
         if task['status'] in TERMINAL: self._crew_return_response(s, task, fx, n)
+        self._studio_return_bot_report(s, actor, task, fx, n, con)
         return {'task': self._bd_public(task), 'memory_id': memory['id'], 'formal_adoption': False}
 
     def _bd_share_memory(self, s, actor, org, memory, fx):
@@ -421,9 +443,14 @@ class BotDevelopmentMixin:
             b, _, _, _ = self._bd_actor(s, actor, task['session_id'], a.get('requested_by_bot'))
             require(b['can_assign'] and self._bd_subordinate(s, b['bot_id'], task['bot_id']), 'unauthorized', 'Manager authority required')
         require(task['version'] == a['version'] and task['status'] not in TERMINAL, 'conflict', 'Task already ended or changed')
+        if task.get('handoff_id'):
+            h=s['bot_handoffs'][task['handoff_id']]
+            h.update(phase='cancelled',version=h['version']+1)
+            self._dev_save(s,fx,'bot_handoffs',h)
         task.update(status='cancelled', version=task['version'] + 1, cancellation=a['reason']); task.pop('fence', None)
         self._dev_save(s, fx, 'bot_tasks', task); self._bd_wake_parent(s, task, fx, n, con)
         self._crew_return_response(s, task, fx, n)
+        self._studio_return_bot_report(s, actor, task, fx, n, con)
         return self._bd_public(task)
 
     def _bd_evidence(self, s, actor, sid, refs):

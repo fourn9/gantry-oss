@@ -118,7 +118,7 @@ class Handler(BaseHTTPRequestHandler):
                   "/ui.js": ("ui.js", "text/javascript; charset=utf-8"),
                   "/views.js": ("views.js", "text/javascript; charset=utf-8"),
                   "/style.css": ("style.css", "text/css; charset=utf-8")}
-        for name in ('studio.js','studio_views.js','studio_model.js','studio_mesh.js','studio_activity.js','onboarding.js','onboarding_views.js','onboarding_model.js','studio.css'):
+        for name in ('studio.js','studio_views.js','studio_bot_views.js','studio_bot_ui.js','intent_key.js','studio_model.js','studio_mesh.js','studio_activity.js','onboarding.js','onboarding_views.js','onboarding_model.js','studio.css'):
             assets['/'+name]=(name, 'text/css; charset=utf-8' if name.endswith('.css') else 'text/javascript; charset=utf-8')
         _, path = self.server.resolve(urlparse(self.path).path)
         if path in assets:

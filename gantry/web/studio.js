@@ -1,3 +1,4 @@
+import {createBotUI} from './studio_bot_ui.js';
 import {$,esc as e,short,icon,download} from './ui.js';
 import * as view from './studio_views.js';
 import {cadFile,meshFile,codeFile,versionLabel,fileChanges,lineDiff,linesOf,relatedWorks,commentCount} from './studio_model.js';
@@ -137,7 +138,9 @@ export function createStudio({api,modal,toast,fail}){
     document.querySelector('#dialog [name=files]').onchange=event=>{const paths=Object.keys(captured.selected.manifest);$('#studio-import-paths').innerHTML=[...event.target.files].map((f,i)=>{const matching=paths.filter(p=>p.split('/').pop()===f.name);return `<label>Target path for ${e(f.name)}<input name="path${i}" required value="${e(matching.length===1?matching[0]:f.webkitRelativePath||f.name)}"></label>`;}).join('');};
   }
   function importProject(){location.hash='#studio-start';}
+  const botUI=createBotUI({api,modal,toast,getContext:()=>({project,detail:threadDetail||detail,selection:conversation,draft,epoch:viewEpoch}),refresh:loadUpdates});
   const handlers={
+    ...botUI.handlers,
     tab:async value=>{remember();selectConversation(null);threadDetail=null;tab=value;file='';drawWork();},
     compare:()=>{compare=!compare;drawWork();},
     orientation:value=>mesh?.view(value),

@@ -6,6 +6,9 @@ import copy
 from .contracts import register, S, I
 from .development import in_scope
 from .model import Fault, require, uid, digest
+from .bot_handoff import BotHandoffMixin
+from .studio_team import StudioTeamMixin
+from .studio_bots import StudioBotsMixin
 from .studio_discussion import StudioDiscussionMixin
 from .studio_workspace import StudioWorkspaceMixin
 from .onboarding import OnboardingMixin
@@ -19,7 +22,7 @@ register('studio_share_update', {'work_id':S,'version':I,'state_id':S,'note':{'t
     ['work_id','version','state_id','note'])
 
 
-class StudioMixin(StudioDiscussionMixin, StudioWorkspaceMixin, OnboardingMixin):
+class StudioMixin(BotHandoffMixin, StudioTeamMixin, StudioBotsMixin, StudioDiscussionMixin, StudioWorkspaceMixin, OnboardingMixin):
     def _studio_work(self, s, actor, wid):
         change = self._dev_get(s, 'dev_changes', wid)
         session = self._dev_session(s, actor, change['session_id'])
@@ -40,6 +43,9 @@ class StudioMixin(StudioDiscussionMixin, StudioWorkspaceMixin, OnboardingMixin):
             'components':[{'id':h['id'],'title':h['title'],'parent':h.get('parent')} for h in state['hierarchy']
                 if any(in_scope(p,change['write_scope']) for p in h['paths']) or
                    any(in_scope(p,h['paths']) for p in change['write_scope'])],
+            'bot_activity':[{'name':s['persistent_bots'][t['bot_id']]['name'],'status':t['status'],'presence':self._studio_presence(s,t['bot_id'])['presence']}
+                for r in s.get('studio_bot_requests',{}).values() if r['work_id']==change['id']
+                for t in [s['bot_tasks'][r['task_id']]] if t['status'] not in {'completed','failed','blocked','cancelled'}],
             'task_status':task['status'] if task else None, 'updated_at':state['created_at']}
 
     def cmd_studio_overview(self, s, actor, a, fx, n, con):
@@ -75,7 +81,8 @@ class StudioMixin(StudioDiscussionMixin, StudioWorkspaceMixin, OnboardingMixin):
         state=self._studio_state(s,actor,c,sid)
         discussions=self._studio_discussion_index(s,actor,c)
         state_ids=set(self._studio_states(s,c))
-        activity=digest({'work':c,'discussions':discussions,
+        requests=self._studio_bot_requests(s,c['id'],actor=actor)
+        activity=digest({'work':c,'discussions':discussions,'bot_requests':requests,
             'shares':[x for x in s.get('dev_shares',{}).values() if x['change_id']==c['id']],
             'execution_context':{table:[x for x in s.get(table,{}).values() if x.get('session_id')==d['id']]
                 for table in ('dev_executions','dev_evaluations','dev_contracts','bot_tasks')},
@@ -108,6 +115,9 @@ class StudioMixin(StudioDiscussionMixin, StudioWorkspaceMixin, OnboardingMixin):
             'discussion_index':discussions,'activity_token':activity,
             'can_update':permitted('studio_import_update') and permitted('studio_share_update') and ('admin' in actor['permissions'] or (actor['id'] in {c['assignee'],c['author']} and {'work','record'} <= set(actor['permissions']))) and c['sharing']!='integrated',
             'can_comment':permitted('studio_comment') and ('record' in actor['permissions'] or 'admin' in actor['permissions']),
+            'bot_requests':requests,
+            'can_ask_bot':actor['kind']=='human' and permitted('studio_request_bot') and ('admin' in actor['permissions'] or {'work','record'} <= set(actor['permissions'])),
+            'can_assign_bot':sid==c['head'] and actor['kind']=='human' and permitted('studio_request_bot') and actor['id'] in {c['assignee'],c['author'],d['owner']} and ('admin' in actor['permissions'] or {'work','record'} <= set(actor['permissions'])),
             'capture':state['capture']}
 
     def cmd_studio_import_update(self, s, actor, a, fx, n, con):

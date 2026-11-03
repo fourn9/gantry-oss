@@ -156,6 +156,8 @@ def _api_effect(client, operation, args, step, key):
 
 def _execute(client, context, ref, config, action, args, workspace, step, key):
     scope = context['task']['write_scope']
+    require(context['task'].get('studio_mode') != 'ask' or action not in {'edit','tool','publish_physical','team','stop'},
+            'scope_denied', 'Ask cannot edit, execute tools or change team work')
     if action == 'publish_physical':
         validate(args, _schema({'plan_path': S}))
         from .hardware import publish_bot

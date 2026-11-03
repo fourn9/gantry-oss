@@ -1,4 +1,81 @@
 {
+  "accept_bot_handoff": {
+    "description": "accept bot handoff",
+    "schema": {
+      "additionalProperties": false,
+      "properties": {
+        "basis": {
+          "type": "object"
+        },
+        "handoff_id": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "intent": {
+          "type": "object"
+        },
+        "runtime_fence": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "version": {
+          "minimum": 1,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "handoff_id",
+        "version",
+        "runtime_fence"
+      ],
+      "type": "object"
+    }
+  },
+  "acknowledge_bot_handoff": {
+    "description": "acknowledge bot handoff",
+    "schema": {
+      "additionalProperties": false,
+      "properties": {
+        "basis": {
+          "type": "object"
+        },
+        "confirm_stopped": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "handoff_id": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "intent": {
+          "type": "object"
+        },
+        "summary": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "unfinished": {
+          "items": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "version": {
+          "minimum": 1,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "handoff_id",
+        "version",
+        "confirm_stopped",
+        "summary",
+        "unfinished"
+      ],
+      "type": "object"
+    }
+  },
   "activate_bot_team": {
     "description": "activate bot team",
     "schema": {
@@ -5624,6 +5701,37 @@
       "type": "object"
     }
   },
+  "list_bot_handoffs": {
+    "description": "list bot handoffs",
+    "schema": {
+      "additionalProperties": false,
+      "properties": {
+        "after": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "basis": {
+          "type": "object"
+        },
+        "bot_id": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "intent": {
+          "type": "object"
+        },
+        "limit": {
+          "maximum": 100,
+          "minimum": 1,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "bot_id"
+      ],
+      "type": "object"
+    }
+  },
   "list_bot_memories": {
     "description": "list bot memories",
     "schema": {
@@ -8631,6 +8739,47 @@
       "type": "object"
     }
   },
+  "request_bot_handoff": {
+    "description": "request bot handoff",
+    "schema": {
+      "additionalProperties": false,
+      "properties": {
+        "basis": {
+          "type": "object"
+        },
+        "intent": {
+          "type": "object"
+        },
+        "reason": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "requested_by_bot": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "task_id": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "to_bot_id": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "version": {
+          "minimum": 1,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "task_id",
+        "version",
+        "to_bot_id",
+        "reason"
+      ],
+      "type": "object"
+    }
+  },
   "request_connection": {
     "description": "request connection",
     "schema": {
@@ -9911,6 +10060,51 @@
       "type": "object"
     }
   },
+  "studio_execution_policy": {
+    "description": "studio execution policy",
+    "schema": {
+      "additionalProperties": false,
+      "properties": {
+        "basis": {
+          "type": "object"
+        },
+        "enabled": {
+          "type": "boolean"
+        },
+        "intent": {
+          "type": "object"
+        },
+        "max_executions": {
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "max_parallel": {
+          "maximum": 64,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "session_id": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "version": {
+          "minimum": 1,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "session_id",
+        "version",
+        "enabled",
+        "max_parallel",
+        "max_executions"
+      ],
+      "type": "object"
+    }
+  },
   "studio_import_project": {
     "description": "studio import project",
     "schema": {
@@ -10200,6 +10394,273 @@
       "type": "object"
     }
   },
+  "studio_request_bot": {
+    "description": "studio request bot",
+    "schema": {
+      "additionalProperties": false,
+      "properties": {
+        "anchor": {
+          "additionalProperties": false,
+          "properties": {
+            "hash": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "kind": {
+              "enum": [
+                "work",
+                "cad",
+                "code"
+              ]
+            },
+            "line": {
+              "minimum": 1,
+              "type": "integer"
+            },
+            "part": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "path": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind"
+          ],
+          "type": "object"
+        },
+        "basis": {
+          "type": "object"
+        },
+        "body": {
+          "maxLength": 4000,
+          "minLength": 1,
+          "type": "string"
+        },
+        "bot_id": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "completion": {
+          "items": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "intent": {
+          "type": "object"
+        },
+        "mode": {
+          "enum": [
+            "ask",
+            "assign"
+          ]
+        },
+        "state_id": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "version": {
+          "minimum": 1,
+          "type": "integer"
+        },
+        "work_id": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "write_scope": {
+          "items": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "work_id",
+        "version",
+        "state_id",
+        "anchor",
+        "mode",
+        "bot_id",
+        "body",
+        "completion",
+        "write_scope"
+      ],
+      "type": "object"
+    }
+  },
+  "studio_setup_team": {
+    "description": "studio setup team",
+    "schema": {
+      "additionalProperties": false,
+      "properties": {
+        "acceptance": {
+          "items": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "basis": {
+          "type": "object"
+        },
+        "configuration_token": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "goal": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "intent": {
+          "type": "object"
+        },
+        "lead_bot_id": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "members": {
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "bot_id": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "can_assign": {
+                "type": "boolean"
+              },
+              "can_integrate": {
+                "type": "boolean"
+              },
+              "name": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "parent_bot_id": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "principal_id": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "profile": {
+                "additionalProperties": false,
+                "properties": {
+                  "focus_paths": {
+                    "items": {
+                      "maxLength": 4000,
+                      "minLength": 1,
+                      "type": "string"
+                    },
+                    "maxItems": 20,
+                    "type": "array"
+                  },
+                  "mission": {
+                    "maxLength": 4000,
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "onboarding": {
+                    "items": {
+                      "maxLength": 4000,
+                      "minLength": 1,
+                      "type": "string"
+                    },
+                    "maxItems": 20,
+                    "type": "array"
+                  },
+                  "report_when": {
+                    "items": {
+                      "maxLength": 4000,
+                      "minLength": 1,
+                      "type": "string"
+                    },
+                    "maxItems": 20,
+                    "type": "array"
+                  },
+                  "responsibilities": {
+                    "items": {
+                      "maxLength": 4000,
+                      "minLength": 1,
+                      "type": "string"
+                    },
+                    "maxItems": 20,
+                    "type": "array"
+                  },
+                  "style": {
+                    "maxLength": 4000,
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "workflow": {
+                    "items": {
+                      "maxLength": 4000,
+                      "minLength": 1,
+                      "type": "string"
+                    },
+                    "maxItems": 20,
+                    "type": "array"
+                  }
+                },
+                "required": [
+                  "mission",
+                  "responsibilities",
+                  "focus_paths",
+                  "workflow",
+                  "report_when",
+                  "style",
+                  "onboarding"
+                ],
+                "type": "object"
+              },
+              "write_scope": {
+                "items": {
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "type": "array"
+              }
+            },
+            "required": [
+              "bot_id",
+              "name",
+              "parent_bot_id",
+              "principal_id",
+              "profile",
+              "write_scope",
+              "can_assign",
+              "can_integrate"
+            ],
+            "type": "object"
+          },
+          "maxItems": 64,
+          "minItems": 1,
+          "type": "array"
+        },
+        "session_id": {
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "required": [
+        "session_id",
+        "configuration_token",
+        "goal",
+        "acceptance",
+        "lead_bot_id",
+        "members"
+      ],
+      "type": "object"
+    }
+  },
   "studio_share_update": {
     "description": "studio share update",
     "schema": {
@@ -10375,6 +10836,28 @@
         "rationale",
         "unfinished",
         "missing"
+      ],
+      "type": "object"
+    }
+  },
+  "studio_team": {
+    "description": "studio team",
+    "schema": {
+      "additionalProperties": false,
+      "properties": {
+        "basis": {
+          "type": "object"
+        },
+        "intent": {
+          "type": "object"
+        },
+        "project_id": {
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "required": [
+        "project_id"
       ],
       "type": "object"
     }
