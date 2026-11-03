@@ -92,6 +92,8 @@ def _input(context, workspace):
             'Use exact shared change IDs/versions for integration; do not claim a test or formal adoption from file existence. '
             'Completed describes reported work only, not certified physical correctness. '
             'Do not call Mentor or create a review to perform this assignment.')
+    if context['task'].get('studio_mode') == 'ask':
+        context['instruction'] += ' This is a read-only Studio Ask. Answer the question and selection in studio_request; do not edit, run tools, delegate edits or integrate.'
     return context
 
 
@@ -126,7 +128,7 @@ def process_bot_task(client, queued, root, infer_fn, runtime_fence, recovered=No
                            initial_fingerprint=safe_fingerprint(workspace))
             persist(marker, journal)
         if journal['phase'] == 'inference':
-            if loop_config and loop_config.get('experience_learning'):
+            if loop_config and loop_config.get('experience_learning') and task.get('studio_mode')!='ask':
                 from .bot_learning_runtime import plan_task
                 journal['input']['learning_plan'] = plan_task(client, ref, journal['input'], infer_fn, directory/'learning')
                 persist(marker, journal)

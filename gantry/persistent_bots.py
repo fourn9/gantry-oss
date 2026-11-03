@@ -227,6 +227,10 @@ class PersistentBotMixin:
                 'unauthorized', 'Runtime must use the existing bound principal')
         old = s.get('bot_runtimes', {}).get(bot['id'], {})
         require(a['version'] == old.get('version', 0), 'stale_basis', 'Runtime changed')
+        require(old.get('lease_until',0) <= self.clock(), 'conflict', 'Stop the old customer runtime before changing its environment')
+        if a['enabled']:
+            require(not any(t.get('bot_id')==bot['id'] and t['status'] in {'running','held','waiting'}
+                for t in s.get('bot_tasks',{}).values()), 'conflict', 'Acknowledge task handoff before replacing its runtime')
         return self._dev_save(s, fx, 'bot_runtimes', dict(a, id=bot['id'], version=a['version'] + 1,
             environment_hash=digest(a['environment']), owner=actor['id'], lease_until=0))
 

@@ -55,7 +55,7 @@ class Service(MembershipMixin, StudioMixin, DesignAssessmentMixin, BotWakeMixin,
 
     READS |= {'get_validation_plan', 'get_evidence_view', 'query_evidence', 'read_artifact_batch', 'list_artifact_files'}
     READS.add('workspace_members')
-    READS |= {'studio_overview', 'studio_work', 'studio_inbox'}
+    READS |= {'studio_overview', 'studio_work', 'studio_inbox', 'studio_team', 'list_bot_handoffs'}
     READS |= {'get_development_state', 'list_development_states', 'get_design_assessment'}
     READS |= {'related_review_context','check_mentor_job'}
     READS |= {'get_review_team', 'review_automation_status'}
@@ -223,6 +223,7 @@ class Service(MembershipMixin, StudioMixin, DesignAssessmentMixin, BotWakeMixin,
                 if cached:
                     require(cached["fingerprint"] == fp, "idempotency_mismatch", "Key reused with different input")
                     return manifest_store.unpack(con,json.loads(cached["response"]))
+            self._studio_ask_guard(s, actor, command, args)
             effects, notices = [], []
             result = (self._apply_sync(s, actor, args, effects, notices, con, _acquired)
                       if command == 'sync_integration' else method(s, actor, args, effects, notices, con))
