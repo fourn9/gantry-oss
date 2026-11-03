@@ -11,6 +11,24 @@ Gantry has two product areas:
 
 **Version: 3.3.0.** Local operation is the supported starting point. Human adoption, agent proposals and execution results remain separate. Gantry does not certify a design's physical safety or operate hardware by default.
 
+Selected external records can be captured with `gantry-integrations`: bounded SaaS
+readers, local workbook cells, and original-format saved exports feed immutable,
+requirement-linked checkpoints. See [supported routes and unverified native
+connections](docs/EXTERNAL-INTEGRATIONS.md). Selected native objects can also be
+updated through [reviewable write plans and readback verification](docs/EXTERNAL-WRITES.md).
+Export capture is not native CAD editing or automatic synchronization.
+Experimental desktop API operations are available through `gantry-native`:
+SOLIDWORKS/CATIA/Creo part parameters and SOLIDWORKS Electrical project user data,
+plus generated Altium/Allegro editor scripts. See [exact coverage and native-runtime
+qualification still required](docs/NATIVE-DESKTOP.md). Zuken and Capital SDK
+implementation remains blocked; none of these eight products has a verified live run.
+
+`gantry-engineering` joins checkout, saved-file checkpoints, external captures,
+physical evaluation, recovery and review in one local workflow. Explicit cross-tool
+dependencies expose which downstream checks need reassessment. See the
+[workflow and limits](docs/ENGINEERING-WORKFLOW.md) and
+[executed verification](docs/ENGINEERING-WORKFLOW-VERIFICATION.md).
+
 **Two service entry points:** `gantry-ledger` for customer-led development
 and review, and `gantry-crew` for delegated Bot development.
 The new Bot queue operates without Mentor; existing v3.0.0 workflows remain

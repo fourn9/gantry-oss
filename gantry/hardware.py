@@ -4,6 +4,7 @@ import json
 from pathlib import Path
 from .model import require
 from .store import Store
+from .model import digest
 from .adapters import artifact_file_parts
 from .continuity_adapter import capture_workspace
 from .physical_evidence import evaluate
@@ -14,16 +15,25 @@ from .contracts import validate
 def publish(client, state_id, change_id, version, root, plan_path, key):
     """Pin a saved acceptance plan, capture bytes, evaluate those bytes, checkpoint."""
     Store.safe_name(plan_path)
-    before=client.call('get_development_state',{'state_id':state_id})
-    state=before['state']
-    listing=client.call('list_development_states',{'session_id':state['session_id']})
-    change=next((c for c in listing['changes'] if c['id']==change_id),None)
-    require(change and change['head']==state_id and change['version']==version,
-            'stale_basis','Change head/version differs; restore the intended state')
-    session=client.call('development_state',{'session_id':state['session_id']})['session']
-    baseline=client.call('get_development_state',{'state_id':change['base_state']})
-    args=_physical_checkpoint(client,before,root,session['zone'],plan_path,key,baseline)
-    return client.call('checkpoint_change',{'change_id':change_id,'version':version,**args},key+':checkpoint')
+    from .workflow_journal import freeze, measure
+    endpoint = getattr(client, 'url', 'local')
+    journal = Path(root).resolve()/'.gantry'/'hardware'/digest([endpoint, key])
+    intent = [endpoint, state_id, change_id, version, plan_path]
+    def prepare():
+        before=client.call('get_development_state',{'state_id':state_id})
+        state=before['state']
+        listing=client.call('list_development_states',{'session_id':state['session_id']})
+        change=next((c for c in listing['changes'] if c['id']==change_id),None)
+        require(change and change['head']==state_id and change['version']==version,
+                'stale_basis','Change head/version differs; restore the intended state')
+        session=client.call('development_state',{'session_id':state['session_id']})['session']
+        baseline=client.call('get_development_state',{'state_id':change['base_state']})
+        args=_physical_checkpoint(client,before,root,session['zone'],plan_path,key,baseline)
+        return {'change_id':change_id,'version':version,**args}
+    with measure(journal, 'capture', state_id, key):
+        args=freeze(journal, key, intent, prepare)
+    with measure(journal, 'publication', state_id, key):
+        return client.call('checkpoint_change',args,key+':checkpoint')
 
 
 def publish_bot(client, task_id, fence, root, plan_path, key):
@@ -41,6 +51,8 @@ def _physical_checkpoint(client, before, root, zone, plan_path, key, baseline):
     Store.safe_name(plan_path)
     state=before['state']
     artifact,missing=capture_workspace(client,root,key,zone)
+    from .continuity_adapter import require_import_files
+    require_import_files(before, artifact['data']['files'])
     manifest=artifact['data']['files']; hashes={p:v['hash'] for p,v in manifest.items()}
     require(plan_path in baseline['manifest'] and plan_path in before['manifest'] and plan_path in manifest
             and baseline['manifest'][plan_path]['hash']==before['manifest'][plan_path]['hash']==hashes[plan_path],
@@ -68,7 +80,7 @@ def _physical_checkpoint(client, before, root, zone, plan_path, key, baseline):
         old=components.get(c['id'])
         require(not old or (old['role']==c['role'] and old['assembly']==c['assembly'] and set(old['inputs'])==set(c['paths'])),
                 'conflict','Plan cannot silently redefine an existing component')
-        components[c['id']]={'id':c['id'],'role':c['role'],'assembly':c['assembly'],'inputs':{p:hashes[p] for p in c['paths']}}
+        components[c['id']]={**(old or {}),'id':c['id'],'role':c['role'],'assembly':c['assembly'],'inputs':{p:hashes[p] for p in c['paths']}}
     check_ids=set()
     for c in plan['checks']:
         require(isinstance(c,dict) and set(c)-{'requirement_refs','source_check'}=={'id','scope','components','required','inputs','report','conditions','evaluator','environment','criteria'}

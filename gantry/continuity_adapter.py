@@ -15,6 +15,14 @@ SECRET = re.compile(rb'-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----|'
                     rb'(?i:api[_-]?key|access[_-]?token|password)\s*[=:]\s*[\"\x27]?[A-Za-z0-9_/-]{20,}')
 
 
+def require_import_files(before, manifest):
+    sources=before['state']['context'].get('environment',{}).get('external_sources',{})
+    prefixes=tuple('imports/'+source+'/' for source in sources)
+    expected={p for p in before['manifest'] if p.startswith(prefixes)}
+    require(expected <= set(manifest), 'restore_required',
+            'Restore the captured state before checkpointing; remote imports are missing locally')
+
+
 def capture_workspace(client, root, key, zone='root'):
     root = Path(root).resolve(); names = []; missing = []
     for path in sorted(root.rglob('*')):
