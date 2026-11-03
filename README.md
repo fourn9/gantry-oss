@@ -1,201 +1,161 @@
 # Gantry
 
-An agent-friendly development ledger for robotics hardware and software.
+**A shared place for people and agents to develop robot hardware and software.**
 
-Gantry stores versioned development states, artifacts, changes, evidence and decisions so people and agents can continue from a shared state. It connects to tools you already use through a local CLI, HTTP API and MCP. Mentor reviews a submitted change against recorded context and proposes follow-up work; Core checks permission, versions, dependencies and execution conditions.
+Keep working in your CAD tools, editor and simulator. Use Gantry to share unfinished changes, preserve their context, and let another person or agent continue from the same version.
 
-Gantry has two product areas:
+[Try the demo](https://gantryrobotics.org/demo/) · [Get started](#get-started) · [Tool support](#tool-support) · [Documentation](#documentation)
 
-- **Gantry Ledger** keeps the shared development state and the history of changes, evidence, discussions, verification and human decisions. Reviewing a submitted change is an operation in Ledger.
-- **Gantry Crew** gives customer-owned agents persistent roles, scopes and experience so they can receive work, collaborate and hand off results through Ledger.
+The demo uses invented, browser-only data. Local operation is the supported starting point. The latest packaged release is [v3.4.0](https://github.com/fourn9/gantry-oss/releases/tag/v3.4.0); `main` also includes guided project onboarding.
 
-**Version: 3.4.0.** Local operation is the supported starting point. Human adoption, agent proposals and execution results remain separate. Gantry does not certify a design's physical safety or operate hardware by default.
+## How it works
 
-Selected external records can be captured with `gantry-integrations`: bounded SaaS
-readers, local workbook cells, and original-format saved exports feed immutable,
-requirement-linked checkpoints. See [supported routes and unverified native
-connections](docs/EXTERNAL-INTEGRATIONS.md). Selected native objects can also be
-updated through [reviewable write plans and readback verification](docs/EXTERNAL-WRITES.md).
-Export capture is not native CAD editing or automatic synchronization.
-Experimental desktop API operations are available through `gantry-native`:
-SOLIDWORKS/CATIA/Creo part parameters and SOLIDWORKS Electrical project user data,
-plus generated Altium/Allegro editor scripts. See [exact coverage and native-runtime
-qualification still required](docs/NATIVE-DESKTOP.md). Zuken and Capital SDK
-implementation remains blocked; none of these eight products has a verified live run.
+```mermaid
+flowchart LR
+    A["Your tools and agents<br/>CAD · Code · Simulation"] -->|Capture saved work| B["Gantry Ledger<br/>Versions · Requirements · Evidence"]
+    B -->|Restore and continue| A
+    B <-->|Shared changes and discussions| C["Your team<br/>Studio · CLI · MCP"]
+```
 
-`gantry-engineering` joins checkout, saved-file checkpoints, external captures,
-physical evaluation, recovery and review in one local workflow. Explicit cross-tool
-dependencies expose which downstream checks need reassessment. See the
-[workflow and limits](docs/ENGINEERING-WORKFLOW.md) and
-[executed verification](docs/ENGINEERING-WORKFLOW-VERIFICATION.md).
+1. **Bring existing work.** Select saved files from a project already in progress.
+2. **Share a checkpoint.** Keep the changes, reasons, requirements and unfinished work together.
+3. **Discuss or review.** Refer to a specific artifact version, CAD part or code line.
+4. **Continue.** Restore the shared state, make the next change, and retain its evidence.
 
-**Two service entry points:** `gantry-ledger` for customer-led development
-and review, and `gantry-crew` for delegated Bot development.
-The new Bot queue operates without Mentor; existing v3.0.0 workflows remain
-compatible. The earlier `gantry-review` and `gantry-bots` command names remain
-compatibility aliases. See [setup and verified limits](docs/BOT_DEVELOPMENT.md)
-and the [product boundary](docs/SERVICE_SPLIT.md).
-Opt-in Bot-owned reasoning, peer consultation and hierarchical delegation are
-documented in [Crew organization](docs/CREW_ORGANIZATION.md), with
-[real subscription acceptance evidence](docs/CREW_ORGANIZATION_ACCEPTANCE.md).
-The local review workflow follows.
+**Sharing, passing a check and formally adopting a design are separate actions.** An old test result never becomes a pass for a new combination of files.
 
-## Share CAD and code with a team
+## Choose how to use Gantry
 
-[Studio workspace setup](docs/CONNECTED_WORKSPACE.md) connects an existing saved
-project to artifact-first CAD, Code and Checks views. The local CLI can capture a
-bounded workspace of up to 10,000 files / 1 GiB using frozen, resumable uploads.
-Share an unfinished version, then let a teammate restore it and continue separately.
-Small browser imports use the existing atomic limits; native editing stays in your tools.
+Both options use the same development history. You can start with Ledger alone.
 
-[Cloud operations and membership](docs/CLOUD-OPERATIONS.md) covers a deployable
-single-host API, recipient-generated credentials, owner-reviewed grants/revocation,
-and verified backup/restore. `gantry-cloud` is the operator/onboarding CLI. It does
-not create a cloud account, enable paid inference, or send invitation emails.
-See [executed acceptance and remaining qualifications](docs/PRODUCT_READINESS_VERIFICATION.md).
-The [public demo](https://gantryrobotics.org/demo/) uses invented, browser-only data.
+| | Gantry Ledger | Gantry Crew |
+| --- | --- | --- |
+| Use it to | Share and review development state | Delegate development to a persistent Bot team |
+| Who drives the work? | Your team and its existing agents | Bots with assigned roles and delegated authority |
+| Main capabilities | Versions, requirements, discussions, evidence, optional Mentor review | Role memory, consultation, hierarchical delegation and handoffs |
+| Entry point | `gantry-ledger` | `gantry-crew` |
+| Guide | [Ledger setup](docs/AGENTS.md) | [Crew setup](docs/BOT_DEVELOPMENT.md) |
 
-## Connect a project
+**Mentor** reviews submitted changes and proposes follow-up work. **Crew Bots** reason and act within their roles; Mentor is not their manager. Core stores the decisions and enforces access and version integrity—it does not choose the best engineering design.
 
-Python 3.11+ on macOS or Linux, with current security patches. Before installing,
-follow the [runtime and installer security update guide](docs/SECURITY-UPDATES.md),
-including the hash-pinned pip bootstrap. No model account is needed to store and
-retrieve development state. Run `python -m gantry.security_check` with the same
-interpreter used by your MCP/server after installation.
+You supply the agent runtime and model account. No inference provider is enabled by default, and storing development state needs no model account.
+
+## Get started
+
+### Connect your local agent
+
+Use patched Python 3.11+ on macOS or Linux. Before installing, follow the [runtime and installer security guide](docs/SECURITY-UPDATES.md), including its hash-pinned pip bootstrap.
 
 ```sh
 git clone https://github.com/fourn9/gantry-oss.git
 cd gantry-oss
 python3 -m venv .venv
+# Apply the installer updates described in the security guide above.
 .venv/bin/python -m pip install .
+.venv/bin/python -m gantry.security_check
+
 .venv/bin/gantry connect /path/to/your/project --client codex \
   --path src/ --path tests/ --write-path src/ \
   --goal "Improve request clamping" \
   --done "Existing boundary tests pass without changing their assertions"
 ```
 
-Review one permission plan: project, readable/writable files, exact test commands, expiry, goal, completion conditions and limits. Confirm once. Gantry creates the ledger, records the internal owner approvals, saves current files, registers separate developer/reviewer identities and adds only its MCP entry to the selected client's project configuration. It does not change that client's approval or trust settings.
+Review and confirm the permission plan: selected files, writable scope, test commands and completion conditions. Gantry creates the local ledger and scoped identities, captures saved files, and adds its project MCP entry. Client trust settings remain under your control.
 
-Use `--client claude`, `cursor`, or `generic` for other clients. Without explicit paths, only discovered files are delegated. The default is **work-capable**, displayed before approval. Use `--mode record-only` when you only want to save externally edited files. The current agent can use scoped MCP tools or CLI:
+- Choose `--client claude`, `cursor` or `generic` for another client.
+- The default permits scoped work. Choose `--mode record-only` to record externally edited files instead.
+- This local route needs no separately operated server. Tests are refused when a supported command sandbox is unavailable.
+
+[Full setup and daily commands →](docs/AGENTS.md)
+
+### Share work in Studio
+
+For a visual workspace, follow [Studio setup](docs/STUDIO_UI.md), then choose **Import project**:
+
+**Select files → Review scope → Clarify components → Open first work → Share update**
+
+Guided setup preserves answers and corrections across interruptions. Agent interpretation is optional; it does not execute the project or approve its design.
+
+Studio keeps the product structure and team work together, with **CAD**, **Code** and **Checks** tabs. Conversations stay attached to their target and version. Another authorized participant can restore a shared version into a separate workspace.
+
+[Guided onboarding](docs/GUIDED_ONBOARDING.md) · [Sync, share and continue](docs/CONNECTED_WORKSPACE.md) · [Self-hosting and membership](docs/CLOUD-OPERATIONS.md)
+
+## What stays with the work
+
+| Saved information | What it enables |
+| --- | --- |
+| Artifact snapshots and development states | Restore the exact saved files and their context |
+| Requirements, changes and declared dependencies | Trace the purpose of a change and what needs reassessment |
+| Evaluations tied to input versions | Distinguish current evidence from obsolete or missing checks |
+| Discussions, decisions and alternatives | Understand why a choice was made and what remains unresolved |
+| Bot roles, experience and execution journals | Carry context into later work and recover supported interrupted operations |
+
+Gantry preserves original captured data. It does not infer complete cross-tool dependencies or certify physical safety. Native editing and engineering validation still require the appropriate tools and evidence.
+
+## Tool support
+
+**Capture, editing and live synchronization are different capabilities.** Check the exact route before adopting an integration.
+
+| Route | Available today | Boundary |
+| --- | --- | --- |
+| Saved files and Git | Versioned capture, restoration, explicit sync and sharing | Only captured scope; unsaved edits are not included |
+| GitHub and external records | Issue, PR and CI ingestion; bounded readers and saved exports | Authentication and capture coverage depend on the connector |
+| CadQuery / STEP | Optional local read, edit, write and static interference checks | Not a universal CAD editor or physical-validity guarantee |
+| Strength, tolerance and prototype results | Evidence capture against a frozen acceptance plan | Requires an actual evaluator or measured input |
+| Commercial CAD / ECAD | Experimental desktop operations and generated editor scripts | No verified live run for the eight listed vendor products; Zuken and Capital SDK implementations remain blocked |
+
+[Integration coverage](docs/EXTERNAL-INTEGRATIONS.md) · [Native desktop support](docs/NATIVE-DESKTOP.md) · [Hardware adapter](docs/HARDWARE-ADAPTER.md)
+
+<details>
+<summary>Limits, execution and recovery</summary>
+
+- Local workspace capture supports up to **10,000 files / 1 GiB** with frozen, resumable uploads. Guided browser onboarding supports **1,000 files / 32 MiB**, at most **16 MiB per file**.
+- Watching saved files is opt-in. It never shares or formally adopts changes automatically.
+- Local reviews and tests have no Gantry count cap. Scope, revocation, command timeouts, branch limits and provider limits still apply. Existing finite credentials retain their approved expiry.
+- Default Mentor review uses your client through structured prepare/finish tools. It does not automatically launch an independent reviewer. Subscription-based review is an explicit opt-in.
+- Single-host deployment and backup/restore procedures are provided. They do not provision a cloud account, email invitations or enable paid inference.
+- Native-runtime qualification, broader physical validity and engineering speedup remain separate from functional tests.
+
+[Recovery](docs/runtime-recovery-and-tool-views.md) · [Executed acceptance and limits](docs/PRODUCT_READINESS_VERIFICATION.md)
+
+</details>
+
+## Documentation
+
+| I want to… | Read |
+| --- | --- |
+| Connect an agent and review a change | [Agent setup](docs/AGENTS.md) |
+| Import, share or restore a project | [Guided onboarding](docs/GUIDED_ONBOARDING.md) · [Connected workspaces](docs/CONNECTED_WORKSPACE.md) |
+| Link requirements, changes and checks | [Requirement traceability](docs/REQUIREMENT_TRACEABILITY.md) · [Design change loop](docs/DESIGN_CHANGE_LOOP.md) |
+| Configure a Bot organization | [Crew organization](docs/CREW_ORGANIZATION.md) · [Persistent Bots](docs/PERSISTENT_BOTS.md) |
+| Use and evaluate Bot experience | [Learning](docs/BOT_LEARNING.md) · [Continuity](docs/BOT_CONTINUITY.md) · [Paired evaluation](docs/BOT_LEARNING_EVALUATION.md) |
+| Connect engineering tools | [Engineering workflow](docs/ENGINEERING-WORKFLOW.md) · [External write plans](docs/EXTERNAL-WRITES.md) |
+| Operate a shared deployment | [Cloud operations](docs/CLOUD-OPERATIONS.md) · [Advanced administration](docs/ADMIN-AGENTS.md) |
+| Understand the architecture | [Architecture](docs/ARCHITECTURE.md) · [Ledger / Crew boundary](docs/SERVICE_SPLIT.md) |
+
+## Privacy and contributions
+
+Feedback is **off by default**. You may opt into statistics and individually selected diagnostics. Nothing is sent in the background; every encrypted upload requires preview confirmation. No public receiver is preconfigured.
+
+[Privacy](docs/PRIVACY.md) · [Security policy](SECURITY.md) · [Optional encrypted feedback](docs/FEEDBACK.md)
+
+Report issues, propose adapters or contribute tests. Use minimal synthetic examples—never confidential CAD, source, logs or credentials.
+
+<details>
+<summary>Run the development checks</summary>
 
 ```sh
-gantry project status --root /path/to/your/project
-# Pass tool arguments using --input file.json and a stable --request-id.
-gantry disconnect /path/to/your/project
+.venv/bin/python -m pip install ".[feedback]"
+.venv/bin/python -m unittest discover -s tests -p 'test_*.py' -q
+node --test tests/test_*.mjs
 ```
 
-No server or manual principal/proposal sequence is required for this local route. First-time client trust/MCP enablement remains a client decision. See [setup and daily use](docs/AGENTS.md). If no supported command sandbox is available, tests are refused; Gantry never silently runs them unrestricted.
+Core tests use the standard library. Optional NumPy and CAD tests skip when dependencies are absent. Use `GANTRY_CAD_PYTHON` to select a separate CadQuery interpreter.
 
-## Shared product workspace
+[Contributing guide](CONTRIBUTING.md) · [Synthetic end-to-end example](examples/connected_project.py)
 
-The authenticated web UI opens Studio: product structure and team work, saved CAD/code
-versions, checks, intermediate sharing and conversations attached to exact parts or
-lines. Native editing remains in your tools. See [Studio setup and supported connections](docs/STUDIO_UI.md).
-
-Use [connected workspaces](docs/CONNECTED_WORKSPACE.md) to import an existing
-assembly/code folder, capture saved edits, share unfinished versions and let another
-authorized participant restore the exact files and context. The local watcher is
-opt-in; it never shares or adopts automatically. Real HTTP/CadQuery acceptance and
-remaining connection limits are [documented separately](docs/CONNECTED_WORKSPACE_VERIFICATION.md).
-
-## Continue through review
-
-Read the saved goal and state → edit within scope → checkpoint unfinished work → submit a meaningful milestone → review grounded Mentor findings → correct/test → checkpoint and respond. Agents do not need another owner decision for these delegated steps. Independent candidates can start from the same state in separate workspaces. Sharing and a successful test do not formally adopt a design.
-
-Mentor uses your existing client model through structured prepare/finish tools. This path does not automatically launch another agent and is not an independent-review claim. Optionally choose `--mentor codex-subscription` with `--goal` and `--done` to automatically review submissions using the installed official Codex CLI and your ChatGPT login. The approval plan covers that source-sharing inference route. No API-key fallback or publisher-funded inference account is included; provider limits still apply.
-
-Local project reviews and test executions have no Gantry count cap. New connections
-have no automatic expiry; an optional `--ttl SECONDS` has no eight-hour ceiling.
-Existing finite credentials keep their approved expiry until the owner runs
-`gantry project unlimit --root /path/to/project`. This preserves the session, Bot
-identities, state and history. Scope, revocation, command timeouts, branch limits
-and provider limits still apply.
-
-Role profiles and evidence-backed experience can follow the customer agent across
-work contexts. Hierarchical review teams reuse the same queue and identity checks;
-unresolved team questions prevent a technical OK. See [teams and personal Bots](docs/TEAMS.md)
-for local setup, the advanced team API and current limits.
-
-For the legacy HTTP server, web interface, scoped MCP profiles and advanced multi-user administration, see [administrator setup](docs/ADMIN-AGENTS.md). Existing APIs remain supported.
-
-For stopped-worker recovery, native-preserving tool output profiles and the optional
-CAD screening command, see [recovery and tool views](docs/runtime-recovery-and-tool-views.md).
-
-Run [the synthetic end-to-end example](examples/connected_project.py) after installation. Its default model responses are marked fixtures; `--live` performs two bounded calls under your subscription. It demonstrates software bounds, not physical robot performance.
-
-## What is included
-
-- Immutable artifact snapshots and development states, with content hashes and restoration.
-- Independent change sets, checkpoints, integration conflict checks and explicit unknown compatibility.
-- Version-bound evaluations: passing an old combination does not approve a new one.
-- Review submissions, specialist reports, Mentor proposals, engineering-check suggestions and outcome tracking.
-- Work contracts, authorization, leases, execution limits and resumable runner journals.
-- Saved-file and Git capture, GitHub issue/PR/CI ingestion, and an optional web interface.
-- An append-only event history, replay and backup/export.
-
-CAD inspection and runtime simulation checkpoints are optional adapters. Install their dependencies separately and declare what is captured. Gantry is not a universal CAD editor, simulator, fleet monitor or deployment system.
-
-See [architecture and boundaries](docs/ARCHITECTURE.md), [workflow](docs/WORKFLOW.md), [privacy](docs/PRIVACY.md) and [security](SECURITY.md).
-
-## Help improve Gantry
-
-Report bugs, propose adapters, discuss workflows and contribute tests through GitHub issues and pull requests. Share a **minimal synthetic example**, not confidential CAD, source, logs or credentials.
-
-On first initialization, choose no feedback (default), statistics, or statistics plus explicitly selected diagnostics. Noninteractive initialization defaults to off. Nothing is sent in the background. Every encrypted upload requires preview confirmation. See [encrypted feedback](docs/FEEDBACK.md) for the optional extra, recipient setup and receiver deployment. A public receiver is not bundled or preconfigured.
-
-```sh
-.venv/bin/gantry usage enable --data .gantry
-.venv/bin/gantry usage export --data .gantry --output usage-preview.json
-# Inspect the JSON before choosing whether to share it.
-.venv/bin/gantry usage disable --data .gantry
-```
-
-## Development
-
-```sh
-python3 -m pip install ".[feedback]"
-python3 -m unittest discover -s tests -p 'test_*.py' -q
-node --test tests/test_review_web.mjs
-```
-
-Core tests use the standard library. Optional NumPy and CAD tests skip when dependencies are absent. Use `GANTRY_CAD_PYTHON` to select a separate CadQuery interpreter. See [contributing](CONTRIBUTING.md).
+</details>
 
 ## License
 
-MIT. The published source, including Core and Mentor orchestration, may be used, modified and redistributed under [LICENSE](LICENSE). Third-party tools and models have their own licenses and terms.
-
-Opt-in [conditional Bot experience](docs/BOT_LEARNING.md) links recalled lessons to
-explicit plans, actual reports and outcome reflections using the customer model.
-This preserves engineering unknowns and does not imply measured speedup.
-
-Persistent organizational and personal Bots, customer-owned workspaces, automatic
-PR-triggered workers and opt-in user services: [Persistent Bots](docs/PERSISTENT_BOTS.md).
-No inference provider is enabled by default; each customer supplies its own agent.
-
-## CAD and physical evidence
-
-The optional [local hardware adapter](docs/HARDWARE-ADAPTER.md) reads/edits/writes
-STEP with CadQuery, runs static interference checks, and captures external strength,
-tolerance or prototype measurements against a frozen acceptance plan. Results stay
-bound to the evaluated files; missing evidence does not become a pass.
-
-### Requirement traceability
-
-Link versioned requirements to development states, changes, Crew tasks and engineering
-checks. See what remains unverified, fails, or needs review after a requirement change,
-without confusing work completion with adoption. Existing free-text notes stay unlinked.
-See [setup, API contracts and limits](docs/REQUIREMENT_TRACEABILITY.md).
-
-Persistent Bot work, conditional experience and selective continuation: see
-[the continuity guide](docs/BOT_CONTINUITY.md).
-
-To compare the same task with and without prior experience in separate ledgers,
-use the opt-in [paired evaluation guide](docs/BOT_LEARNING_EVALUATION.md).
-It retains failures and checks saved candidates independently; the included
-synthetic example does not establish engineering speedup.
-
-To turn saved changes into the next correction or test, use the
-[design assessment and development loop](docs/DESIGN_CHANGE_LOOP.md). It connects
-cumulative changes, declared impact and requirement evidence to normal Bot inputs
-and retained reports. A native CAD/subscription-model example demonstrates two
-successive tasks; broader physical validity remains explicitly unverified.
+[MIT](LICENSE). The published source, including Core and Mentor orchestration, may be used, modified and redistributed. Third-party tools and models retain their own licenses and terms.
