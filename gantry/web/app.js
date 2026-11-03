@@ -1,6 +1,7 @@
 import {$,esc as e,short,badge,button as b,options,toast,download} from './ui.js';
 import * as view from './views.js';
 import * as reviewView from './review_views.js';
+import {createStudio} from './studio.js';
 
 let token='', base='', data, identity, detail, projectDetail, dialogSubmit, revision=0, refreshing=false;
 let reviewPage, reviewTeam, reviewDetail, reviewAutomation;
@@ -24,16 +25,19 @@ async function api(command,args={},idempotency=key()){
   const value=await response.json();if(!response.ok||value.error)throw new Error((value.error?.message||'Request failed')+(value.error?.code?' ['+value.error.code+']':''));return value.result;
 }
 function fail(error){$('#error-banner').textContent=error.message||String(error);$('#error-banner').hidden=false;}
-function route(){const [name='sessions',id]=location.hash.slice(1).split('/');return {name:name||'sessions',id};}
+function route(){const [name='studio',id]=location.hash.slice(1).split('/');return {name:name||'studio',id};}
 function modal(title,body,submit,label='Save'){$('#dialog-title').textContent=title;$('#dialog-body').innerHTML=body;$('#dialog-error').textContent='';$('#dialog-submit').textContent=label;$('#dialog-submit').hidden=!submit;dialogSubmit=submit;$('#dialog').showModal();}
 function closeModal(){$('#dialog').close();dialogSubmit=null;}
 const field=(label,name,value='',extra='')=>`<label>${e(label)}<input name="${e(name)}" value="${e(value)}" ${extra}></label>`;
 const area=(label,name,value='',extra='')=>`<label>${e(label)}<textarea name="${e(name)}" ${extra}>${e(value)}</textarea></label>`;
 const formData=form=>Object.fromEntries(new FormData(form));
 const projectSelect=(selected='')=>`<label>Project<select name="project_id" required>${options(data.projects,'id','name',selected)}</select></label>`;
+const studio=createStudio({api,modal,toast,fail});
 async function render(){
   if(!data)return;const r=route(),current=++revision;
-  const side=view.sidebar(data,r.name);$('#nav').innerHTML=side.nav;$('#sidebar-projects').innerHTML=side.projects;$('#recent-sessions').innerHTML=side.recent;
+  if(studio.handles()){await studio.render();return;}
+  studio.leave();
+  const side=view.sidebar(data,r.name);$('#nav').innerHTML='<a href="#studio">Shared workspace</a>'+side.nav;$('#sidebar-projects').innerHTML=side.projects;$('#recent-sessions').innerHTML=side.recent;
   if(r.name==='session'){
     if(lastSession!==r.id){selectedState='';inspector='Changes';lastSession=r.id;}
     const [value,team]=await Promise.all([api('session_details',{session_id:r.id,...(selectedState?{state_id:selectedState}:{})}),api('get_review_team',{session_id:r.id})]);if(current!==revision)return;detail={...value,review_team:team.team};
@@ -158,8 +162,8 @@ $('#dialog-form').onsubmit=async event=>{event.preventDefault();const submit=dia
 $('#dialog-close').onclick=closeModal;$('#dialog-cancel').onclick=closeModal;
 $('#workspace').value=location.pathname.match(/^\/w\/([^/]+)/)?.[1]||'';
 $('#login-form').onsubmit=async event=>{event.preventDefault();const workspace=$('#workspace').value.trim();if(workspace&&!/^[a-z0-9][a-z0-9-]{0,47}$/.test(workspace)){$('#login-error').textContent='Invalid workspace ID';return;}event.submitter.disabled=true;try{token=$('#token-file').files[0]?(await $('#token-file').files[0].text()).trim():$('#token').value.trim();base=workspace?'/w/'+workspace:'';identity=await api('identity');$('#token').value='';$('#token-file').value='';$('#login').hidden=true;$('#shell').hidden=false;$('#workspace-name').textContent=workspace||'Local';$('#actor-name').textContent=identity.id||identity.actor_id||'Member';$('#actor-avatar').textContent=$('#actor-name').textContent[0].toUpperCase();await refresh();}catch(err){token='';$('#login-error').textContent=err.message;}finally{event.submitter.disabled=false;}};
-$('#logout').onclick=()=>{token='';data=null;detail=null;revision++;closeModal();$('#main').replaceChildren();$('#login').hidden=false;$('#shell').hidden=true;$('#login-error').textContent='';};
+$('#logout').onclick=()=>{studio.reset();token='';data=null;detail=null;revision++;closeModal();$('#main').replaceChildren();$('#login').hidden=false;$('#shell').hidden=true;$('#login-error').textContent='';};
 $('#refresh').onclick=refresh;$('#new-session').onclick=()=>newSession().catch(fail);
 $('#menu-button').onclick=()=>{const open=$('.sidebar').classList.toggle('open');$('#menu-button').setAttribute('aria-expanded',String(open));};
 window.addEventListener('hashchange',()=>{$('.sidebar').classList.remove('open');$('#menu-button').setAttribute('aria-expanded','false');render().catch(fail);});
-setInterval(()=>{if(token&&!document.hidden&&!$('#dialog').open&&!['TEXTAREA','INPUT','SELECT'].includes(document.activeElement?.tagName))refresh();},15000);
+setInterval(()=>{if(token&&studio.handles()){studio.checkUpdates();return;}if(token&&!document.hidden&&!$('#dialog').open&&!['TEXTAREA','INPUT','SELECT'].includes(document.activeElement?.tagName))refresh();},15000);

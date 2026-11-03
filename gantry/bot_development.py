@@ -266,6 +266,9 @@ class BotDevelopmentMixin:
                 change = self._dev_get(s, 'dev_changes', child['change_id'])
                 candidates.append({'task_id': ident, 'status': child['status'], 'candidate_id': child.get('candidate_id'), 'change': change})
         result['own_change'] = self._dev_get(s, 'dev_changes', task['change_id']) if task.get('change_id') else None
+        result['design_assessment'] = self.cmd_get_design_assessment(s, actor, {
+            'baseline_state_id': task['state_id'], 'state_id': task.get('output_state', task['state_id'])}, fx, n, con)
+        result['design_assessment']['task_requirement_refs'] = copy.deepcopy(task.get('requirement_refs', []))
         result['candidate_changes'] = candidates
         result['candidates_truncated'] = bool(pending)
         if self._binding_access(s, actor, self._bd_binding(s, task['session_id'], task['bot_id'])):
@@ -363,6 +366,9 @@ class BotDevelopmentMixin:
             'state_id': task.get('output_state', task['state_id']), 'seq': s['seq'] + 1,
             'input_versions': copy.deepcopy(task['stamp']),
             'environment': copy.deepcopy(s['bot_runtimes'][task['bot_id']]['environment'])})
+        task['reports'][-1]['design_assessment'] = self.cmd_get_design_assessment(s, actor, {
+            'baseline_state_id': task['state_id'], 'state_id': task.get('output_state', task['state_id'])}, fx, n, con)
+        task['reports'][-1]['design_assessment']['task_requirement_refs'] = copy.deepcopy(task.get('requirement_refs', []))
         task.update(status=report['status'], version=task['version'] + 1); task.pop('fence', None)
         if task['status'] == 'waiting' and questions and not outstanding and not any(q['status'] == 'open' for q in questions):
             task['status'] = 'pending'

@@ -37,8 +37,11 @@ class MonthlyRecoveryTests(unittest.TestCase):
         from gantry.monthly_recovery import prepare_retry
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)/'model'; failed_invocation(root)
+            state = json.loads((root/'inference.json').read_text())
+            state['inference_settings'] = {'model': 'pinned-model', 'reasoning_effort': 'low'}
+            persist(root/'inference.json', state)
             with patch('gantry.monthly_recovery.time.time', return_value=100):
-                with self.assertRaises(Fault) as error: infer_monthly({}, {}, root)
+                with self.assertRaises(Fault) as error: infer_monthly({}, {}, root, model='pinned-model', reasoning_effort='low')
                 self.assertEqual(error.exception.code, 'provider_rate_limited')
                 with self.assertRaises(Fault) as error: prepare_retry(root, 'Previous process stopped')
                 self.assertEqual(error.exception.code, 'provider_rate_limited')
@@ -46,6 +49,7 @@ class MonthlyRecoveryTests(unittest.TestCase):
                 prepare_retry(root, 'Previous process stopped')
                 prepare_retry(root, 'Retry interrupted before starting')
             self.assertEqual(json.loads((root/'inference.json').read_text())['phase'], 'retry_ready')
+            self.assertEqual(json.loads((root/'inference.json').read_text())['inference_settings'], state['inference_settings'])
             archives = list((root/'recoveries').glob('*/events.jsonl'))
             self.assertEqual(len(archives), 1)
             self.assertIn('429', archives[0].read_text())

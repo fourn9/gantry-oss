@@ -3,9 +3,29 @@
 This file records changes after v3.3.0. Earlier release notes remain in the
 [GitHub releases](https://github.com/fourn9/gantry-oss/releases).
 
-## Unreleased
+## 3.4.0 — Shared workspaces and connected engineering
+
+- Artifact-first Studio with version-bound CAD/code discussions, unfinished sharing,
+  saved-workspace import/watch/sync and independent continuation.
+- Integrate external/native tool adapters and physical evidence workflows with Studio.
+  Preserve fixed baseline acceptance alongside durable publication recovery.
+- Streaming larger saved-file captures (10,000 files / 1 GiB), frozen retries and
+  explicit stale-head/scope holds. Small browser imports retain atomic limits.
+- Human-reviewed member grants, scoped recipient-owned credentials, session enrollment
+  and revocation over existing audited principal decisions. No anonymous signup,
+  administrator invitation or automatic paid inference.
+- Operator provisioning, consistent verified backup/restore and single-host TLS/systemd
+  configuration. Bound API request threads. Native vendor/cloud runtime qualification
+  remains explicit; see PRODUCT_READINESS_VERIFICATION.md.
+
+### Previously unreleased Bot work included in this version
 
 ### Added
+
+- Opt-in paired Bot experience evaluation through isolated Core ledgers and
+  normal Bot execution. Frozen inputs/verifier/model settings, private journals,
+  independent candidate checks, failure-inclusive reporting and offline report
+  regeneration. The synthetic example is not evidence of engineering speedup.
 
 - Opt-in Bot experience planning and outcome reflection, with conditional lessons,
   applicability checks and preserved correction history.
@@ -29,7 +49,13 @@ This file records changes after v3.3.0. Earlier release notes remain in the
 
 ### Validation
 
-- Final Python regression: 1,062 invocations, no failures, 8 skips.
+- New paired evaluation smoke: both real subscription-model arms completed; the
+  supplied-experience arm took 69.28 seconds versus 66.25 seconds without it.
+  This synthetic single pair did not demonstrate time saving. See
+  [comparison evidence and limits](docs/BOT_LEARNING_EVALUATION_VALIDATION.md).
+
+- Earlier Bot-only Python regression: 1,062 invocations, no failures, 8 skips.
+  The complete 3.4.0 validation is in `docs/PRODUCT_READINESS_VERIFICATION.md`.
 - Real subscription-model checks completed experience selection, tool execution,
   working-note updates, experience/action links, report and outcome reflection.
   A changed-input check recorded a real failure without reusing the previous pass.

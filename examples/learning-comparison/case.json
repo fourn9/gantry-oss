@@ -1,0 +1,15 @@
+{
+  "name": "Synthetic joint interface update",
+  "project_root": "project",
+  "files": ["mechanical.json", "control.json", "verify.py"],
+  "write_scope": ["mechanical.json", "control.json"],
+  "goal": "Update the declared joint travel to 60 degrees in both mechanical and control configuration, run verify, and report remaining physical unknowns.",
+  "acceptance": ["Both configurations declare travel_deg = 60", "The frozen verify.py exits successfully", "No physical validity or formal adoption is claimed"],
+  "verifier": {"script": "verify.py", "timeout_seconds": 10},
+  "experiences": [{
+    "observation": "A mechanical interface update can leave a stale control limit. Inspect both configurations before editing either, then check the combined state with verify.",
+    "applicability": "A joint travel value shared by mechanical and control configuration",
+    "source": "Operator-authored synthetic lesson for evaluation mechanics",
+    "limitations": ["Not an automatically learned or independently verified engineering history", "Does not establish geometry, torque, clearance or physical safety"]
+  }]
+}

@@ -129,3 +129,13 @@ check. The plan must cover its existing input paths. The Adapter then preserves 
 and state provenance while recording the measured result. Without this explicit correspondence
 it refuses to overwrite the inferred check. Threshold adequacy remains an engineering review
 responsibility; correspondence alone is not certification.
+
+## From coverage to the next change
+
+The [design assessment](DESIGN_CHANGE_LOOP.md) compares the assignment baseline to
+its latest state and includes requirement transitions, cumulative edits and affected
+checks. It travels through normal Crew/optional Mentor context and saved Bot reports.
+Changed causal inputs omitted by a dependency-selected check keep its assessment
+unknown even if that check still declares pass. Read the assessment's coverage when
+using change-impact context; the standalone state view reports only its directly
+bound engineering checks.

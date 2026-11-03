@@ -9,7 +9,25 @@ Gantry has two product areas:
 - **Gantry Ledger** keeps the shared development state and the history of changes, evidence, discussions, verification and human decisions. Reviewing a submitted change is an operation in Ledger.
 - **Gantry Crew** gives customer-owned agents persistent roles, scopes and experience so they can receive work, collaborate and hand off results through Ledger.
 
-**Version: 3.3.0.** Local operation is the supported starting point. Human adoption, agent proposals and execution results remain separate. Gantry does not certify a design's physical safety or operate hardware by default.
+**Version: 3.4.0.** Local operation is the supported starting point. Human adoption, agent proposals and execution results remain separate. Gantry does not certify a design's physical safety or operate hardware by default.
+
+Selected external records can be captured with `gantry-integrations`: bounded SaaS
+readers, local workbook cells, and original-format saved exports feed immutable,
+requirement-linked checkpoints. See [supported routes and unverified native
+connections](docs/EXTERNAL-INTEGRATIONS.md). Selected native objects can also be
+updated through [reviewable write plans and readback verification](docs/EXTERNAL-WRITES.md).
+Export capture is not native CAD editing or automatic synchronization.
+Experimental desktop API operations are available through `gantry-native`:
+SOLIDWORKS/CATIA/Creo part parameters and SOLIDWORKS Electrical project user data,
+plus generated Altium/Allegro editor scripts. See [exact coverage and native-runtime
+qualification still required](docs/NATIVE-DESKTOP.md). Zuken and Capital SDK
+implementation remains blocked; none of these eight products has a verified live run.
+
+`gantry-engineering` joins checkout, saved-file checkpoints, external captures,
+physical evaluation, recovery and review in one local workflow. Explicit cross-tool
+dependencies expose which downstream checks need reassessment. See the
+[workflow and limits](docs/ENGINEERING-WORKFLOW.md) and
+[executed verification](docs/ENGINEERING-WORKFLOW-VERIFICATION.md).
 
 **Two service entry points:** `gantry-ledger` for customer-led development
 and review, and `gantry-crew` for delegated Bot development.
@@ -21,6 +39,21 @@ Opt-in Bot-owned reasoning, peer consultation and hierarchical delegation are
 documented in [Crew organization](docs/CREW_ORGANIZATION.md), with
 [real subscription acceptance evidence](docs/CREW_ORGANIZATION_ACCEPTANCE.md).
 The local review workflow follows.
+
+## Share CAD and code with a team
+
+[Studio workspace setup](docs/CONNECTED_WORKSPACE.md) connects an existing saved
+project to artifact-first CAD, Code and Checks views. The local CLI can capture a
+bounded workspace of up to 10,000 files / 1 GiB using frozen, resumable uploads.
+Share an unfinished version, then let a teammate restore it and continue separately.
+Small browser imports use the existing atomic limits; native editing stays in your tools.
+
+[Cloud operations and membership](docs/CLOUD-OPERATIONS.md) covers a deployable
+single-host API, recipient-generated credentials, owner-reviewed grants/revocation,
+and verified backup/restore. `gantry-cloud` is the operator/onboarding CLI. It does
+not create a cloud account, enable paid inference, or send invitation emails.
+See [executed acceptance and remaining qualifications](docs/PRODUCT_READINESS_VERIFICATION.md).
+The [public demo](https://gantryrobotics.org/demo/) uses invented, browser-only data.
 
 ## Connect a project
 
@@ -52,6 +85,18 @@ gantry disconnect /path/to/your/project
 ```
 
 No server or manual principal/proposal sequence is required for this local route. First-time client trust/MCP enablement remains a client decision. See [setup and daily use](docs/AGENTS.md). If no supported command sandbox is available, tests are refused; Gantry never silently runs them unrestricted.
+
+## Shared product workspace
+
+The authenticated web UI opens Studio: product structure and team work, saved CAD/code
+versions, checks, intermediate sharing and conversations attached to exact parts or
+lines. Native editing remains in your tools. See [Studio setup and supported connections](docs/STUDIO_UI.md).
+
+Use [connected workspaces](docs/CONNECTED_WORKSPACE.md) to import an existing
+assembly/code folder, capture saved edits, share unfinished versions and let another
+authorized participant restore the exact files and context. The local watcher is
+opt-in; it never shares or adopts automatically. Real HTTP/CadQuery acceptance and
+remaining connection limits are [documented separately](docs/CONNECTED_WORKSPACE_VERIFICATION.md).
 
 ## Continue through review
 
@@ -143,3 +188,14 @@ See [setup, API contracts and limits](docs/REQUIREMENT_TRACEABILITY.md).
 
 Persistent Bot work, conditional experience and selective continuation: see
 [the continuity guide](docs/BOT_CONTINUITY.md).
+
+To compare the same task with and without prior experience in separate ledgers,
+use the opt-in [paired evaluation guide](docs/BOT_LEARNING_EVALUATION.md).
+It retains failures and checks saved candidates independently; the included
+synthetic example does not establish engineering speedup.
+
+To turn saved changes into the next correction or test, use the
+[design assessment and development loop](docs/DESIGN_CHANGE_LOOP.md). It connects
+cumulative changes, declared impact and requirement evidence to normal Bot inputs
+and retained reports. A native CAD/subscription-model example demonstrates two
+successive tasks; broader physical validity remains explicitly unverified.

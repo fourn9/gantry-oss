@@ -79,4 +79,5 @@ def prepare_retry(root, reason, check_only=False):
     # it; a crash after a started marker remains uncertain. Completed tool/API
     # receipts live outside this directory and are never touched.
     persist(marker, {'phase': 'retry_ready', 'context': state['context'], 'schema': state['schema'],
+                     **({'inference_settings': state['inference_settings']} if 'inference_settings' in state else {}),
                      'failures': failure['failures'], 'recovery': archive.name})

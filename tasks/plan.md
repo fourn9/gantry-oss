@@ -1,5 +1,20 @@
 # Organization and personal Bot foundations
 
+## Current extension: connected workspace
+
+Implement the approved import/capture/share/continue priority in
+[connected-workspace.md](connected-workspace.md). Preserve earlier work below.
+
+## Current extension: shared product UI
+
+The approved artifact-first Studio implementation is tracked in [studio-ui.md](studio-ui.md).
+Existing design-loop and Bot work below is preserved.
+
+## Current extension: design change feedback
+
+Implement the approved remaining development loop in [design-change-loop.md](design-change-loop.md).
+Existing unrelated checklists and historical work below are preserved.
+
 ## Current extension: personal Bot continuity
 
 The owner approved continuing the memory/skills/continuity direction on 2026-11-03.

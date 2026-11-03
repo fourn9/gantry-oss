@@ -40,9 +40,12 @@ from .crew_onboarding import CrewOnboardingMixin
 from .bot_learning import BotLearningMixin
 from .bot_continuity import BotContinuityMixin
 from .bot_wake import BotWakeMixin
+from .design_assessment import DesignAssessmentMixin
+from .studio import StudioMixin
+from .membership import MembershipMixin
 
 
-class Service(BotWakeMixin, BotContinuityMixin, BotLearningMixin, ConnectionMixin, CrewOnboardingMixin, CrewCoordinationMixin, BotDevelopmentMixin, PersistentBotMixin, BotMixin, ReviewContextMixin, MentorJobsMixin, ChangeReviewMixin, ValidationMixin, EvidenceMixin, AutonomyMixin, ProductMixin, ContinuityMixin, DevelopmentMixin):
+class Service(MembershipMixin, StudioMixin, DesignAssessmentMixin, BotWakeMixin, BotContinuityMixin, BotLearningMixin, ConnectionMixin, CrewOnboardingMixin, CrewCoordinationMixin, BotDevelopmentMixin, PersistentBotMixin, BotMixin, ReviewContextMixin, MentorJobsMixin, ChangeReviewMixin, ValidationMixin, EvidenceMixin, AutonomyMixin, ProductMixin, ContinuityMixin, DevelopmentMixin):
     READS = {"state", "design", "diff", "history", "impact", "open", "reviews", "why",
              "outcomes", "operations", "restore_artifact", "read_artifact_chunk", "verify", "work", "context", "events", "export", "identity", "review_context", "development_state", "mentor_context", "check_execution"}
 
@@ -51,7 +54,9 @@ class Service(BotWakeMixin, BotContinuityMixin, BotLearningMixin, ConnectionMixi
         self.clock = clock or (lambda: time.time_ns() // 1000000)
 
     READS |= {'get_validation_plan', 'get_evidence_view', 'query_evidence', 'read_artifact_batch', 'list_artifact_files'}
-    READS |= {'get_development_state', 'list_development_states'}
+    READS.add('workspace_members')
+    READS |= {'studio_overview', 'studio_work', 'studio_inbox'}
+    READS |= {'get_development_state', 'list_development_states', 'get_design_assessment'}
     READS |= {'related_review_context','check_mentor_job'}
     READS |= {'get_review_team', 'review_automation_status'}
     READS |= {'get_persistent_bot', 'list_organization_bots', 'list_persistent_memories', 'bot_inbox'}

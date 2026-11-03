@@ -86,6 +86,9 @@ def _input(context, workspace):
             'Return waiting with assignments when delegating. On the next attempt read the returned child reports. '
             'Return concrete edits only within write_scope; a customer tool bridge may also edit that workspace. '
             'Report missing capabilities, failed checks and unresolved compatibility in unverified. '
+            'Read design_assessment before choosing the next edit, test or handoff: it compares the assignment baseline with the current checkpoint. '
+            'Use its open_checks, requirement transitions and impact gaps; choose corrections, retests or consultations with recorded reasons. '
+            'A requirement is met only relative to its linked evidence; do not erase unknown dependencies or change acceptance to obtain a pass. '
             'Use exact shared change IDs/versions for integration; do not claim a test or formal adoption from file existence. '
             'Completed describes reported work only, not certified physical correctness. '
             'Do not call Mentor or create a review to perform this assignment.')

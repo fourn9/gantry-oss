@@ -30,6 +30,9 @@ def assess(context, manifest):
                 'invalid_input', 'Component role and assembly required')
         stale = bindings(c.get('inputs'))
         mismatches.extend(stale)
+    from .engineering_dependencies import impact
+    dependency_impact = impact(components, contract.get('dependencies', []), manifest, bindings)
+    affected = set(dependency_impact['affected_components'])
     check_ids = set()
     for check in checks:
         require(isinstance(check, dict) and isinstance(check.get('id'), str) and check['id'] not in check_ids,
@@ -46,12 +49,15 @@ def assess(context, manifest):
         require(isinstance(evidence, dict), 'invalid_input', 'Evidence must bind paths and hashes')
         evidence_stale = bindings(evidence) if evidence else []
         effective = check['status']
-        if stale or evidence_stale or (effective == 'pass' and not evidence): effective = 'unknown'
+        dependency_stale = sorted(set(check['components']) & affected)
+        if stale or evidence_stale or dependency_stale or (effective == 'pass' and not evidence): effective = 'unknown'
         if effective == 'not_applicable' and not check.get('reason'): effective = 'unknown'
         if check['required'] and effective not in {'pass','not_applicable'}: gaps.append(check['id'])
         view.append({**check, 'effective_status': effective, 'stale_inputs': stale,
-                     'stale_evidence': evidence_stale, 'provenance': 'submitted declaration; not independently certified'})
+                     'stale_evidence': evidence_stale, 'dependency_stale': dependency_stale,
+                     'provenance': 'submitted declaration; not independently certified'})
     return {'configured': True, 'components': components, 'checks': view,
             'input_mismatches': sorted(set(mismatches)),
-            'review_gaps': sorted(set(gaps + ['input:'+x for x in mismatches])),
+            'dependency_impact': dependency_impact,
+            'review_gaps': sorted(set(gaps + ['input:'+x for x in mismatches] + ['dependency:'+x for x in affected])),
             'limitations': ['Hash equality does not prove physical compatibility or semantic agreement between CAD and settings.']}

@@ -29,12 +29,19 @@ def private_dir(path):
     return path
 
 
+def sync_dir(path):
+    fd=os.open(path,os.O_RDONLY|os.O_DIRECTORY|os.O_NOFOLLOW)
+    try:os.fsync(fd)
+    finally:os.close(fd)
+
+
 def save(path, value):
     path = Path(path); private_dir(path.parent)
     fd, tmp = tempfile.mkstemp(prefix='.pending-', dir=path.parent)
     try:
         with os.fdopen(fd, 'w') as f: f.write(canonical(value)); f.flush(); os.fsync(f.fileno())
         os.replace(tmp, path)
+        sync_dir(path.parent)
     finally:
         if os.path.exists(tmp): os.unlink(tmp)
 

@@ -1,0 +1,26 @@
+# Set GANTRY_DOMAIN to the dedicated application hostname; do not use the static
+# public demo host. The Caddy process reads this value, not the Gantry process.
+{$GANTRY_DOMAIN} {
+    request_body {
+        max_size 90MiB
+    }
+    header {
+        Strict-Transport-Security "max-age=31536000"
+        X-Content-Type-Options nosniff
+        Referrer-Policy no-referrer
+        -Server
+    }
+    @application path /w/*
+    handle @application {
+        reverse_proxy 127.0.0.1:8770 {
+            transport http {
+                dial_timeout 5s
+                response_header_timeout 60s
+            }
+        }
+    }
+    # Health is available only on loopback for the host's monitoring agent.
+    handle {
+        respond "Not found" 404
+    }
+}

@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "gantry-ledger"
-version = "3.3.0"
+version = "3.4.0"
 description = "Versioned robot design and decision ledger"
 requires-python = ">=3.11"
 dependencies = []
@@ -19,11 +19,16 @@ Issues = "https://github.com/fourn9/gantry-oss/issues"
 [project.optional-dependencies]
 cad = ["cadquery>=2.8,<2.9"]
 feedback = ["PyNaCl>=1.6.2,<2"]
+native-windows = ["pywin32==312; sys_platform == 'win32'", "comtypes==1.4.17; sys_platform == 'win32'"]
 
 [project.scripts]
 gantry = "gantry.cli:main"
+gantry-cloud = "gantry.cloud:main"
 gantry-ledger = "gantry.cli:review_main"
 gantry-crew = "gantry.cli:bots_main"
+gantry-integrations = "gantry.integrations.__main__:main"
+gantry-native = "gantry.native.__main__:main"
+gantry-engineering = "gantry.engineering_cli:main"
 # Compatibility aliases for the names used before product branding was fixed.
 gantry-review = "gantry.cli:review_main"
 gantry-bots = "gantry.cli:bots_main"

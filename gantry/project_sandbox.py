@@ -21,7 +21,8 @@ def backend():
 
 def runtime_roots():
     # Runtime dependencies are trusted read-only inputs, explicitly listed in approval.
-    roots = {str(Path(sys.base_prefix).resolve()), str(Path(sysconfig.get_path('stdlib')).resolve())}
+    roots = {str(Path(sys.base_prefix).resolve()), str(Path(sys.prefix).resolve()),
+             str(Path(sysconfig.get_path('stdlib')).resolve())}
     return sorted(p for p in roots if p not in {'/', str(Path.home()), '/Users', '/home', '/usr', '/usr/local'})
 
 

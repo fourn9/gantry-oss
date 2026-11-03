@@ -1,0 +1,22 @@
+{
+  "paths": ["cad/", "control/", "checks/"],
+  "name": "Bench assembly",
+  "description": "Existing saved mechanical and control development",
+  "title": "Adjust carriage clearance",
+  "purpose": "Share geometry and coordinate the matching controller change",
+  "hierarchy": [
+    {"id": "assembly", "title": "Bench assembly", "kind": "assembly", "paths": ["cad/", "control/", "checks/"], "editable": true},
+    {"id": "carriage", "parent": "assembly", "title": "Carriage and controller", "kind": "subsystem", "paths": ["cad/carriage.step", "control/motion.py"], "editable": true}
+  ],
+  "context": {
+    "requirements": ["At least 1 mm static separation"],
+    "constraints": ["Saved-file work only; no physical operations"],
+    "decisions": [],
+    "open_questions": ["Static clearance, dynamics and strength are unverified", "Declare component input hashes and applicable checks"],
+    "environment": {"unit": "mm", "frame": "assembly", "setup": "Supply installed tool versions and startup instructions"}
+  },
+  "write_scope": ["cad/carriage.step", "cad/carriage.stl", "control/", "checks/"],
+  "dependencies": ["cad/base.step"],
+  "actors": [],
+  "missing": ["Earlier editing history", "Native feature-operation capture"]
+}
