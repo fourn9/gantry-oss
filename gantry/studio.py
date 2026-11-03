@@ -7,6 +7,7 @@ from .contracts import register, S, I
 from .development import in_scope
 from .model import Fault, require, uid, digest
 from .studio_discussion import StudioDiscussionMixin
+from .studio_workspace import StudioWorkspaceMixin
 
 LIMIT = {'type':'integer','minimum':1,'maximum':100}
 register('studio_overview', {'after':S, 'limit':LIMIT})
@@ -17,7 +18,7 @@ register('studio_share_update', {'work_id':S,'version':I,'state_id':S,'note':{'t
     ['work_id','version','state_id','note'])
 
 
-class StudioMixin(StudioDiscussionMixin):
+class StudioMixin(StudioDiscussionMixin, StudioWorkspaceMixin):
     def _studio_work(self, s, actor, wid):
         change = self._dev_get(s, 'dev_changes', wid)
         session = self._dev_session(s, actor, change['session_id'])
@@ -64,7 +65,9 @@ class StudioMixin(StudioDiscussionMixin):
         works.sort(key=lambda w:w['id'])
         after=a.get('after',''); eligible=[w for w in works if w['id']>after]; limit=a.get('limit',100)
         return {'projects':projects,'works':eligible[:limit], 'next':eligible[limit-1]['id'] if len(eligible)>limit else None,
-            'total':len(works),'seq':s['seq']}
+            'total':len(works),'seq':s['seq'],
+            'can_import':actor['kind']=='human' and ('admin' in actor['permissions'] or {'work','record'} <= set(actor['permissions'])) and
+                ('allowed_commands' not in actor or 'studio_import_project' in actor['allowed_commands'])}
 
     def cmd_studio_work(self, s, actor, a, fx, n, con):
         c,d=self._studio_work(s,actor,a['work_id']); sid=a.get('state_id',c['head'])
@@ -94,7 +97,7 @@ class StudioMixin(StudioDiscussionMixin):
         task=next((t for t in s.get('bot_tasks',{}).values() if t.get('change_id')==c['id']),None)
         source=self._dev_artifact(s,state['snapshot'])['data'].get('source') or {}
         permitted=lambda command: 'allowed_commands' not in actor or command in actor['allowed_commands']
-        return {'work':{**self._studio_summary(s,c,project,task),'write_scope':c['write_scope']},
+        return {'work':{**self._studio_summary(s,c,project,task),'write_scope':c['write_scope'],'dependencies':c['dependencies']},
             'source':{k:source[k] for k in ('repository','commit') if isinstance(source.get(k),str)},
             'activity':[{'id':x['id'],'status':x['status']} for x in s.get('dev_executions',{}).values()
                 if x.get('input_state')==sid and x['status'] in ('running','waiting')],

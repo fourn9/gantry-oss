@@ -39,7 +39,7 @@ export function createStudio({api,modal,toast,fail}){
       const inbox=await api('studio_inbox');if(current!==viewEpoch)return;activity.set('studio_inbox',{},inbox);$('#breadcrumb').textContent='Inbox';$('#main').innerHTML=view.inbox(inbox.items)+(inbox.next?a('more-inbox','Load more',inbox.next,'class="studio-more"'):'');return;
     }
     if(kind==='studio-recent'){$('#breadcrumb').textContent='Recent';$('#main').innerHTML='<div class="studio-page-title"><h1>Recent</h1><span class="studio-small">Work opened in this tab</span></div>'+view.workList(recent,'No recently opened work.');return;}
-    if(!project){$('#breadcrumb').textContent='Projects';$('#main').innerHTML=view.hint('Start a shared project','Create a project, import saved files, then start work.')+'<div class="studio-empty"><button data-action="new-project">Create project</button></div>';return;}
+    if(!project){$('#breadcrumb').textContent='Projects';$('#main').innerHTML=view.hint('Start a shared project','Create a project, import saved files, then start work.')+(overview.can_import?'<div class="studio-empty">'+a('import-project','Import project')+'</div>':'');return;}
     const projectTab=parts[3]==='work'?'work':'structure';$('#breadcrumb').innerHTML=view.projectHeader(project,node,projectTab);
     $('#main').innerHTML=(projectTab==='structure'?view.structure(project,node,overview.works):
       '<div class="studio-list-tools">'+a('new-work','New work')+'</div>'+view.workList(relatedWorks(overview.works,project.id,node?.id,project.hierarchy)))+
@@ -131,6 +131,26 @@ export function createStudio({api,modal,toast,fail}){
     },'Import checkpoint');
     document.querySelector('#dialog [name=files]').onchange=event=>{const paths=Object.keys(captured.selected.manifest);$('#studio-import-paths').innerHTML=[...event.target.files].map((f,i)=>{const matching=paths.filter(p=>p.split('/').pop()===f.name);return `<label>Target path for ${e(f.name)}<input name="path${i}" required value="${e(matching.length===1?matching[0]:f.webkitRelativePath||f.name)}"></label>`;}).join('');};
   }
+  function importProject(){
+    modal('Import an existing project',`<p>Choose saved files in a project folder. Files are uploaded only when you press Import project.</p><label>Project name<input name="projectName" required maxlength="120"></label><label>Purpose of the first work<input name="purpose" required maxlength="240"></label><label>Project folder<input type="file" name="folder" webkitdirectory multiple required></label><div id="studio-project-files" class="studio-small"></div><label>Requirements (one per line)<textarea name="requirements"></textarea></label><label>Mapping manifest (optional JSON)<input type="file" name="mapping" accept=".json,application/json"></label><p>A manifest supplies component hierarchy, constraints, dependencies and environment. Without one, the selected files belong to a single component; cross-tool relationships remain undeclared.</p>`,async form=>{
+      const excluded=/(^|\/)(\.[^/]+|node_modules|__pycache__|venv|env)(\/|$)|\.(token|pem|key|p12|pfx|db|sqlite3?)$/i;
+      const chosen=[...form.folder.files].map(f=>({f,path:f.webkitRelativePath.split('/').slice(1).join('/')})).filter(x=>x.path&&!excluded.test(x.path));
+      let mapping={};if(form.mapping.files[0]){if(form.mapping.files[0].size>256*1024)throw new Error('Mapping exceeds 256 KiB.');mapping=JSON.parse(await form.mapping.files[0].text());}
+      const scope=mapping.paths;const selected=scope?chosen.filter(x=>scope.some(p=>x.path===p||p.endsWith('/')&&x.path.startsWith(p))):chosen;
+      if(!selected.length||selected.length>1000||selected.reduce((n,x)=>n+x.f.size,0)>32*1024*1024)throw new Error('Choose 1–1000 files, at most 16 MiB per file and 32 MiB total. Use the local adapter for scoped imports.');
+      const files={};for(const {f,path} of selected){if(f.size>16*1024*1024)throw new Error('File exceeds 16 MiB.');const raw=new Uint8Array(await f.arrayBuffer());let text='';for(let i=0;i<raw.length;i+=32768)text+=String.fromCharCode(...raw.subarray(i,i+32768));files[path]=btoa(text);}
+      const paths=Object.keys(files),{paths:ignored,...config}=mapping;
+      const value=await api('studio_import_project',{name:form.projectName.value,description:'Imported saved project',
+        title:form.purpose.value,purpose:form.purpose.value,files,
+        hierarchy:[{id:'assembly',title:form.projectName.value,kind:'assembly',paths,editable:true}],
+        context:{requirements:form.requirements.value.split('\n').map(x=>x.trim()).filter(Boolean),constraints:[],decisions:[],open_questions:['Engineering correspondence not declared'],environment:{}},
+        write_scope:paths,dependencies:[],actors:[],missing:['Hidden/private files excluded by browser folder import'],...config,files});
+      toast('Project imported · Unverified');location.hash=view.workURL(value.change.id);
+    },'Import project');
+    document.querySelector('#dialog [name=folder]').onchange=event=>{
+      const files=[...event.target.files];$('#studio-project-files').textContent=`${files.length} files selected. Hidden/private paths are excluded; the server also checks paths and credential patterns.`;
+    };
+  }
   const handlers={
     tab:async value=>{remember();selectConversation(null);threadDetail=null;tab=value;file='';drawWork();},
     compare:()=>{compare=!compare;drawWork();},
@@ -142,15 +162,15 @@ export function createStudio({api,modal,toast,fail}){
     'close-conversation':closeConversation,
     'back-to-artifact':closeConversation,
     unmention:value=>{mentions=mentions.filter(x=>x!==value);drawConversation();},
-    import:importFiles,share,
+    import:importFiles,share,'import-project':importProject,
     'load-updates':loadUpdates,
     latest:()=>{selectConversation(null);file='';const url='#'+view.workURL(detail.work.id);if(location.hash===url)return render();location.hash=url;},
     discussions:()=>modal('Conversations',view.discussionList(detail),null),
     'open-thread':id=>{const t=detail.discussion_index.find(t=>t.id===id);if(!t)return;$('#dialog').close();const url='#'+view.workURL(detail.work.id,t.state_id,t.id);if(location.hash===url)return render();location.hash=url;},
     changes:()=>modal('Changed files',`<p>Compared with the previous checkpoint.</p><div class="studio-share-files">${detail.selected.diffs.map(d=>`<div><span>${e(d.path)}</span><span>${e(d.kind)}</span></div>`).join('')||'<p>No file changes in this checkpoint.</p>'}</div>`,null),
     'download-file':async path=>download(path.split('/').pop(),await bytes(downloadState,path,32*1024*1024),'application/octet-stream'),
-    'import-help':()=>modal('Connect your tools',`<p>Native editing stays in your CAD tool or editor. Save a checkpoint through the Gantry local adapter, or import selected files here.</p><pre>gantry checkpoint-workspace --help</pre><p>Use this work’s change ID: <code>${e(detail?.work.id||'Select work first')}</code>. Save editable CAD sources plus STL/OBJ previews. Git and tool connections are managed under Connections.</p>`,null),
-    details:()=>modal('Saved version',`<dl class="context-list"><dt>State</dt><dd>${e(detail.selected.state.id)}</dd><dt>Checkpoint note</dt><dd>${e(detail.selected.state.summary)}</dd><dt>Shared update notes</dt><dd>${e((detail.versions.find(v=>v.id===detail.selected.state.id)?.notes||[]).join(' · ')||'No note')}</dd><dt>Snapshot</dt><dd>${e(detail.selected.state.snapshot)}</dd><dt>Work</dt><dd>${e(detail.selected.status.work)}</dd><dt>Sharing</dt><dd>${e(detail.selected.status.sharing)}</dd><dt>Verification</dt><dd>${e(detail.selected.status.verification)}</dd><dt>Adoption</dt><dd>${e(detail.selected.status.adoption)}</dd><dt>Not captured</dt><dd>${e(detail.capture.missing.join(', ')||'No omissions declared')}</dd></dl><p>Restore this saved version into a new directory:</p><pre>gantry restore-development-state ${e(detail.selected.state.id)} --destination ./continued-work --key resume-unique-key</pre>${view.link('session/'+detail.work.session_id,'Open execution and review tools')}`,null),
+    'import-help':()=>modal('Connect / continue',view.connectionInstructions(detail,location.origin+location.pathname.replace(/\/$/,'')),null),
+    details:()=>modal('Saved version',`<dl class="context-list"><dt>State</dt><dd>${e(detail.selected.state.id)}</dd><dt>Checkpoint note</dt><dd>${e(detail.selected.state.summary)}</dd><dt>Shared update notes</dt><dd>${e((detail.versions.find(v=>v.id===detail.selected.state.id)?.notes||[]).join(' · ')||'No note')}</dd><dt>Snapshot</dt><dd>${e(detail.selected.state.snapshot)}</dd><dt>Work</dt><dd>${e(detail.selected.status.work)}</dd><dt>Sharing</dt><dd>${e(detail.selected.status.sharing)}</dd><dt>Verification</dt><dd>${e(detail.selected.status.verification)}</dd><dt>Adoption</dt><dd>${e(detail.selected.status.adoption)}</dd><dt>Not captured</dt><dd>${e(detail.capture.missing.join(', ')||'No omissions declared')}</dd></dl><p>Restore this saved version into a new directory:</p><pre>gantry restore-development-state ${e(detail.selected.state.id)} --destination ./continued-work --key resume-unique-key</pre>${view.workspaceContext(detail.selected)}${view.link('session/'+detail.work.session_id,'Open execution and review tools')}`,null),
     component:value=>{const n=project.hierarchy.find(n=>n.id===value);const works=relatedWorks(overview.works,project.id,value,project.hierarchy);$('#studio-component-detail').innerHTML=`<div class="studio-row"><strong>${e(n.title)}</strong>${view.link(view.projectURL(project.id,value,'work'),'View work →')}</div><div class="studio-small">${e(n.paths.join(' · ')||'No saved files mapped')}</div>${view.workList(works)}`;},
     'more-work':async cursor=>{const epoch=viewEpoch;const next=await api('studio_overview',{after:cursor});if(epoch!==viewEpoch)return;overview.works.push(...next.works);overview.next=next.next;const list=$('.studio-worklist');if(list)list.outerHTML=view.workList(relatedWorks(overview.works,project.id,node?.id,project.hierarchy));document.querySelector('[data-studio=more-work]')?.remove();if(next.next)$('#main').insertAdjacentHTML('beforeend',a('more-work','Load more work',next.next,'class="studio-more"'));},
     'more-inbox':async cursor=>{const epoch=viewEpoch;const next=await api('studio_inbox',{after:cursor});if(epoch!==viewEpoch)return;const wrapper=document.createElement('div');wrapper.innerHTML=view.inbox(next.items);$('.studio-worklist').insertAdjacentHTML('beforeend',wrapper.querySelector('.studio-worklist').innerHTML);document.querySelector('[data-studio=more-inbox]')?.remove();if(next.next)$('#main').insertAdjacentHTML('beforeend',a('more-inbox','Load more',next.next,'class="studio-more"'));},

@@ -8,6 +8,10 @@ The existing execution, integration, review and adoption screens remain under
 
 ## Daily workflow
 
+For first use, **Import project** accepts a saved folder and optional component/
+context manifest. The [connected workspace guide](CONNECTED_WORKSPACE.md) covers
+scoped import, opt-in saved-file watching and continuation by another participant.
+
 1. Open a project in the sidebar. **Structure** shows its saved component hierarchy,
    labelled with the source state; selecting a component shows associated work.
    **Work** lists change sets, owners (human or agent), component scope and recorded status.
@@ -18,7 +22,9 @@ The existing execution, integration, review and adoption screens remain under
 3. Edit in the external CAD/editor and save. **Import changes** accepts selected
    saved files, lets you map destination paths, and creates an unshared checkpoint.
    Unselected files are retained. The scope and expected work version are checked.
-   To capture a complete workspace, use the existing `checkpoint-workspace` adapter.
+   **Connect / continue** provides commands for local saved-file sync/watch and
+   restoration to a new independently assigned work. The existing
+   `checkpoint-workspace` adapter remains available for larger captures.
 4. **Share update** lists paths and before/after content hashes against the previous
    shared version. Add a short note and share the work in progress. Sharing does
    not complete work, pass a test or formally adopt a design. Historical views are
@@ -49,6 +55,8 @@ adding tools to a profile does not silently widen an issued credential.
 | `studio_overview` | Authorized projects/hierarchy and paged change-set work list; no estimated progress |
 | `studio_work` | Work ID plus optional state ID; exact manifest, versions, check applicability, participants, versioned discussion index and activity token. `activity_only: true` returns only the token after the same authorization checks |
 | `studio_import_update` | Work ID, expected version, path/base64 files, summary; upload screening + immutable overlay + existing checkpoint |
+| `studio_import_project` | Saved files, hierarchy/context and initial work scope; human-authenticated atomic project/session/state/change creation |
+| `studio_sync_update` | Expected work version and state, changed file bytes, explicit deletions, reason and optional updated context; scoped immutable checkpoint |
 | `studio_share_update` | Work ID, expected version, exact current state, note; existing share operation, no adoption |
 | `studio_comment` | Work ID, state ID, exact anchor, optional thread ID, body, recipient IDs |
 | `studio_inbox` | Only the current recipient's accessible mentions, with exact target and cursor |
@@ -71,11 +79,11 @@ no duplicate project or version model is introduced.
 
 | Capability | Implemented | Remaining connection work |
 | --- | --- | --- |
-| CAD | Actual saved STL/OBJ assembly preview, orbit/zoom, top/front/isometric, file-part selection, old-file overlay | Native CAD tessellation, stable subpart/face IDs, local tool synchronization and vendor runtime validation |
+| CAD | Actual saved STL/OBJ assembly preview, orbit/zoom, top/front/isometric, file-part selection, old-file overlay; opt-in local saved-file synchronization | Native CAD tessellation, stable subpart/face IDs, live vendor API/runtime validation |
 | Native CAD source | Source download with exact version; explicit unsupported preview | Export a preview next to editable source, preserving units/coordinate frames; no native editing in browser |
 | Code | Saved UTF-8 content, exact line anchors, inline old/new diff; recorded repository/source commit when available | Git provider/adapter must supply accurate repository/revision metadata and checkpoint files; browser does not pull a repo automatically |
 | Checks | Existing engineering checks and evaluations; stale inputs/evidence and non-applicable prior results stay visible; input-bound running execution is labelled separately | Tool must return exact state/input hashes, evaluator/environment/scope and evidence; no simulated pass is generated |
-| Import | Browser file upload and existing local checkpoint adapter | Live unsaved-change detection, deletion/rename UX, continuous vendor synchronization |
+| Import | Browser project/file upload, scoped delta sync/watch, explicit deletion in local adapter, independent continuation | Live unsaved-change detection, browser deletion/rename UX, native vendor operation capture |
 | Conversation | Version-bound selection, human/agent mentions, personal Inbox, replies | Native-feature remapping, notification delivery/agent reaction policy; no guessed carry-forward of old comments |
 
 Known limits: preview files up to 16 MiB, 40,000 triangles/file, current assemblies
@@ -83,8 +91,10 @@ up to 12 files/80,000 triangles (larger assemblies show a selected file); previo
 selected file may add up to 40,000 triangles. Meshes share their exported coordinate
 system; no assembly transforms or unit conversion are inferred. Preview is not a
 collision checker. Code preview/anchoring is limited to 256 KiB; large diffs use
-separate panes and truncated previews with a restore path. Browser upload accepts
-1–200 files, at most 32 MiB each/48 MiB total. Full adapters can handle larger
+separate panes and truncated previews with a restore path. Existing **Import changes**
+accepts 1–200 files, at most 32 MiB each/48 MiB total. **Import project** and the new
+atomic saved-file connection use 1–1000 files, 16 MiB each/32 MiB total.
+Full chunked adapters can handle larger
 artifact workflows. Work/Inbox lists paginate; state history and conversations
 are not yet paginated and need further scaling for very long-lived projects.
 

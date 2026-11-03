@@ -43,6 +43,24 @@ def main(service=None):
     project.add_argument('--request-id', help='Stable ID for safe retries')
     project_mcp = sub.add_parser('project-mcp', help='Serve only the scoped local project tools over stdio')
     project_mcp.add_argument('--root', required=True)
+    workspace = sub.add_parser('workspace', help='Connect saved CAD/code files to shared Studio work')
+    workspace.add_argument('action', choices=['import','attach','status','sync','watch','share','continue'])
+    workspace.add_argument('--root', default='.')
+    workspace.add_argument('--manifest', help='Project mapping JSON for import')
+    workspace.add_argument('--apply', action='store_true', help='Upload the inspected import scope; default is preview')
+    workspace.add_argument('--work-id')
+    workspace.add_argument('--write-path', action='append', help='Scope for the new continuation work')
+    workspace.add_argument('--dependency', action='append', help='Exact baseline input path for the new work')
+    workspace.add_argument('--state-id', help='Exact shared state to continue')
+    workspace.add_argument('--destination', help='New directory for continuation bundle')
+    workspace.add_argument('--title', default='Continue shared work')
+    workspace.add_argument('--summary', default='Saved external edits')
+    workspace.add_argument('--rationale', default='External tool save; intent not inferred')
+    workspace.add_argument('--unfinished', action='append')
+    workspace.add_argument('--note', default='')
+    workspace.add_argument('--context', help='Updated versioned context JSON for sync; never automatically inferred')
+    workspace.add_argument('--interval', type=float, default=2)
+    workspace.add_argument('--iterations', type=int, default=0, help='Watch ticks; zero runs until stopped')
     init = sub.add_parser("init", help="Local, one-time initialization")
     init.add_argument("--data", default=".gantry")
     init.add_argument("--actor", default="admin")
@@ -346,6 +364,30 @@ def main(service=None):
         else:
             token = Path(args.token_file).read_text().strip() if args.token_file else os.getenv("GANTRY_TOKEN", "")
             client = Client(args.url, token)
+            if args.command == 'workspace':
+                from .workspace import Workspace, import_workspace, continue_workspace, watch_workspace
+                from .model import require
+                if args.action == 'import':
+                    require(args.manifest,'invalid_input','Provide --manifest project.json')
+                    result=import_workspace(client,args.root,json.loads(Path(args.manifest).read_text()),args.apply)
+                elif args.action == 'continue':
+                    require(args.work_id and args.state_id and args.destination,'invalid_input','Provide --work-id, --state-id and --destination')
+                    result=continue_workspace(client,args.work_id,args.state_id,args.destination,args.title,args.write_path,args.dependency)
+                else:
+                    workspace=Workspace(client,args.root)
+                    if args.action == 'attach':
+                        require(args.work_id,'invalid_input','Provide --work-id')
+                        result=workspace.bind(args.work_id)
+                    elif args.action == 'status': result=workspace.status()
+                    elif args.action == 'sync': result=workspace.sync(args.summary,args.rationale,args.unfinished,json.loads(Path(args.context).read_text()) if args.context else None)
+                    elif args.action == 'share': result=workspace.share(args.note)
+                    else:
+                        try:
+                            for event in watch_workspace(workspace,args.interval,args.iterations):
+                                print(json.dumps(event,ensure_ascii=False),flush=True)
+                        except KeyboardInterrupt: pass
+                        return
+                print(json.dumps(result,ensure_ascii=False,indent=2)); return
             if args.command == "mcp":
                 from .mcp import run
                 run(client,args.profile,args.require_agent); return

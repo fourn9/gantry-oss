@@ -33,3 +33,7 @@ test('conversation index labels historical discussions instead of implying curre
  const html=view.discussionList({selected:{state:{id:'new'}},versions:[{id:'old',number:1,sharing:'shared'}],discussion_index:[{id:'t',state_id:'old',anchor:{kind:'cad',path:'part.stl'},message_count:2}]});
  assert.ok(html.includes('Previous version'));assert.ok(html.includes('v1'));assert.ok(html.includes('2 comments'));
 });
+test('handoff context shows requirements and gaps without claiming physical validation',()=>{
+ const html=view.workspaceContext({state:{context:{requirements:['Travel <10 mm'],constraints:['No power'],open_questions:['Clearance'],environment:{python:'3.12'}},unfinished:['Retest motion']},requirement_coverage:{configured:true,items:[{requirement_id:'req-motion',status:'unverified'}]}});
+ assert.ok(html.includes('Travel &lt;10 mm'));assert.ok(html.includes('Clearance'));assert.ok(html.includes('Retest motion'));assert.ok(html.includes('unverified'));
+});

@@ -1,5 +1,10 @@
 # Organization and personal Bot foundations
 
+## Current extension: connected workspace
+
+Implement the approved import/capture/share/continue priority in
+[connected-workspace.md](connected-workspace.md). Preserve earlier work below.
+
 ## Current extension: shared product UI
 
 The approved artifact-first Studio implementation is tracked in [studio-ui.md](studio-ui.md).

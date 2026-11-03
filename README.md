@@ -59,6 +59,12 @@ The authenticated web UI opens Studio: product structure and team work, saved CA
 versions, checks, intermediate sharing and conversations attached to exact parts or
 lines. Native editing remains in your tools. See [Studio setup and supported connections](docs/STUDIO_UI.md).
 
+Use [connected workspaces](docs/CONNECTED_WORKSPACE.md) to import an existing
+assembly/code folder, capture saved edits, share unfinished versions and let another
+authorized participant restore the exact files and context. The local watcher is
+opt-in; it never shares or adopts automatically. Real HTTP/CadQuery acceptance and
+remaining connection limits are [documented separately](docs/CONNECTED_WORKSPACE_VERIFICATION.md).
+
 ## Continue through review
 
 Read the saved goal and state → edit within scope → checkpoint unfinished work → submit a meaningful milestone → review grounded Mentor findings → correct/test → checkpoint and respond. Agents do not need another owner decision for these delegated steps. Independent candidates can start from the same state in separate workspaces. Sharing and a successful test do not formally adopt a design.

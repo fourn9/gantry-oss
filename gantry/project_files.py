@@ -58,7 +58,14 @@ def write_file(root, name, raw, expected_hash):
 
 def inventory(root, scopes=None):
     root = Path(root); payload = {}; missing = []; total = 0
-    for directory, folders, files in os.walk(root, followlinks=False):
+    def unreadable(exc):
+        # os.walk otherwise silently skips a directory, which would look like
+        # file deletions to an incremental checkpoint consumer.
+        path = Path(exc.filename) if exc.filename else root
+        try: rel = path.relative_to(root).as_posix()
+        except ValueError: rel = '.'
+        missing.append({'path': rel, 'reason': 'unsafe_or_unreadable'})
+    for directory, folders, files in os.walk(root, followlinks=False, onerror=unreadable):
         folders.sort(); files.sort()
         for name in list(folders):
             path = Path(directory)/name; rel = path.relative_to(root).as_posix()
