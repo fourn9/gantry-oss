@@ -17,6 +17,15 @@ and concurrent guided-onboarding changes. No public release is implied.
 - Existing local ledger backed up before restart; hash verification and replay
   succeed. Schema additions are additive and preserve existing data.
 
+## Publication integration check
+
+The publication branch subsequently incorporated `origin/main` at `1ebaa88`,
+preserving the published onboarding and documentation changes. Its runtime and
+test files match the verified local implementation. The full suite passed again:
+1,310 Python tests in 142.897 seconds (8 skips), and 39 Node tests. A fresh offline
+wheel build/import check also passed. The eight new API schemas and guide links
+are included; no private fixtures or credentials are part of the source update.
+
 ## Actual execution paths
 
 | Scenario | Observed result |
