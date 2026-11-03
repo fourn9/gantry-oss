@@ -20,7 +20,23 @@ class Server(ThreadingHTTPServer):
         self.service = service
         self.failures = defaultdict(deque)
         self.failure_lock = threading.Lock()
+        self.connections = threading.BoundedSemaphore(16)
         super().__init__(address, Handler)
+
+    def process_request(self, request, client_address):
+        # Bound concurrent request bodies/threads even behind a misconfigured edge.
+        if not self.connections.acquire(blocking=False):
+            try:
+                request.sendall(b'HTTP/1.1 503 Service Unavailable\r\nContent-Length: 0\r\nRetry-After: 1\r\nConnection: close\r\n\r\n')
+            finally: self.shutdown_request(request)
+            return
+        try: super().process_request(request, client_address)
+        except BaseException:
+            self.connections.release(); raise
+
+    def process_request_thread(self, request, client_address):
+        try: super().process_request_thread(request, client_address)
+        finally: self.connections.release()
 
     def get_request(self):
         sock, address = super().get_request()

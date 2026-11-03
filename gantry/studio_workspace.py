@@ -9,26 +9,40 @@ from .model import require, uid
 FILES = {'type':'object','maxProperties':1000,'additionalProperties':{'type':'string'}}
 register('studio_import_project', {'name':S,'description':S,'files':FILES,
     'hierarchy':{'type':'array','minItems':1,'maxItems':1000,'items':NODE},'context':CONTEXT,
-    'title':S,'purpose':S,'write_scope':A,'dependencies':A,'actors':A,'missing':A,'zone':S},
+    'snapshot':S,'title':S,'purpose':S,'write_scope':A,'dependencies':A,'actors':A,'missing':A,'zone':S},
     ['name','description','files','hierarchy','context','title','purpose','write_scope','dependencies','actors','missing'])
 register('studio_sync_update', {'work_id':S,'version':I,'expected_state':S,'files':FILES,'deleted':A,
-    'summary':S,'rationale':S,'unfinished':A,'missing':A,'context':CONTEXT},
+    'summary':S,'rationale':S,'unfinished':A,'missing':A,'context':CONTEXT,'snapshot':S},
     ['work_id','version','expected_state','files','deleted','summary','rationale','unfinished','missing'])
 
 
 class StudioWorkspaceMixin:
+    def _studio_saved_snapshot(self,s,actor,revision,zone):
+        artifact=self._dev_artifact(s,revision)
+        self.zone_write(actor,artifact['zone'])
+        require(artifact['zone']==zone,'scope_denied','Snapshot belongs to another zone')
+        for path in self._manifest(s,revision): safe_path(path)
+        return artifact
+
     def cmd_studio_import_project(self, s, actor, a, fx, n, con):
         self._dev_human(actor); self.allowed(actor,'record')
-        decode_files(a['files'], list(a['files']))
+        if a.get('snapshot'):
+            require(not a['files'],'invalid_input','Choose files or a stored snapshot')
+            artifact=self._studio_saved_snapshot(s,actor,a['snapshot'],a.get('zone','root'))
+        else:
+            decode_files(a['files'], list(a['files']))
         for node in a['hierarchy']:
             for path in node['paths']: safe_path(path, True)
         for path in a['write_scope']: safe_path(path, True)
         project=self.cmd_save_project(s,actor,{'name':a['name'],'description':a['description'],
             'zone':a.get('zone','root')},fx,n,con)
         missing=sorted(set(a['missing']+['unsaved edits','earlier tool operations','environment not verified']))
-        artifact=self.cmd_capture_artifact(s,actor,{'files':a['files'],'zone':project['zone'],
-            'source':{'adapter':'saved-workspace','project_id':project['id']},
-            'capture_scope':'explicit saved workspace scope','missing_dependencies':missing},fx,n,con)
+        if not a.get('snapshot'):
+            artifact=self.cmd_capture_artifact(s,actor,{'files':a['files'],'zone':project['zone'],
+                'source':{'adapter':'saved-workspace','project_id':project['id']},
+                'capture_scope':'explicit saved workspace scope','missing_dependencies':missing},fx,n,con)
+        else:
+            missing=sorted(set(missing+artifact['data'].get('missing_dependencies',[])))
         d=self.cmd_connect_development(s,actor,{'title':a['title'],'zone':project['zone'],
             'snapshot':artifact['revision_id'],'requirements':a['context']['requirements'],
             'constraints':a['context']['constraints'],'capture':{'scope':'saved workspace','missing':missing},
@@ -47,6 +61,15 @@ class StudioWorkspaceMixin:
         c=self._change(s,actor,{'change_id':a['work_id'],'version':a['version']}); self.allowed(actor,'record')
         require(c['head']==a['expected_state'],'stale_basis','Work advanced; inspect before synchronization')
         previous=self._continuity_state(s,actor,c['head'])
+        if a.get('snapshot'):
+            require(not a['files'] and not a['deleted'],'invalid_input','Full snapshot cannot include file deltas')
+            artifact=self._studio_saved_snapshot(s,actor,a['snapshot'],s['dev_sessions'][c['session_id']]['zone'])
+            missing=sorted(set(previous['capture']['missing']+a['missing']+artifact['data'].get('missing_dependencies',[])))
+            return self.cmd_checkpoint_change(s,actor,{'change_id':c['id'],'version':c['version'],
+                'snapshot':artifact['revision_id'],'summary':a['summary'],'rationale':a['rationale'],
+                'unfinished':a['unfinished'],'work_status':'working',
+                **({'context':a['context']} if 'context' in a else {}),
+                'capture':{'scope':'saved files; no unsaved edits or native tool operations','missing':missing}},fx,n,con)
         require(not set(a['deleted']) & set(a['files']),'invalid_input','Cannot update and delete the same path')
         paths=set(a['deleted']) | set(a['files'])
         require(paths or ('context' in a and a['context'] != previous['context']), 'invalid_input','No update')

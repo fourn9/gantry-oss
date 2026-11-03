@@ -81,6 +81,11 @@ every possible credential format or vendor document payload is detectable.
 
 ## Remaining work
 
+The following is the original local-workflow qualification. Larger CLI captures,
+member request/grant, provisioning and verified backup/restore were subsequently
+implemented; see [current readiness verification](PRODUCT_READINESS_VERIFICATION.md).
+Licensed runtime and live cloud qualification still require external environments.
+
 - Licensed SOLIDWORKS/CATIA/Creo/ECAD environments and their live APIs still need
   installed-product verification. Saved native bytes are supported; browser preview
   and editing capabilities depend on exported formats and external tools.

@@ -204,7 +204,7 @@ def main(service=None):
     from .feedback import add_parser as feedback_parser
     feedback_parser(sub)
     if service:
-        common = {'init', 'serve', 'call', 'mcp', 'agent-config', 'agent-request', 'credential',
+        common = {'workspace', 'serve-cloud', 'init', 'serve', 'call', 'mcp', 'agent-config', 'agent-request', 'credential',
                   'export', 'restore-backup', 'capture-workspace', 'restore-development-state', 'restore-artifact'}
         allowed = common | ({'bot-worker', 'bot-service', 'evaluate-learning', 'learning-evaluation-report'} if service == 'bots' else
             {'connect', 'disconnect', 'project', 'project-mcp', 'mentor-worker', 'recover-mentor-job'})

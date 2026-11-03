@@ -42,9 +42,10 @@ from .bot_continuity import BotContinuityMixin
 from .bot_wake import BotWakeMixin
 from .design_assessment import DesignAssessmentMixin
 from .studio import StudioMixin
+from .membership import MembershipMixin
 
 
-class Service(StudioMixin, DesignAssessmentMixin, BotWakeMixin, BotContinuityMixin, BotLearningMixin, ConnectionMixin, CrewOnboardingMixin, CrewCoordinationMixin, BotDevelopmentMixin, PersistentBotMixin, BotMixin, ReviewContextMixin, MentorJobsMixin, ChangeReviewMixin, ValidationMixin, EvidenceMixin, AutonomyMixin, ProductMixin, ContinuityMixin, DevelopmentMixin):
+class Service(MembershipMixin, StudioMixin, DesignAssessmentMixin, BotWakeMixin, BotContinuityMixin, BotLearningMixin, ConnectionMixin, CrewOnboardingMixin, CrewCoordinationMixin, BotDevelopmentMixin, PersistentBotMixin, BotMixin, ReviewContextMixin, MentorJobsMixin, ChangeReviewMixin, ValidationMixin, EvidenceMixin, AutonomyMixin, ProductMixin, ContinuityMixin, DevelopmentMixin):
     READS = {"state", "design", "diff", "history", "impact", "open", "reviews", "why",
              "outcomes", "operations", "restore_artifact", "read_artifact_chunk", "verify", "work", "context", "events", "export", "identity", "review_context", "development_state", "mentor_context", "check_execution"}
 
@@ -53,6 +54,7 @@ class Service(StudioMixin, DesignAssessmentMixin, BotWakeMixin, BotContinuityMix
         self.clock = clock or (lambda: time.time_ns() // 1000000)
 
     READS |= {'get_validation_plan', 'get_evidence_view', 'query_evidence', 'read_artifact_batch', 'list_artifact_files'}
+    READS.add('workspace_members')
     READS |= {'studio_overview', 'studio_work', 'studio_inbox'}
     READS |= {'get_development_state', 'list_development_states', 'get_design_assessment'}
     READS |= {'related_review_context','check_mentor_job'}

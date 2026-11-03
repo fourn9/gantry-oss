@@ -146,9 +146,10 @@ responsibility of the declared evaluator and qualified review.
 | Stop/restart watcher | Persisted binding/outbox reused; watching must be started explicitly |
 
 The watcher does not auto-merge remote updates. Authorized concurrent writes use
-Core's version checks. The first atomic workflow supports **1–1000 files, 16 MiB
-per file and 32 MiB total**. A large assembly must be scoped or use the existing
-chunked capture/restore APIs; those limits are not universal CAD capability claims.
+Core's version checks. The browser's atomic workflow supports **1–1000 files,
+16 MiB per file and 32 MiB total**. The local CLI automatically uses the chunked
+path described below for larger saved workspaces. Neither limit is a universal
+CAD capability claim.
 The watcher currently scans scoped file contents, so cadence should suit file size.
 
 ## Architecture and migration
@@ -172,3 +173,39 @@ accounts or production multi-organization onboarding. The public static demo has
 no authenticated storage; it remains separate from this runtime.
 
 See [verification and remaining limits](CONNECTED_WORKSPACE_VERIFICATION.md).
+
+
+## Larger saved workspaces and team access
+
+The CLI now automatically uses a streaming path when the atomic limits (1,000
+files, 16 MiB per file, 32 MiB total) are exceeded. The complete scoped workspace
+is bounded to 10,000 files and 1 GiB. Source bytes are inspected, frozen into
+owner-only `.gantry/uploads/` staging and checked again before publication. Existing
+immutable files are referenced, changed files use bounded chunks, and only the
+completed manifest becomes a new work state. Network retries preserve the staged
+bytes and idempotency keys even if the live editor has since saved another version.
+The capture is saved-file content; it does not capture unsaved operations or claim
+a simultaneous filesystem-wide snapshot. Browser uploads retain their smaller limits.
+
+Pending staging is necessary for recovery. After acknowledgement and a durable
+local state update, the client removes the matching private staging directory.
+Deletion checks its path, ownership and filesystem identity. If cleanup fails,
+the confirmed upload stays confirmed, `cleanup_pending` is visible in status and
+the next sync retries cleanup before capturing more data. Import retries also
+finish cleanup without duplicating the project. Staging is ignored by Git and
+excluded from subsequent captures. Do not remove pending bytes manually.
+A separate capture-intent journal is saved before writing staged bytes. Failed
+freezes are removed, and the next sync/import recovers abandoned captures from a
+process interruption before the pending request was saved. Active pending uploads
+are protected. Journal replacements and directory entries are fsynced; recovery
+tests simulate interruption boundaries, not hardware power-cut behavior.
+The server keeps immutable committed artifacts; failed uploads can leave unreferenced
+parts. Storage garbage collection is not part of this release.
+
+For a second person or agent, use the request/grant procedure in
+[CLOUD-OPERATIONS.md](CLOUD-OPERATIONS.md); a recipient's token stays on their own
+device. Grant the relevant session before they run `workspace continue`. A saved
+state can include native CAD, editable code, requirements and environment notes,
+but exact engineering correspondence still needs explicit stable mappings or a
+reviewed Mentor declaration. Filename similarity is never treated as verified
+hardware/software compatibility.

@@ -9,7 +9,7 @@ Gantry has two product areas:
 - **Gantry Ledger** keeps the shared development state and the history of changes, evidence, discussions, verification and human decisions. Reviewing a submitted change is an operation in Ledger.
 - **Gantry Crew** gives customer-owned agents persistent roles, scopes and experience so they can receive work, collaborate and hand off results through Ledger.
 
-**Version: 3.3.0.** Local operation is the supported starting point. Human adoption, agent proposals and execution results remain separate. Gantry does not certify a design's physical safety or operate hardware by default.
+**Version: 3.4.0.** Local operation is the supported starting point. Human adoption, agent proposals and execution results remain separate. Gantry does not certify a design's physical safety or operate hardware by default.
 
 Selected external records can be captured with `gantry-integrations`: bounded SaaS
 readers, local workbook cells, and original-format saved exports feed immutable,
@@ -39,6 +39,21 @@ Opt-in Bot-owned reasoning, peer consultation and hierarchical delegation are
 documented in [Crew organization](docs/CREW_ORGANIZATION.md), with
 [real subscription acceptance evidence](docs/CREW_ORGANIZATION_ACCEPTANCE.md).
 The local review workflow follows.
+
+## Share CAD and code with a team
+
+[Studio workspace setup](docs/CONNECTED_WORKSPACE.md) connects an existing saved
+project to artifact-first CAD, Code and Checks views. The local CLI can capture a
+bounded workspace of up to 10,000 files / 1 GiB using frozen, resumable uploads.
+Share an unfinished version, then let a teammate restore it and continue separately.
+Small browser imports use the existing atomic limits; native editing stays in your tools.
+
+[Cloud operations and membership](docs/CLOUD-OPERATIONS.md) covers a deployable
+single-host API, recipient-generated credentials, owner-reviewed grants/revocation,
+and verified backup/restore. `gantry-cloud` is the operator/onboarding CLI. It does
+not create a cloud account, enable paid inference, or send invitation emails.
+See [executed acceptance and remaining qualifications](docs/PRODUCT_READINESS_VERIFICATION.md).
+The [public demo](https://gantryrobotics.org/demo/) uses invented, browser-only data.
 
 ## Connect a project
 
