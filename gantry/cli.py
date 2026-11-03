@@ -43,6 +43,8 @@ def main(service=None):
     project.add_argument('--request-id', help='Stable ID for safe retries')
     project_mcp = sub.add_parser('project-mcp', help='Serve only the scoped local project tools over stdio')
     project_mcp.add_argument('--root', required=True)
+    from .onboarding_cli import add_parser as add_onboarding_parser
+    add_onboarding_parser(sub)
     workspace = sub.add_parser('workspace', help='Connect saved CAD/code files to shared Studio work')
     workspace.add_argument('action', choices=['import','attach','status','sync','watch','share','continue'])
     workspace.add_argument('--root', default='.')
@@ -364,6 +366,9 @@ def main(service=None):
         else:
             token = Path(args.token_file).read_text().strip() if args.token_file else os.getenv("GANTRY_TOKEN", "")
             client = Client(args.url, token)
+            if args.command == 'onboard':
+                from .onboarding_cli import run as run_onboarding
+                print(json.dumps(run_onboarding(client,args),ensure_ascii=False,indent=2)); return
             if args.command == 'workspace':
                 from .workspace import Workspace, import_workspace, continue_workspace, watch_workspace
                 from .model import require

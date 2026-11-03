@@ -1,5 +1,7 @@
 # v3.1 designation — 2026-10-07
 
+> Historical implementation record. “Current” and completion claims below refer to the recorded work, not the latest release or an active assignment. See the [record index](README.md), [current usage guides](../docs/README.md) and [verification index](../docs/VERIFICATION.md). Open items are retained.
+
 The owner designated the existing Bot-owned organization implementation as v3.1.
 Package/runtime metadata and the README now use 3.1.0. Version propagation to the
 HTTP/MCP modules and a newly built 3.1.0 wheel were checked. The release record

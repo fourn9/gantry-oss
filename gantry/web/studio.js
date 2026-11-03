@@ -6,23 +6,28 @@ import {parseMesh,mountMesh} from './studio_mesh.js';
 import {createActivityMonitor} from './studio_activity.js';
 
 export function createStudio({api,modal,toast,fail}){
+  let onboarding;
   let overview,detail,project,node,viewEpoch=0,artifactEpoch=0,mesh,tab='cad',compare=false,compareState='',file='',selectedPart='',conversation=null,lastWork='',draft='',mentions=[],threadDetail;
   let downloadState=null,recent=[],cache=new Map(),drafts=new Map(),cameras=new Map(),meshKey='';
   const route=()=>location.hash.slice(1).split('/').map(x=>decodeURIComponent(x));
-  const handles=()=>['studio','studio-work','studio-inbox','studio-recent'].includes(route()[0]||'studio');
+  const handles=()=>['studio','studio-work','studio-inbox','studio-recent','studio-start'].includes(route()[0]||'studio');
   const a=view.action;
   const activity=createActivityMonitor({api,notice:text=>{const el=$('#studio-live-notice');if(el){el.hidden=!text;el.querySelector('span').textContent=text;}}});
-  function reset(){activity.clear();viewEpoch++;artifactEpoch++;disposeMesh();cache.clear();drafts.clear();cameras.clear();overview=detail=undefined;recent=[];lastWork='';conversation=null;threadDetail=null;draft='';mentions=[];}
+  function reset(){onboarding?.leave();activity.clear();viewEpoch++;artifactEpoch++;disposeMesh();cache.clear();drafts.clear();cameras.clear();overview=detail=undefined;recent=[];lastWork='';conversation=null;threadDetail=null;draft='';mentions=[];}
   function disposeMesh(){if(mesh){if(mesh.camera)cameras.set(meshKey,mesh.camera());mesh.destroy();mesh=null;while(cameras.size>50)cameras.delete(cameras.keys().next().value);}}
   function chooseFile(path){file=path;selectedPart=path;selectConversation(null);threadDetail=null;drawWork();}
   function remember(){if(conversation)drafts.set(JSON.stringify([detail.work.id,conversation]),{draft,mentions:[...mentions]});}
   function selectConversation(value){remember();conversation=value;const saved=drafts.get(JSON.stringify([detail.work.id,value]));draft=saved?.draft||'';mentions=saved?.mentions||[];}
   function sidebar(){const side=view.sidebar(overview,recent,{project:project?.id});$('#nav').innerHTML=side.nav;$('#sidebar-projects').innerHTML=side.projects;$('#recent-sessions').innerHTML=side.recent;}
   async function render(){
-    remember();activity.clear();const current=++viewEpoch,parts=route(),kind=parts[0]||'studio';artifactEpoch++;disposeMesh();
+    onboarding?.leave();remember();activity.clear();const current=++viewEpoch,parts=route(),kind=parts[0]||'studio';artifactEpoch++;disposeMesh();
     document.body.classList.add('studio-mode');$('#main').className='studio-main';
     $('#main').innerHTML=view.hint('Loading workspace…');
     const loaded=await api('studio_overview');if(current!==viewEpoch||!handles())return;overview=loaded;activity.set('studio_overview',{},loaded);
+    if(kind==='studio-start'){
+      sidebar();if(!onboarding){const {createOnboarding}=await import('./onboarding.js');onboarding=createOnboarding({api,modal,toast,fail});}
+      if(current!==viewEpoch)return;await onboarding.render(parts[1],overview);return;
+    }
     if(kind==='studio-work'){
       const value=await api('studio_work',{work_id:parts[1],...(parts[2]?{state_id:parts[2]}:{})});if(current!==viewEpoch||!handles())return;
       if(lastWork!==value.work.id){conversation=null;threadDetail=null;draft='';mentions=[];tab='cad';compare=false;file='';selectedPart='';lastWork=value.work.id;}
@@ -132,26 +137,7 @@ export function createStudio({api,modal,toast,fail}){
     },'Import checkpoint');
     document.querySelector('#dialog [name=files]').onchange=event=>{const paths=Object.keys(captured.selected.manifest);$('#studio-import-paths').innerHTML=[...event.target.files].map((f,i)=>{const matching=paths.filter(p=>p.split('/').pop()===f.name);return `<label>Target path for ${e(f.name)}<input name="path${i}" required value="${e(matching.length===1?matching[0]:f.webkitRelativePath||f.name)}"></label>`;}).join('');};
   }
-  function importProject(){
-    modal('Import an existing project',`<p>Choose saved files in a project folder. Files are uploaded only when you press Import project.</p><label>Project name<input name="projectName" required maxlength="120"></label><label>Purpose of the first work<input name="purpose" required maxlength="240"></label><label>Project folder<input type="file" name="folder" webkitdirectory multiple required></label><div id="studio-project-files" class="studio-small"></div><label>Requirements (one per line)<textarea name="requirements"></textarea></label><label>Mapping manifest (optional JSON)<input type="file" name="mapping" accept=".json,application/json"></label><p>A manifest supplies component hierarchy, constraints, dependencies and environment. Without one, the selected files belong to a single component; cross-tool relationships remain undeclared.</p>`,async form=>{
-      const excluded=/(^|\/)(\.[^/]+|node_modules|__pycache__|venv|env)(\/|$)|\.(token|pem|key|p12|pfx|db|sqlite3?)$/i;
-      const chosen=[...form.folder.files].map(f=>({f,path:f.webkitRelativePath.split('/').slice(1).join('/')})).filter(x=>x.path&&!excluded.test(x.path));
-      let mapping={};if(form.mapping.files[0]){if(form.mapping.files[0].size>256*1024)throw new Error('Mapping exceeds 256 KiB.');mapping=JSON.parse(await form.mapping.files[0].text());}
-      const scope=mapping.paths;const selected=scope?chosen.filter(x=>scope.some(p=>x.path===p||p.endsWith('/')&&x.path.startsWith(p))):chosen;
-      if(!selected.length||selected.length>1000||selected.reduce((n,x)=>n+x.f.size,0)>32*1024*1024)throw new Error('Choose 1–1000 files, at most 16 MiB per file and 32 MiB total. Use the local adapter for scoped imports.');
-      const files={};for(const {f,path} of selected){if(f.size>16*1024*1024)throw new Error('File exceeds 16 MiB.');const raw=new Uint8Array(await f.arrayBuffer());let text='';for(let i=0;i<raw.length;i+=32768)text+=String.fromCharCode(...raw.subarray(i,i+32768));files[path]=btoa(text);}
-      const paths=Object.keys(files),{paths:ignored,...config}=mapping;
-      const value=await api('studio_import_project',{name:form.projectName.value,description:'Imported saved project',
-        title:form.purpose.value,purpose:form.purpose.value,files,
-        hierarchy:[{id:'assembly',title:form.projectName.value,kind:'assembly',paths,editable:true}],
-        context:{requirements:form.requirements.value.split('\n').map(x=>x.trim()).filter(Boolean),constraints:[],decisions:[],open_questions:['Engineering correspondence not declared'],environment:{}},
-        write_scope:paths,dependencies:[],actors:[],missing:['Hidden/private files excluded by browser folder import'],...config,files});
-      toast('Project imported · Unverified');location.hash=view.workURL(value.change.id);
-    },'Import project');
-    document.querySelector('#dialog [name=folder]').onchange=event=>{
-      const files=[...event.target.files];$('#studio-project-files').textContent=`${files.length} files selected. Hidden/private paths are excluded; the server also checks paths and credential patterns.`;
-    };
-  }
+  function importProject(){location.hash='#studio-start';}
   const botUI=createBotUI({api,modal,toast,getContext:()=>({project,detail:threadDetail||detail,selection:conversation,draft,epoch:viewEpoch}),refresh:loadUpdates});
   const handlers={
     ...botUI.handlers,
@@ -203,5 +189,5 @@ export function createStudio({api,modal,toast,fail}){
       conversation.thread_id=result.thread_id;remember();await drawWork();toast('Comment saved');
     }catch(err){if(sameTarget()&&$('#studio-comment-error'))$('#studio-comment-error').textContent=err.message;else fail(err);}finally{submit.disabled=false;}
   });
-  return {handles,render,reset,checkUpdates:()=>handles()&&!document.hidden?activity.check():undefined,leave:()=>{activity.clear();remember();viewEpoch++;artifactEpoch++;disposeMesh();document.body.classList.remove('studio-mode');$('#main').className='';}};
+  return {handles,render,reset,checkUpdates:()=>handles()&&!document.hidden?activity.check():undefined,leave:()=>{onboarding?.leave();activity.clear();remember();viewEpoch++;artifactEpoch++;disposeMesh();document.body.classList.remove('studio-mode');$('#main').className='';}};
 }
