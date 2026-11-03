@@ -6,6 +6,7 @@ For current usage start at the [documentation index](README.md). For security re
 
 | Area / report | Evidence |
 | --- | --- |
+| Studio Bot requests and handoff — 2026-11-04 | [Report](STUDIO_BOT_WORKFLOW_VERIFICATION.md) |
 | Shared product paths — verification, 2026-11-04 | [Report](PRODUCT_READINESS_VERIFICATION.md) |
 | Guided onboarding verification — 2026-11-04 | [Report](GUIDED_ONBOARDING_VERIFICATION.md) |
 | Studio verification — 2026-11-03 | [Report](STUDIO_VERIFICATION.md) |

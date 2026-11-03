@@ -20,6 +20,7 @@ Start with **Bot development**, then choose the extra behavior you need. These g
 
 | Layer | Guide |
 | --- | --- |
+| Ask, assign and hand off from Studio | [Studio Bot workflow](STUDIO_BOT_WORKFLOW.md) |
 | Independent Crew setup and task execution | [Bot development](BOT_DEVELOPMENT.md) |
 | Managers, specialists and peer consultation | [Crew organization](CREW_ORGANIZATION.md) |
 | Persistent identity, runtime and workspaces | [Persistent Bots](PERSISTENT_BOTS.md) |

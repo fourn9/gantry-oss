@@ -6,7 +6,7 @@ Keep working in your CAD tools, editor and simulator. Use Gantry to share unfini
 
 [Try the demo](https://gantryrobotics.org/demo/) · [Get started](#get-started) · [Tool support](#tool-support) · [Documentation](#documentation)
 
-The demo uses invented, browser-only data. Local operation is the supported starting point. The latest packaged release is [v3.4.0](https://github.com/fourn9/gantry-oss/releases/tag/v3.4.0); `main` also includes guided project onboarding.
+The demo uses invented, browser-only data. Local operation is the supported starting point. The latest packaged release is [v3.4.0](https://github.com/fourn9/gantry-oss/releases/tag/v3.4.0); `main` also includes guided project onboarding and contextual Studio Bot work.
 
 ## How it works
 
@@ -77,6 +77,12 @@ For a visual workspace, follow [Studio setup](docs/STUDIO_UI.md), then choose **
 Guided setup preserves answers and corrections across interruptions. Agent interpretation is optional; it does not execute the project or approve its design.
 
 Studio keeps the product structure and team work together, with **CAD**, **Code** and **Checks** tabs. Conversations stay attached to their target and version. Another authorized participant can restore a shared version into a separate workspace.
+
+Open **Team** to configure persistent Bot roles and customer runtimes. From a work,
+CAD part or code line, **Ask a Bot** queues a read-only question; **Assign work**
+queues a scoped edit. Answers return to the original conversation and Inbox;
+edits return as separate shared candidates. Browsing or mentioning a Bot does not
+start it. [Studio Bot setup and handoff →](docs/STUDIO_BOT_WORKFLOW.md)
 
 [Guided onboarding](docs/GUIDED_ONBOARDING.md) · [Sync, share and continue](docs/CONNECTED_WORKSPACE.md) · [Self-hosting and membership](docs/CLOUD-OPERATIONS.md)
 
