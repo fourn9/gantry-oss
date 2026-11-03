@@ -1,3 +1,4 @@
+import {createBotUI} from './studio_bot_ui.js';
 import {$,esc as e,short,icon,download} from './ui.js';
 import * as view from './studio_views.js';
 import {cadFile,meshFile,codeFile,versionLabel,fileChanges,lineDiff,linesOf,relatedWorks,commentCount} from './studio_model.js';
@@ -151,7 +152,9 @@ export function createStudio({api,modal,toast,fail}){
       const files=[...event.target.files];$('#studio-project-files').textContent=`${files.length} files selected. Hidden/private paths are excluded; the server also checks paths and credential patterns.`;
     };
   }
+  const botUI=createBotUI({api,modal,toast,getContext:()=>({project,detail:threadDetail||detail,selection:conversation,draft,epoch:viewEpoch}),refresh:loadUpdates});
   const handlers={
+    ...botUI.handlers,
     tab:async value=>{remember();selectConversation(null);threadDetail=null;tab=value;file='';drawWork();},
     compare:()=>{compare=!compare;drawWork();},
     orientation:value=>mesh?.view(value),

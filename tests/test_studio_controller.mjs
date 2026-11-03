@@ -10,7 +10,7 @@ const model=uri(await readFile(new URL('../gantry/web/studio_model.js',import.me
 const activity=uri(await readFile(new URL('../gantry/web/studio_activity.js',import.meta.url),'utf8'));
 const mesh=uri(`export const parseMesh=()=>[];export const mountMesh=()=>({destroy(){}});`);
 let code=await readFile(new URL('../gantry/web/studio.js',import.meta.url),'utf8');
-for(const [name,module] of [['ui',ui],['studio_views',views],['studio_model',model],['studio_mesh',mesh],['studio_activity',activity]])code=code.replace(`'./${name}.js'`,JSON.stringify(module));
+for(const [name,module] of [['studio_bot_ui',uri('export const createBotUI=()=>({handlers:{}});')],['ui',ui],['studio_views',views],['studio_model',model],['studio_mesh',mesh],['studio_activity',activity]])code=code.replace(`'./${name}.js'`,JSON.stringify(module));
 const {createStudio}=await import(uri(code+'\n//# sourceURL=studio_controller_test.js'));
 const deferred=()=>{let resolve;const promise=new Promise(r=>resolve=r);return {promise,resolve};};
 function setup(){

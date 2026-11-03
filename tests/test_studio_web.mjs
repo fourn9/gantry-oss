@@ -12,7 +12,8 @@ test('manifest comparison catches deleted files and stable versions',()=>{assert
 const {parseMesh}=await import(moduleFrom(await readFile(new URL('../gantry/web/studio_mesh.js',import.meta.url),'utf8')));
 test('STL and OBJ display actual saved geometry and reject broken coordinates',()=>{const bytes=s=>new TextEncoder().encode(s);assert.equal(parseMesh(bytes('solid fixture\nfacet normal 0 0 1\nouter loop\nvertex 0 0 0\nvertex 1 0 0\nvertex 0 1 0\nendloop\nendfacet\nendsolid'),'part.stl').length,1);assert.equal(parseMesh(bytes('v 0 0 0\nv 1 0 0\nv 0 1 0\nf 1 2 3'),'part.obj').length,1);assert.throws(()=>parseMesh(bytes('v NaN 0 0\nv 1 0 0\nv 0 1 0\nf 1 2 3'),'bad.obj'));});
 const ui=moduleFrom(await readFile(new URL('../gantry/web/ui.js',import.meta.url),'utf8'));
-const viewSource=(await readFile(new URL('../gantry/web/studio_views.js',import.meta.url),'utf8')).replace("'./ui.js'",JSON.stringify(ui)).replace("'./studio_model.js'",JSON.stringify(moduleFrom(await readFile(new URL('../gantry/web/studio_model.js',import.meta.url),'utf8'))));
+const botViews=moduleFrom((await readFile(new URL('../gantry/web/studio_bot_views.js',import.meta.url),'utf8')).replace("'./ui.js'",JSON.stringify(ui)));
+const viewSource=(await readFile(new URL('../gantry/web/studio_views.js',import.meta.url),'utf8')).replace("'./studio_bot_views.js'",JSON.stringify(botViews)).replace("'./ui.js'",JSON.stringify(ui)).replace("'./studio_model.js'",JSON.stringify(moduleFrom(await readFile(new URL('../gantry/web/studio_model.js',import.meta.url),'utf8'))));
 const view=await import(moduleFrom(viewSource));
 test('previous passing evidence never renders as a pass for this version',()=>{
  const html=view.checks({selected:{state:{id:'new'},engineering:{checks:[{id:'clearance',scope:'bracket',effective_status:'unknown',stale_inputs:['part.stl']}]},evaluations:[{scope:'motion',state_id:'old',verdict:'pass',applicable:false}]}});

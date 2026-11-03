@@ -1,3 +1,4 @@
+import {intentKey as key} from './intent_key.js';
 import {$,esc as e,short,badge,button as b,options,toast,download} from './ui.js';
 import * as view from './views.js';
 import * as reviewView from './review_views.js';
@@ -7,19 +8,6 @@ let token='', base='', data, identity, detail, projectDetail, dialogSubmit, revi
 let reviewPage, reviewTeam, reviewDetail, reviewAutomation;
 let inspector='Changes',selectedState='',lastSession='',automationStatus;
 const filter={layout:'board',project:'',status:'',query:''};
-// randomUUID is only exposed in secure contexts by some mobile browsers. The
-// pilot can be opened over a private LAN HTTP address, so keep idempotency
-// keys working there as well.
-const key=()=>{
-  if(globalThis.crypto?.randomUUID)return globalThis.crypto.randomUUID();
-  if(globalThis.crypto?.getRandomValues){
-    const bytes=new Uint8Array(16);globalThis.crypto.getRandomValues(bytes);
-    bytes[6]=(bytes[6]&15)|64;bytes[8]=(bytes[8]&63)|128;
-    const hex=[...bytes].map(value=>value.toString(16).padStart(2,'0')).join('');
-    return `${hex.slice(0,8)}-${hex.slice(8,12)}-${hex.slice(12,16)}-${hex.slice(16,20)}-${hex.slice(20)}`;
-  }
-  return 'fallback-'+Date.now().toString(36)+'-'+Math.random().toString(36).slice(2);
-};
 async function api(command,args={},idempotency=key()){
   const response=await fetch(base+'/v1/commands/'+command,{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+token,'Idempotency-Key':idempotency},body:JSON.stringify(args)});
   const value=await response.json();if(!response.ok||value.error)throw new Error((value.error?.message||'Request failed')+(value.error?.code?' ['+value.error.code+']':''));return value.result;
