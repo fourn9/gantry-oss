@@ -8,7 +8,7 @@ from .model import require
 READ_TOOLS = set('context reviews events project_details session_details product_overview identity get_development_state list_development_states development_state get_change_review list_change_reviews related_review_context get_review_team review_automation_status get_evidence_view query_evidence get_validation_plan state why impact open history outcomes design review_context list_artifact_files read_artifact_chunk read_artifact_batch restore_artifact'.split())
 READ_TOOLS.add('render_evidence_view')
 READ_TOOLS.add('get_design_assessment')
-READ_TOOLS.update({'studio_overview','studio_work','studio_inbox'})
+READ_TOOLS.update({'studio_overview','studio_work','studio_inbox','get_onboarding','list_onboardings'})
 READ_TOOLS.update({'get_persistent_bot', 'list_persistent_memories', 'bot_inbox'})
 DEVELOP_TOOLS = set('record capture_artifact begin_change checkpoint_change share_change integrate_changes submit_change_review respond_to_change_review create_work claim_work submit_work discuss'.split())
 DEVELOP_TOOLS.update({'studio_comment','studio_acknowledge','studio_import_update','studio_share_update','studio_sync_update','record_state_restore'})
@@ -16,6 +16,7 @@ REVIEW_TOOLS = set('claim_change_review submit_specialist_review complete_change
 REVIEW_TOOLS.add('recover_mentor_job')
 READ_TOOLS.update({'get_bot_context', 'list_bot_memories', 'list_team_messages', 'get_team_proposal'})
 TEAM_TOOLS = {'start_bot_runtime', 'heartbeat_bot_runtime', 'stop_bot_runtime', 'propose_review_team', 'send_team_message', 'resolve_team_message', 'record_bot_memory'}
+DEVELOP_TOOLS.add('propose_onboarding')
 DEVELOP_TOOLS.update(TEAM_TOOLS | {'claim_mentor_job', 'check_mentor_job', 'finish_mentor_job', 'fail_mentor_job', 'recover_mentor_job'})
 REVIEW_TOOLS.update(TEAM_TOOLS)
 PROFILES = {'read-only': READ_TOOLS, 'developer': READ_TOOLS | DEVELOP_TOOLS,
