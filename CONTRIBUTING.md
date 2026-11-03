@@ -8,6 +8,35 @@ Maintain these invariants: immutable published states; atomic permission/version
 
 Contributions are submitted under the project's MIT license. Provide only work you have the right to contribute. There is no contributor license assignment requirement.
 
+## Repository map
+
+- `gantry/`: runtime, adapters and Studio UI.
+- `tests/`: automated regression tests.
+- [docs/](docs/README.md): usage guides, contracts and verification records.
+- [examples/](examples/README.md): anonymous demonstrations with explicit prerequisites.
+- [tasks/](tasks/README.md): implementation history and unresolved task-specific items.
+- `deploy/`: operator-managed service/proxy templates.
+
+Keep a single guide authoritative for each workflow; link to it rather than duplicating its instructions. Keep dated test evidence separate from current setup instructions.
+
 ## CI setup
 
 `docs/ci-workflow.yml` is a GitHub Actions template. A repository owner with workflow permissions can copy it to `.github/workflows/ci.yml` to run Python 3.11/3.12 and JavaScript tests on Ubuntu. It is not active merely by being in `docs`.
+
+## Refresh the API reference
+
+Generate from the same source revision after all service contracts are imported:
+
+```sh
+python3 - <<'PYTHON'
+import json
+from pathlib import Path
+from gantry.service import Service  # registers service contracts
+from gantry.contracts import CONTRACTS
+Path("docs/api-contracts.json").write_text(
+    json.dumps(CONTRACTS, indent=2, sort_keys=True) + "\n"
+)
+PYTHON
+```
+
+This is documentation generation, not a ledger migration or a service start.
