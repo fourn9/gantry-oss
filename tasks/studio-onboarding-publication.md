@@ -22,6 +22,9 @@ This is a known-advisory check, not a security certification.
 No mandatory/optional dependency declarations changed. New host modules and
 web assets were byte-matched against the built wheel.
 
+The isolated publication checkout passed 1,722 Python tests (8 skipped) and
+57 JavaScript tests. Independent publication review found no required findings.
+
 The website is a Cloudflare Pages static demo, not a hosted Gantry Core service.
 Its initial source is retained separately for rollback; production deployment
 can also be rolled back through the existing Pages deployment history.
