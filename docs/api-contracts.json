@@ -391,6 +391,10 @@
         "intent": {
           "type": "object"
         },
+        "memory_id": {
+          "minLength": 1,
+          "type": "string"
+        },
         "question": {
           "minLength": 1,
           "type": "string"
@@ -2175,6 +2179,38 @@
         "summary",
         "output_hash",
         "details"
+      ],
+      "type": "object"
+    }
+  },
+  "complete_empty_bot_learning": {
+    "description": "complete empty bot learning",
+    "schema": {
+      "additionalProperties": false,
+      "properties": {
+        "basis": {
+          "type": "object"
+        },
+        "fence": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "intent": {
+          "type": "object"
+        },
+        "plan_id": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "task_id": {
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "required": [
+        "task_id",
+        "fence",
+        "plan_id"
       ],
       "type": "object"
     }
@@ -4416,6 +4452,40 @@
               "maxItems": 16,
               "type": "array"
             },
+            "experience_check": {
+              "additionalProperties": false,
+              "properties": {
+                "action_ids": {
+                  "items": {
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "maxItems": 40,
+                  "minItems": 1,
+                  "type": "array"
+                },
+                "reason": {
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "verdict": {
+                  "enum": [
+                    "supported_for_scope",
+                    "contradicted",
+                    "inconclusive"
+                  ]
+                }
+              },
+              "required": [
+                "verdict",
+                "reason",
+                "action_ids"
+              ],
+              "type": [
+                "object",
+                "null"
+              ]
+            },
             "experience_uses": {
               "items": {
                 "additionalProperties": false,
@@ -6528,6 +6598,9 @@
         },
         "basis": {
           "type": "object"
+        },
+        "compact": {
+          "type": "boolean"
         },
         "fence": {
           "minLength": 1,

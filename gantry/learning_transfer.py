@@ -38,14 +38,18 @@ def transfer_note(memory, training_hash):
 
 
 def run_transfer_evaluation(training_case, cases, output, *, model, reasoning_effort,
-                            max_calls, seconds, repetitions=1, seed=0, infer_fn=None):
+                            max_calls, seconds, repetitions=1, seed=0, infer_fn=None, learning_mode="always"):
     require(isinstance(model, str) and model.strip() and '\x00' not in model, 'invalid_input', 'Pin model')
     require(reasoning_effort in {'minimal','low','medium','high','xhigh'}, 'invalid_input', 'Pin reasoning effort')
     require(all(type(n) is int and n > 0 for n in (max_calls, seconds, repetitions)) and type(seed) is int,
         'invalid_input', 'Positive experimental bounds and integer seed required')
     require(isinstance(cases, (list, tuple)) and 0 < len(cases) <= 20, 'invalid_input', 'Select 1–20 held-out cases')
+    require(learning_mode in {"always","selective"}, "invalid_input", "Unknown learning mode")
     paths = [training_case, *cases]
     frozen = [freeze_case(p) for p in paths]  # Freeze all inputs BEFORE training.
+    fingerprints = [digest({k:c[k] for k in ('manifest','write_scope','verifier')}) for c in frozen]
+    require(len(set(fingerprints)) == len(fingerprints), 'invalid_input',
+        'Training and held-out tasks must have different frozen content, not just different names')
     require(all(not c['experiences'] for c in frozen), 'invalid_input', 'Transfer study starts without supplied lessons')
     require(all(c['environment']['sandbox'] != 'unavailable' for c in frozen), 'sandbox_unavailable', 'OS sandbox required')
     root = Path(output).resolve()
@@ -55,7 +59,7 @@ def run_transfer_evaluation(training_case, cases, output, *, model, reasoning_ef
     require(not root.exists() and not root.is_symlink(), 'invalid_input', 'Use a new private output directory')
     root.mkdir(parents=True, mode=0o700)
     settings = dict(model=model, reasoning_effort=reasoning_effort, max_calls=max_calls, seconds=seconds,
-        repetitions=repetitions, seed=seed, backend='codex_subscription' if infer_fn is None else 'test_override')
+        repetitions=repetitions, seed=seed, learning_mode=learning_mode, backend='codex_subscription' if infer_fn is None else 'test_override')
     persist(root/'frozen-inputs.json', frozen)
     row = {'trial_id': uid('trial'), 'status': 'pending', 'calls': [], 'verification': []}
     result = {'status': 'training', 'settings': settings, 'training': row, 'generated_lessons': [],
@@ -95,5 +99,8 @@ def run_transfer_evaluation(training_case, cases, output, *, model, reasoning_ef
         return result
     except KeyboardInterrupt:
         result['status'] = 'interrupted'; return result
+    except Exception as exc:
+        result.update(status='failed', error=getattr(exc, 'code', type(exc).__name__))
+        raise
     finally:
         save()

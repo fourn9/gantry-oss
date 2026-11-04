@@ -74,6 +74,7 @@ def setup(root, frozen, settings, supplied):
         'local_tools': {'verify': {'argv': [frozen['environment']['executable'], '-B', frozen['verifier']['script']],
             'timeout_seconds': frozen['verifier']['timeout_seconds']}},
         'tool_runtime': frozen['environment']['runtime'], 'sandbox': frozen['environment']['sandbox']}
+    if settings.get('learning_mode') == 'selective': config['learning_mode'] = 'selective'
     persist(root/'runtime-config.json', config)
     owner.call('configure_bot_runtime', {'bot_id': 'evaluation-bot', 'version': 0, 'principal_id': 'evaluation-bot',
         'enabled': True, 'environment': environment_manifest(config)})

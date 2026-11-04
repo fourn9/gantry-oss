@@ -33,6 +33,20 @@ class BotLearningMixin:
             working_state=copy.deepcopy(self._working_note(s, task['session_id'], task['bot_id'])),
             query={'after': a.get('after', ''), 'limit': limit},
             recall=recall(self, s, actor, task, con, a.get('after', ''), limit), created_seq=s['seq']+1)
+        if a.get('compact'): packet['compact'] = True
+        return self._dev_save(s, fx, 'bot_learning_plans', packet)
+
+    def cmd_complete_empty_bot_learning(self, s, actor, a, fx, n, con):
+        packet = self._dev_get(s, 'bot_learning_plans', a['plan_id'])
+        require(not packet['recall']['items'] and not packet['recall']['truncated'] and not packet['query']['after'],
+            'invalid_input', 'Only complete empty recall can use the no-experience route')
+        # The ordinary task model still chooses work. This is an attributed
+        # absence-of-matches receipt, not a synthesized Bot plan or learned rule.
+        output = dict(decisions=[], steps=['Choose work from the current task and acceptance'],
+            consult_bot_ids=[], unknowns=['Lexical recall can miss relevant experience'],
+            rationale='No matching experience in the completed scoped recall; ordinary task reasoning and reflection retained')
+        packet = self.cmd_submit_bot_learning_plan(s, actor, {**a, 'output': output}, fx, n, con)
+        packet['selection_method'] = 'no_matching_experience'
         return self._dev_save(s, fx, 'bot_learning_plans', packet)
 
     def cmd_submit_bot_learning_plan(self, s, actor, a, fx, n, con):

@@ -118,18 +118,28 @@ def collect_actions(owner, row, root):
         return digest([args, action['details'].get('workspace_before')])
     signatures = [signature(a) for a in tools]
     row['repeated_identical_tool_checks'] = len(signatures)-len(set(signatures))
+    detail = owner.call('get_bot_task', {'task_id':row['task_id']})
+    plan = detail.get('learning_plan')
+    row['learning_plan'] = {k:plan[k] for k in ('id','status','output','selection_method') if k in plan} if plan else None
+    links=[]; cursor=None
+    while True:
+        page=owner.call('get_bot_records', {'task_id':row['task_id'], 'kind':'learning_uses', 'limit':100, **({'after':cursor} if cursor else {})})
+        links.extend(page['items']); cursor=page['next_cursor']
+        if not cursor: break
+    row['experience_use_count']=len(links); persist(root/'experience-uses.json',links)
     row['failed_tool_checks'] = sum(bool(a['details'].get('result', {}).get('error')) or
         a['details'].get('result', {}).get('exit_code') not in (None, 0) or
         bool(a['details'].get('result', {}).get('reason')) for a in tools)
 
 
 def run_evaluation(case_path, output, *, model, reasoning_effort, max_calls, seconds,
-                   repetitions=1, seed=0, infer_fn=None):
+                   repetitions=1, seed=0, infer_fn=None, learning_mode="always"):
     require(isinstance(model, str) and model.strip() and '\x00' not in model, 'invalid_input', 'Pin an explicit model')
     require(reasoning_effort in {'minimal','low','medium','high','xhigh'}, 'invalid_input', 'Pin a supported reasoning effort')
     for value in (max_calls, seconds, repetitions):
         require(type(value) is int and value > 0, 'invalid_input', 'Positive experimental limits required')
     require(type(seed) is int, 'invalid_input', 'Integer randomization seed required')
+    require(learning_mode in {"always","selective"}, "invalid_input", "Unknown learning mode")
     frozen = freeze_case(case_path)
     require(frozen['environment']['sandbox'] != 'unavailable', 'sandbox_unavailable', 'A supported OS sandbox is required')
     root = Path(output).resolve()
@@ -139,7 +149,7 @@ def run_evaluation(case_path, output, *, model, reasoning_effort, max_calls, sec
     root.mkdir(parents=True, mode=0o700)
     persist(root/'frozen-case.json', frozen)
     settings = dict(model=model, reasoning_effort=reasoning_effort, max_calls=max_calls, seconds=seconds,
-                    repetitions=repetitions, seed=seed, backend='codex_subscription' if infer_fn is None else 'test_override')
+                    repetitions=repetitions, seed=seed, learning_mode=learning_mode, backend='codex_subscription' if infer_fn is None else 'test_override')
     return run_frozen_evaluation(frozen, root, settings, infer_fn)
 
 

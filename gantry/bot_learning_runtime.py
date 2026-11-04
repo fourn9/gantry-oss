@@ -29,19 +29,20 @@ def _infer_saved(infer, context, schema, directory):
     return receipt
 
 
-def plan_task(client, ref, context, infer, root):
+def plan_task(client, ref, context, infer, root, mode='always'):
     root = Path(root); root.mkdir(parents=True, exist_ok=True, mode=0o700)
     marker = root/'plan.json'
-    saved = json.loads(marker.read_text()) if marker.exists() else {'prepare': ref, 'key': 'learning:' + digest(ref)}
+    prepare = {**ref, **({'compact': True} if mode == 'selective' else {})}
+    saved = json.loads(marker.read_text()) if marker.exists() else {'prepare': prepare, 'key': 'learning:' + digest(ref)}
     persist(marker, saved)
     if 'packet' not in saved:
         try:
             saved['packet'] = client.call('prepare_bot_learning', saved['prepare'], saved['key']+':prepare')
         except Fault as exc:
             # Only an uncommitted request with an expired task fence can rotate.
-            if exc.code != 'stale_basis' or saved['prepare'] == ref: raise
-            saved.update(prepare=ref, key='learning:'+digest(ref)); persist(marker, saved)
-            saved['packet'] = client.call('prepare_bot_learning', ref, saved['key']+':prepare')
+            if exc.code != 'stale_basis' or saved['prepare'] == prepare: raise
+            saved.update(prepare=prepare, key='learning:'+digest(ref)); persist(marker, saved)
+            saved['packet'] = client.call('prepare_bot_learning', prepare, saved['key']+':prepare')
         saved['input'] = {'operation': 'plan_from_experience', 'task': context['task'],
             'project': context['project'], 'bot': context['bot'], 'limits': context['limits'],
             'team': context['team'], 'working_state': saved['packet'].get('working_state'),
@@ -54,6 +55,19 @@ def plan_task(client, ref, context, infer, root):
                 'Your plan is guidance for your subsequent work, not proof of success or automatic assignment.'}
         persist(marker, saved)
     client.call('get_bot_learning_plan', {'plan_id': saved['packet']['id']})
+    if mode == 'selective' and not saved['packet']['recall']['items'] and not saved['packet']['recall']['truncated']:
+        if 'result' not in saved:
+            saved.setdefault('empty_submit', {**ref, 'plan_id': saved['packet']['id']})
+            persist(marker, saved)
+            try:
+                saved['result'] = client.call('complete_empty_bot_learning', saved['empty_submit'], saved['key']+':empty')
+            except Fault as exc:
+                if exc.code != 'stale_basis' or saved['empty_submit']['fence'] == ref['fence']: raise
+                saved['empty_submit'].update(ref); saved['key'] += ':recover:'+digest(ref)[:16]
+                persist(marker, saved)
+                saved['result'] = client.call('complete_empty_bot_learning', saved['empty_submit'], saved['key']+':empty')
+            persist(marker, saved)
+        return planning_view(saved['result'])
     if 'receipt' not in saved:
         saved['receipt'] = _infer_saved(infer, saved['input'], PLAN, root/'inference'); persist(marker, saved)
     if 'result' not in saved:

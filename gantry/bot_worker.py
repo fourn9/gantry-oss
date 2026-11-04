@@ -23,6 +23,7 @@ def environment_manifest(config):
     fields = ('backend', 'command', 'executable_hash', 'cad_python', 'verification', 'environment_definition')
     if 'workflow' in config: fields += ('workflow',)
     if config.get('experience_learning'): fields += ('experience_learning',)
+    if 'learning_mode' in config: fields += ('learning_mode',)
     if config.get('personal_continuity'): fields += ('personal_continuity',)
     if config.get('agent_loop'): fields += ('agent_loop', 'local_tools', 'tool_runtime', 'sandbox')
     return {'name': config['name'], 'backend': config['backend'], 'tools': config.get('tools', []),
@@ -73,6 +74,9 @@ class BotWorker:
         require(isinstance(config.get('experience_learning', False), bool), 'invalid_input', 'experience_learning must be boolean')
         require(not config.get('experience_learning') or config.get('workflow') == 'bot_development',
                 'invalid_input', 'Experience learning belongs to independent Bot development')
+        require(config.get('learning_mode', 'always') in ('always', 'selective'), 'invalid_input', 'Unknown learning mode')
+        require('learning_mode' not in config or config.get('experience_learning'),
+                'invalid_input', 'Learning mode requires experience learning')
         require(isinstance(config.get('personal_continuity', False), bool), 'invalid_input', 'personal_continuity must be boolean')
         require(not config.get('personal_continuity') or config.get('workflow') == 'bot_development',
                 'invalid_input', 'Personal continuity belongs to independent Bot development')

@@ -31,7 +31,7 @@ BOT_READS.add('list_bot_handoffs')
 BOT_WRITES.update({'request_bot_handoff','acknowledge_bot_handoff','accept_bot_handoff'})
 PROFILES['bot'] = BOT_READS | BOT_WRITES | {'get_design_assessment','studio_overview','studio_work','studio_inbox','studio_team','studio_comment','studio_acknowledge'}
 PROFILES['bot'].update({'get_bot_working_state', 'update_bot_working_state', 'record_bot_learning_use', 'poll_bot_continuations'})
-PROFILES['bot'].update({'get_bot_learning_plan', 'prepare_bot_learning', 'submit_bot_learning_plan', 'get_bot_reflection', 'list_bot_reflections', 'complete_bot_reflection'})
+PROFILES['bot'].update({'get_bot_learning_plan', 'prepare_bot_learning', 'submit_bot_learning_plan', 'complete_empty_bot_learning', 'get_bot_reflection', 'list_bot_reflections', 'complete_bot_reflection'})
 PROFILES['bot'].update({'refresh_bot_task', 'ask_bot', 'record_bot_decision', 'record_bot_action', 'record_bot_experience'})
 PROFILES['bot'].update({'propose_bot_team', 'get_bot_team_proposal', 'get_bot_records'})
 PROFILES['bot'].update({'resolve_bot_question', 'stop_bot_task'})

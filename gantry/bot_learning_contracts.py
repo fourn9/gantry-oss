@@ -27,8 +27,10 @@ REFLECTION['properties']['self_assessment'] = obj({'needs_independent_check': {'
     'concerns': STRINGS, 'reason': TEXT})
 REFLECTION['properties']['self_assessment']['type'] = ['object', 'null']
 REF = {'task_id': S, 'fence': S}
-register('prepare_bot_learning', {**REF, **PAGE, 'limit': {'type':'integer', 'minimum':1, 'maximum':40}}, list(REF))
+register('prepare_bot_learning', {**REF, **PAGE, 'limit': {'type':'integer', 'minimum':1, 'maximum':40},
+    'compact': {'type':'boolean'}}, list(REF))
 register('submit_bot_learning_plan', {**REF, 'plan_id': S, 'output': PLAN}, [*REF, 'plan_id', 'output'])
+register('complete_empty_bot_learning', {**REF, 'plan_id': S}, [*REF, 'plan_id'])
 register('get_bot_learning_plan', {'plan_id': S}, ['plan_id'])
 register('get_bot_reflection', {'reflection_id': S}, ['reflection_id'])
 register('list_bot_reflections', {'bot_id': S, **PAGE}, ['bot_id'])

@@ -1,17 +1,25 @@
 """Real ledgers/sandbox; deterministic inference tests experiment integrity only."""
 import json
+import shutil
 
 from test_learning_evaluation import LearningEvaluationTests
 
 
 class LearningTransferTests(LearningEvaluationTests):
+    def target(self, case):
+        shutil.copytree(self.root/'project', self.root/'target-project')
+        (self.root/'target-project/mechanical.json').write_text('{"value":0}')
+        path=self.root/'target.json'
+        path.write_text(json.dumps(dict(case, project_root='target-project')))
+        return path
+
     def test_failure_generated_lesson_transfers_without_answers_or_manual_seed(self):
         from gantry.learning_transfer import run_transfer_evaluation
         from gantry import project_sandbox
         if project_sandbox.backend() == 'unavailable': self.skipTest('OS sandbox unavailable')
         training = dict(self.case, experiences=[])
         train = self.root/'training.json'; train.write_text(json.dumps(training))
-        target = self.root/'target.json'; target.write_text(json.dumps(training))
+        target = self.target(training)
         seen = []
         def infer(ctx, schema, directory, **options):
             seen.append(ctx)
@@ -45,7 +53,17 @@ class LearningTransferTests(LearningEvaluationTests):
         train = self.root/'training.json'; train.write_text(json.dumps(case))
         def infer(ctx, schema, directory, **options):
             return {'output': self.response(ctx), 'provider': {'kind': 'deterministic_fixture'}}
-        result = run_transfer_evaluation(train, [train], self.root/'transfer', model='fixture-model',
+        result = run_transfer_evaluation(train, [self.target(case)], self.root/'transfer', model='fixture-model',
             reasoning_effort='low', max_calls=8, seconds=30, infer_fn=infer)
         self.assertEqual(result['status'], 'inconclusive_no_generated_lessons')
         self.assertEqual(result['evaluations'], [])
+
+    def test_same_task_even_renamed_is_not_held_out(self):
+        from gantry.learning_transfer import run_transfer_evaluation
+        from gantry.model import Fault
+        train=self.root/'train.json'; train.write_text(json.dumps(dict(self.case, experiences=[])))
+        other=self.root/'other.json'; other.write_text(json.dumps(dict(self.case, name='renamed', experiences=[])))
+        with self.assertRaises(Fault) as caught:
+            run_transfer_evaluation(train, [other], self.root/'bad', model='fixture', reasoning_effort='low', max_calls=8, seconds=30)
+        self.assertEqual(caught.exception.code, 'invalid_input')
+        self.assertFalse((self.root/'bad').exists())

@@ -11,7 +11,7 @@ register('stop_bot_task', {**REF, 'target_task_id': S, 'version': I, 'reason': S
 register('get_bot_records', {'task_id': S, 'kind': {'enum': ['actions', 'decisions', 'learning_uses']}, **PAGE}, ['task_id', 'kind'])
 register('resolve_bot_question', {**REF, 'message_id': S, 'reason': S, 'evidence': A},
          [*REF, 'message_id', 'reason', 'evidence'])
-register('ask_bot', {**REF, 'to_bot_id': S, 'question': S, 'evidence': A},
+register('ask_bot', {**REF, 'to_bot_id': S, 'question': S, 'evidence': A, 'memory_id': S},
          [*REF, 'to_bot_id', 'question', 'evidence'])
 register('record_bot_decision', {**REF, 'verdict': {'enum': [
     'authorize', 'revise', 'select', 'continue', 'stop', 'escalate']},
@@ -50,14 +50,26 @@ class CrewCoordinationMixin:
         rows = con.execute('SELECT id FROM records WHERE collection=? AND subject_id=? AND id>? ORDER BY id LIMIT ?',
                            (table, task['id'], a.get('after', ''), limit + 1)).fetchall()
         values = [self._dev_get(s, table, row[0]) for row in rows[:limit]]
-        if table == 'bot_actions': values = [self._crew_action_view(s, actor, task, v) for v in values]
+        if table == 'bot_decisions' and task.get('experience_check'):
+            values = [self._crew_check_record(s, actor, task, v, con) for v in values]
+        if table == 'bot_actions': values = [self._crew_action_view(s, actor, task, v, con) for v in values]
         return {'items': values,
                 'next_cursor': rows[limit-1][0] if len(rows) > limit else None}
 
-    def _crew_action_view(self, s, actor, task, record):
+    def _crew_check_record(self, s, actor, task, record, con):
+        if not task.get('experience_check'): return record
+        from .bot_experience_checks import view
+        if view(self, s, actor, task, con)['available']: return record
+        return {'id':record['id'], 'private':True, 'reason':'Experience check evidence is unavailable'}
+
+    def _crew_action_view(self, s, actor, task, record, con=None):
         project = s['bot_projects'][task['session_id']]
         own = actor['id'] == task['principal_id'] and self._binding_access(s, actor,
             self._bd_binding(s, task['session_id'], task['bot_id']))
+        if task.get('experience_check'):
+            from .bot_experience_checks import view
+            if con is not None and view(self, s, actor, task, con)['available']: return record
+            return {**record, 'details': {'private': True, 'reason': 'Experience check observations'}}
         if not (own or self._bd_owner(actor, project)) and record['kind'] in {
                 'working_state', 'experience_use', 'remember', 'context', 'records', 'inspect', 'finish'}:
             # Raw finish arguments may contain private experience receipts.
@@ -74,8 +86,8 @@ class CrewCoordinationMixin:
         consultations = [self._dev_get(s, 'bot_task_messages', i) for i in task.get('consultations', [])]
         request = self._dev_get(s, 'bot_task_messages', task['reply_request_id']) if task.get('reply_request_id') else None
         return {'consultations': consultations, 'response_request': copy.deepcopy(request),
-                'decisions': self._crew_records(s, con, 'bot_decisions', task['id']),
-                'actions': [self._crew_action_view(s, actor, task, v) for v in self._crew_records(s, con, 'bot_actions', task['id'])],
+                'decisions': [self._crew_check_record(s, actor, task, v, con) for v in self._crew_records(s, con, 'bot_decisions', task['id'])],
+                'actions': [self._crew_action_view(s, actor, task, v, con) for v in self._crew_records(s, con, 'bot_actions', task['id'])],
                 'action_history': {'total': con.execute('SELECT count(*) FROM records WHERE collection=? AND subject_id=?',
                     ('bot_actions', task['id'])).fetchone()[0], 'retrieval': 'get_bot_records', 'kind': 'actions', 'recent_limit': 20},
                 'decision_history': {'retrieval': 'get_bot_records', 'kind': 'decisions', 'recent_limit': 20}}
@@ -102,6 +114,9 @@ class CrewCoordinationMixin:
             'title': a['question'], 'completion': ['Answer the recorded question with evidence and limitations'],
             'write_scope': [], 'dependencies': [], 'after_tasks': [],
             **({'candidate_id': task['candidate_id']} if task.get('candidate_id') else {})}, fx, n, con, consultation=True)
+        if a.get('memory_id'):
+            from .bot_experience_checks import prepare
+            response['experience_check'] = prepare(self, s, actor, task, response, a['memory_id'], con)
         msg = dict(id=uid('bmessage'), subject_id=task['id'], task_id=task['id'],
             session_id=task['session_id'], from_bot_id=task['bot_id'], to_bot_id=a['to_bot_id'],
             principal_id=actor['id'], body=a['question'], kind='question', blocking=True,

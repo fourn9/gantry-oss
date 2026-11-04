@@ -55,14 +55,25 @@ Commands (from this checkout):
 
 ## Tasks
 
-- [ ] Add failure-first transfer evaluation and isolated learned/no-lesson arms.
-- [ ] Add opt-in empty-recall routing and recovery tests.
-- [ ] Add conservative duplicate grouping with provenance/security tests.
-- [ ] Add scoped independent lesson consultation and actual peer result path.
-- [ ] Run frozen live monthly-model transfer and overhead checks; report null/negative results.
-- [ ] Independent review, regression/package checks, docs and additive API catalog.
+- [x] Add failure-first transfer evaluation and isolated learned/no-lesson arms.
+- [x] Add opt-in empty-recall routing and recovery tests.
+- [x] Add conservative duplicate grouping with provenance/security tests.
+- [x] Add scoped independent lesson consultation and actual peer result path.
+- [x] Run frozen live monthly-model transfer and overhead checks; report null/negative results.
+- [x] Independent review, regression/package checks, docs and additive API catalog.
 
 Risks: lessons can be wrong, absence of lexical matches is not absence of relevant
 knowledge, independent peers can share model biases, provider latency/cache varies.
 Do not describe these mechanisms as guaranteed learning or speedup. Correctness and
 evidence boundaries take precedence over elapsed-time improvements.
+
+## Recorded outcome
+
+Implemented all four modules; old configuration remains unchanged. Monthly-model
+training generated one conditional lesson from an actual failed check. Both held-out
+pairs passed, but learned runs averaged 108.98 s versus 70.14 s without experience.
+A separate no-lesson overhead pair was 91.83 s always versus 74.65 s selective.
+No general learning speedup is claimed. See docs/BOT_LEARNING_TRANSFER_VALIDATION.md.
+Full regression: 1,626 tests, 8 environmental skips; final targeted regressions and
+packaging followed the stale-discard fix. Independent review closed with no blockers.
+Private source/model journals stay outside the public repository.
