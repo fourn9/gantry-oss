@@ -160,6 +160,7 @@ def main(service=None):
     bot_worker.add_argument('--collect-interrupted-verification', action='store_true')
     evaluation = sub.add_parser('evaluate-learning', help='Paired isolated Bot experience experiment (uses your ChatGPT login)')
     evaluation.add_argument('--case', required=True, help='Trusted experiment JSON; selected source and acceptance verifier')
+    evaluation.add_argument('--training-case', help='Generate lessons from this separate case before evaluating --case; both start with experiences=[]')
     evaluation.add_argument('--output', required=True, help='New private directory, outside the source project')
     evaluation.add_argument('--model', required=True)
     evaluation.add_argument('--reasoning-effort', required=True, choices=['minimal','low','medium','high','xhigh'])
@@ -219,9 +220,17 @@ def main(service=None):
     try:
         if args.command == 'evaluate-learning':
             from .learning_evaluation import run_evaluation
-            report = run_evaluation(args.case, args.output, model=args.model, reasoning_effort=args.reasoning_effort,
+            options = dict(model=args.model, reasoning_effort=args.reasoning_effort,
                 max_calls=args.max_calls, seconds=args.seconds, repetitions=args.repetitions, seed=args.seed)
-            result = {'report': str(Path(args.output).resolve()/'report.md'), 'summary': report['summary']}
+            if args.training_case:
+                from .learning_transfer import run_transfer_evaluation
+                report = run_transfer_evaluation(args.training_case, [args.case], args.output, **options)
+                result = {'report': str(Path(args.output).resolve()/'transfer.json'), 'status': report['status'],
+                    'generated_lesson_count': len(report['generated_lessons']),
+                    'summaries': [r['summary'] for r in report['evaluations']]}
+            else:
+                report = run_evaluation(args.case, args.output, **options)
+                result = {'report': str(Path(args.output).resolve()/'report.md'), 'summary': report['summary']}
         elif args.command == 'learning-evaluation-report':
             from .learning_evaluation_report import regenerate
             result = regenerate(args.directory)['summary']

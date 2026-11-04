@@ -140,10 +140,14 @@ def run_evaluation(case_path, output, *, model, reasoning_effort, max_calls, sec
     persist(root/'frozen-case.json', frozen)
     settings = dict(model=model, reasoning_effort=reasoning_effort, max_calls=max_calls, seconds=seconds,
                     repetitions=repetitions, seed=seed, backend='codex_subscription' if infer_fn is None else 'test_override')
-    first = random.Random(seed).randrange(2)
+    return run_frozen_evaluation(frozen, root, settings, infer_fn)
+
+
+def run_frozen_evaluation(frozen, root, settings, infer_fn=None):
+    first = random.Random(settings['seed']).randrange(2)
     trials = [{'pair': p, 'arm': ARMS[(first+p+i)%2], 'trial_id': uid('trial'),
                'status': 'pending', 'calls': [], 'verification': []}
-              for p in range(repetitions) for i in range(2)]
+              for p in range(settings['repetitions']) for i in range(2)]
     report = {'schema_version': 1, 'case_hash': frozen['case_hash'], 'settings': settings, 'trials': trials,
               'human_seconds': None, 'human_interventions': None,
               'limitations': ['Small opt-in comparison, no population-level effect claim',
@@ -153,47 +157,52 @@ def run_evaluation(case_path, output, *, model, reasoning_effort, max_calls, sec
     save = lambda: write_report(root, report)
     save()
     for row in trials:
-        started = time.monotonic(); row['status'] = 'running'; save()
-        metrics = None; owner = None; arm_root = root/row['trial_id']
-        try:
-            require(digest(environment()) == digest(frozen['environment']), 'stale_basis', 'Runtime environment changed between arms')
-            # No arm label in paths sent to the model; only the report knows the assignment.
-            owner, client, config, sid, state = setup(arm_root, frozen, settings, row['arm'] == 'with_experience')
-            row.update(setup_seconds=time.monotonic()-started, session_id=sid, initial_state=state)
-            metrics = Measurements(arm_root, frozen, row, settings, infer_fn or infer_monthly, save)
-            metrics.owner = owner
-            baseline = metrics.verify(state)
-            if baseline['accepted']:
-                row['status'] = 'pre_satisfied'
-                continue
-            task = owner.call('assign_bot_task', assignment(sid, state, frozen)); row['task_id'] = task['id']
-            client.before, client.after = metrics.before, metrics.after
-            with BotWorker(client, config, arm_root/'journals', infer_fn=metrics.inference) as worker:
-                row['worker_results'] = worker.tick()
-            final = owner.call('get_bot_task', {'task_id': task['id']})['task']
-            row.update(task_status=final['status'], final_state=final.get('output_state', state))
-            checked = metrics.verify(row['final_state'])
-            pending = owner.call('list_bot_reflections', {'bot_id': 'evaluation-bot'})['items']
-            reflections = row.get('reflections', []) + [{'id': r['id'], 'status': r['status']} for r in pending]
-            row['reflections'] = reflections
-            finished = final['status'] == 'completed' and bool(reflections) and all(r['status'] == 'completed' for r in reflections)
-            row['status'] = 'accepted' if finished and checked['accepted'] else 'not_accepted' if finished else 'held'
-        except (Exception, KeyboardInterrupt) as exc:
-            code = exc.code if isinstance(exc, Fault) else type(exc).__name__
-            row.update(status='timeout' if code in {'evaluation_timeout','provider_timeout'} else
-                'interrupted' if isinstance(exc, KeyboardInterrupt) else 'failed', error=code)
-            if isinstance(exc, KeyboardInterrupt): break
-        finally:
-            if owner and row.get('task_id'):
-                try: collect_actions(owner, row, arm_root)
-                except Exception as exc:
-                    row['metrics_error'] = exc.code if isinstance(exc, Fault) else type(exc).__name__
-                    if row['status'] == 'accepted': row['status'] = 'incomplete'
-            if metrics:
-                row['total_seconds'] = time.monotonic()-metrics.start
-                if row['status'] == 'accepted' and row['total_seconds'] >= settings['seconds']:
-                    row.update(status='timeout', error='evaluation_timeout')
-            else:
-                row['setup_seconds'] = time.monotonic()-started
-            row['usage'] = usage(row['calls']); save()
+        try: run_trial(root, frozen, settings, row, infer_fn or infer_monthly, save, row['arm'] == 'with_experience')
+        except KeyboardInterrupt: break
     return save()
+
+
+def run_trial(root, frozen, settings, row, infer_fn, save, supplied):
+    started = time.monotonic(); row['status'] = 'running'; save()
+    metrics = None; owner = None; arm_root = root/row['trial_id']
+    try:
+        require(digest(environment()) == digest(frozen['environment']), 'stale_basis', 'Runtime environment changed between arms')
+        # No arm label in paths sent to the model; only the report knows the assignment.
+        owner, client, config, sid, state = setup(arm_root, frozen, settings, supplied)
+        row.update(setup_seconds=time.monotonic()-started, session_id=sid, initial_state=state)
+        metrics = Measurements(arm_root, frozen, row, settings, infer_fn or infer_monthly, save)
+        metrics.owner = owner
+        baseline = metrics.verify(state)
+        if baseline['accepted']:
+            row['status'] = 'pre_satisfied'
+            return
+        task = owner.call('assign_bot_task', assignment(sid, state, frozen)); row['task_id'] = task['id']
+        client.before, client.after = metrics.before, metrics.after
+        with BotWorker(client, config, arm_root/'journals', infer_fn=metrics.inference) as worker:
+            row['worker_results'] = worker.tick()
+        final = owner.call('get_bot_task', {'task_id': task['id']})['task']
+        row.update(task_status=final['status'], final_state=final.get('output_state', state))
+        checked = metrics.verify(row['final_state'])
+        pending = owner.call('list_bot_reflections', {'bot_id': 'evaluation-bot'})['items']
+        reflections = row.get('reflections', []) + [{'id': r['id'], 'status': r['status']} for r in pending]
+        row['reflections'] = reflections
+        finished = final['status'] == 'completed' and bool(reflections) and all(r['status'] == 'completed' for r in reflections)
+        row['status'] = 'accepted' if finished and checked['accepted'] else 'not_accepted' if finished else 'held'
+    except (Exception, KeyboardInterrupt) as exc:
+        code = exc.code if isinstance(exc, Fault) else type(exc).__name__
+        row.update(status='timeout' if code in {'evaluation_timeout','provider_timeout'} else
+            'interrupted' if isinstance(exc, KeyboardInterrupt) else 'failed', error=code)
+        if isinstance(exc, KeyboardInterrupt): raise
+    finally:
+        if owner and row.get('task_id'):
+            try: collect_actions(owner, row, arm_root)
+            except Exception as exc:
+                row['metrics_error'] = exc.code if isinstance(exc, Fault) else type(exc).__name__
+                if row['status'] == 'accepted': row['status'] = 'incomplete'
+        if metrics:
+            row['total_seconds'] = time.monotonic()-metrics.start
+            if row['status'] == 'accepted' and row['total_seconds'] >= settings['seconds']:
+                row.update(status='timeout', error='evaluation_timeout')
+        else:
+            row['setup_seconds'] = time.monotonic()-started
+        row['usage'] = usage(row['calls']); save()
