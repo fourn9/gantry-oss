@@ -31,3 +31,18 @@ export const setupURL=(session,id='')=>'#studio-crew/'+encodeURIComponent(sessio
 const quote=value=>"'"+String(value).replaceAll("'","'\\''")+"'";
 export const analyzeCommand=d=>`gantry crew-setup analyze --setup-id ${quote(d.id)} --backend codex-subscription --journal /private/crew-analysis`;
 export const prepareCommand=d=>`gantry crew-setup prepare --setup-id ${quote(d.id)} --journal /private/crew-runtime --backend codex-subscription --runtime-template /private/runtime-template.json`;
+// Read-only UI decisions. The authenticated Core independently checks each action.
+export const activeJob=c=>(c?.jobs||[]).find(j=>['queued','running','held'].includes(j.status));
+export function readyPreparation(d,c){
+ const p=c?.prepared,host=c?.hosts?.find(h=>h.id===p?.host_id);
+ return Boolean(p&&host?.online&&p.config_hash===host.config_hash&&p.proposal_hash===d.proposal?.hash&&!d.stale);
+}
+export function editRole(proposal,index,values){
+ const p=structuredClone(proposal),r=p.roles[index];if(!r)throw new Error('Role no longer exists. Refresh the proposal.');
+ if(r.existing_bot_id)throw new Error('Edit an existing Bot in Team settings to preserve its identity and memory.');
+ r.name=values.name.trim();r.parent_role_id=values.parent||null;r.profile.mission=values.mission.trim();
+ r.profile.responsibilities=values.responsibilities.split('\n').map(x=>x.trim()).filter(Boolean);
+ r.write_scope=values.scope.split('\n').map(x=>x.trim()).filter(Boolean);r.can_assign=Boolean(values.assign);r.can_integrate=Boolean(values.integrate);
+ if(!r.name||!r.profile.mission||!r.profile.responsibilities.length)throw new Error('Enter a name, responsibility and mission.');
+ return p;
+}

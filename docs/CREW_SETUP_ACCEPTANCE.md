@@ -1,5 +1,9 @@
 # Initial Crew onboarding acceptance — 2026-11-05
 
+This is the original CLI/model baseline. The subsequent Studio-controlled host
+implementation and its current boundaries are documented in
+[Studio team control acceptance](STUDIO_CREW_ACCEPTANCE.md).
+
 ## Scope
 
 Connect saved project state and selected organizational exports to a proposed

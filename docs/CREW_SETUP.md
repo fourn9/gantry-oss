@@ -36,10 +36,12 @@ in this setup context; it does not import other projects' files or memories. Sel
 only organizational material appropriate for this project's participants.
 
 Studio exposes **Team → Initial team setup**, also offered after project import.
-It previews selected sources and shows saved proposals, evidence and readiness.
-Run analysis through the CLI or a connected customer agent; opening the UI does
-not invoke a model. Credential preparation is a private CLI operation. The browser
-can activate roles mapped to existing eligible agent identities.
+Its normal path is **Sources → Team review → Start**. With a customer setup host
+connected once, the owner can request a proposal, edit roles, create the reviewed
+team, and start/stop workers entirely from Studio. Opening the page does not invoke
+a model. Private credentials are prepared by that customer's host, never in the
+browser. See [Studio onboarding](STUDIO_CREW_ONBOARDING.md) for connection and recovery.
+The individual CLI steps below remain available for existing integrations.
 
 ## Preview and save selected evidence
 
