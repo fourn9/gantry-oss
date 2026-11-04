@@ -156,6 +156,7 @@ loss. These explanations remain private to the executor and owner through
 `get_bot_records(kind="learning_uses")`; the shared task report omits them and raw
 finish action details are private. Completion remains separate from adoption.
 The existing standalone action remains available for meaningful mid-task updates.
+See the [measured comparison and limits](BOT_LEARNING_EFFICIENCY_VALIDATION.md).
 
 ## Reflection, failures and recovery
 

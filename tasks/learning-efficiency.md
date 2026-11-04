@@ -67,3 +67,16 @@ The standalone API and old reports remain valid. No inferred claim of memory use
   due to the privacy defect. Its three completed outcomes and five unstarted
   slots remain in private records. Corrected code receives a separate frozen,
   counterbalanced comparison; do not pool the prototype outcomes with it.
+
+## Corrected-snapshot live result
+
+Four fresh pairs using the same imported experience: both paths accepted 4/4.
+Mean full-session time 112.50 s → 99.07 s (11.9% lower); model calls 24 → 20;
+input tokens 445,095 → 359,654 (19.2% lower). Every pair was faster. Actual
+edit/tool links and reflection were retained in all eight verified ledgers.
+Setup was measured separately (0.134/0.132 s summed per variant).
+
+This measures receipt overhead, not a demonstrated advantage of experience over
+no experience, autonomous lesson acquisition, or robot-development speed. Provider
+latency/cache and limited fixed code checks constrain interpretation. Full method
+and limitations: [validation](../docs/BOT_LEARNING_EFFICIENCY_VALIDATION.md).
