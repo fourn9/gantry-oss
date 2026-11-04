@@ -44,9 +44,10 @@ from .design_assessment import DesignAssessmentMixin
 from .studio import StudioMixin
 from .membership import MembershipMixin
 from .crew_setup import CrewSetupMixin
+from .crew_setup_jobs import CrewSetupJobsMixin
 
 
-class Service(CrewSetupMixin, MembershipMixin, StudioMixin, DesignAssessmentMixin, BotWakeMixin, BotContinuityMixin, BotLearningMixin, ConnectionMixin, CrewOnboardingMixin, CrewCoordinationMixin, BotDevelopmentMixin, PersistentBotMixin, BotMixin, ReviewContextMixin, MentorJobsMixin, ChangeReviewMixin, ValidationMixin, EvidenceMixin, AutonomyMixin, ProductMixin, ContinuityMixin, DevelopmentMixin):
+class Service(CrewSetupJobsMixin, CrewSetupMixin, MembershipMixin, StudioMixin, DesignAssessmentMixin, BotWakeMixin, BotContinuityMixin, BotLearningMixin, ConnectionMixin, CrewOnboardingMixin, CrewCoordinationMixin, BotDevelopmentMixin, PersistentBotMixin, BotMixin, ReviewContextMixin, MentorJobsMixin, ChangeReviewMixin, ValidationMixin, EvidenceMixin, AutonomyMixin, ProductMixin, ContinuityMixin, DevelopmentMixin):
     READS = {"state", "design", "diff", "history", "impact", "open", "reviews", "why",
              "outcomes", "operations", "restore_artifact", "read_artifact_chunk", "verify", "work", "context", "events", "export", "identity", "review_context", "development_state", "mentor_context", "check_execution"}
 
@@ -56,7 +57,7 @@ class Service(CrewSetupMixin, MembershipMixin, StudioMixin, DesignAssessmentMixi
 
     READS |= {'get_validation_plan', 'get_evidence_view', 'query_evidence', 'read_artifact_batch', 'list_artifact_files'}
     READS.add('workspace_members')
-    READS |= {'get_crew_setup', 'list_crew_setups'}
+    READS |= {'get_crew_setup', 'list_crew_setups', 'get_crew_setup_control'}
     READS |= {'studio_overview', 'studio_work', 'studio_inbox', 'studio_team', 'list_bot_handoffs', 'get_onboarding', 'list_onboardings'}
     READS |= {'get_development_state', 'list_development_states', 'get_design_assessment'}
     READS |= {'related_review_context','check_mentor_job'}
@@ -231,7 +232,7 @@ class Service(CrewSetupMixin, MembershipMixin, StudioMixin, DesignAssessmentMixi
                       if command == 'sync_integration' else method(s, actor, args, effects, notices, con))
             if readonly:
                 return json.loads(canonical(result))
-            if command == 'claim_analysis' and not effects:
+            if command in {'claim_analysis','claim_crew_setup_job'} and not effects:
                 # Polls with no claim are observations, not development events.
                 con.execute("INSERT INTO requests VALUES (?,?,?,?)", (actor['id'], key, fp, canonical(manifest_store.pack(con,result))))
                 con.commit()

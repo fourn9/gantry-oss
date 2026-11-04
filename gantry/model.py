@@ -67,6 +67,7 @@ DEVELOPMENT_TABLES += ('bot_learning_plans', 'bot_reflections', 'bot_experience_
 DEVELOPMENT_TABLES += ('bot_working_states', 'bot_continuations', 'bot_learning_uses')
 DEVELOPMENT_TABLES += ('studio_threads', 'studio_messages', 'studio_notifications')
 DEVELOPMENT_TABLES += ('onboardings', 'crew_setups')
+DEVELOPMENT_TABLES += ('crew_setup_hosts', 'crew_setup_jobs')
 DEVELOPMENT_TABLES += ('studio_bot_requests', 'bot_handoffs')
 MANAGED = {"goal", "requirement", "design_document", "subsystem", "part_spec", "bom",
            "validation_plan", "unit", "zone", "interface", "policy", "principal", "relation"}

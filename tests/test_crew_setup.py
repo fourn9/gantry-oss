@@ -76,6 +76,16 @@ class CrewSetupTests(unittest.TestCase):
         restored=Service(self.root/'ledger').call(self.token,'get_crew_setup',{'setup_id':d['id']})
         self.assertEqual(restored['proposal'],result['proposal'])
 
+    def test_nonexpiring_worker_credentials_do_not_depend_on_clock_call_timing(self):
+        d=self.propose(self.setup());bindings=self.grants(d)
+        now=[self.service.clock()]
+        def advancing_clock():
+            now[0]+=2
+            return now[0]
+        self.service.clock=advancing_clock
+        result=self.activate(d,bindings)
+        self.assertEqual(result['status'],'activated')
+
     def test_unknown_evidence_cycle_scope_and_secret_rejected(self):
         d=self.setup()
         for mut,code in [(lambda p:p['roles'][0].update(evidence_ids=['fabricated']),'invalid_input'),

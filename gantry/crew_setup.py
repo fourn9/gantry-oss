@@ -196,7 +196,7 @@ class CrewSetupMixin:
             principal=s['principals'].get(b['principal_id'],{})
             require(principal.get('kind')=='agent' and principal.get('enabled',True) and b['principal_id'] in session['actors'],
                 'unauthorized','Use an existing delegated agent or a new scoped access request')
-            require(principal.get('expires_at',self.clock()+1)>self.clock(),'expired','Agent credential has expired')
+            require('expires_at' not in principal or principal['expires_at']>self.clock(),'expired','Agent credential has expired')
         oid=setup['organization_id']
         if oid not in s.get('organizations',{}):
             self.cmd_configure_organization(s,actor,{'organization_id':oid,'version':0,'name':setup['organization_name'],
