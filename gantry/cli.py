@@ -47,6 +47,8 @@ def main(service=None):
     add_onboarding_parser(sub)
     from .crew_setup_cli import add_parser as add_crew_setup_parser
     add_crew_setup_parser(sub)
+    from .crew_setup_host_cli import add_parser as add_crew_setup_host_parser
+    add_crew_setup_host_parser(sub)
     workspace = sub.add_parser('workspace', help='Connect saved CAD/code files to shared Studio work')
     workspace.add_argument('action', choices=['import','attach','status','sync','watch','share','continue'])
     workspace.add_argument('--root', default='.')
@@ -212,7 +214,7 @@ def main(service=None):
     if service:
         common = {'workspace', 'serve-cloud', 'init', 'serve', 'call', 'mcp', 'agent-config', 'agent-request', 'credential',
                   'export', 'restore-backup', 'capture-workspace', 'restore-development-state', 'restore-artifact'}
-        allowed = common | ({'crew-setup', 'bot-worker', 'bot-service', 'evaluate-learning', 'learning-evaluation-report'} if service == 'bots' else
+        allowed = common | ({'crew-setup', 'crew-setup-host', 'bot-worker', 'bot-service', 'evaluate-learning', 'learning-evaluation-report'} if service == 'bots' else
             {'connect', 'disconnect', 'project', 'project-mcp', 'mentor-worker', 'recover-mentor-job'})
         for name in list(sub.choices):
             if name not in allowed: del sub.choices[name]
@@ -327,6 +329,9 @@ def main(service=None):
                     os.chmod(args.output,0o600); json.dump(metrics.report(),f,indent=2)
                 result={'preview_file':str(Path(args.output).absolute()),'sent':False,
                         'next':'Inspect this report and share voluntarily through your chosen channel.'}
+        elif args.command == 'crew-setup-host':
+            from .crew_setup_host_cli import run as run_crew_setup_host
+            run_crew_setup_host(args); return
         elif args.command == 'bot-service':
             from .bot_worker import service_manifest
             content = service_manifest(args.config, args.journal, args.executable, args.platform,
