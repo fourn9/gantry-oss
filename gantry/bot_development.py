@@ -28,8 +28,15 @@ REPORT = {'summary': S, 'rationale': S, 'unverified': A,
           'integrate_changes': {'type': 'array', 'maxItems': 32, 'items': {
               'type': 'object', 'properties': {'id': S, 'version': I},
               'required': ['id', 'version'], 'additionalProperties': False}}}
+REPORT_REQUIRED = list(REPORT)
+# Shared with the standalone endpoint; optional for saved reports/older clients.
+LEARNING_USE = {'memory_id': S,
+    'action_ids': {'type': 'array', 'minItems': 1, 'maxItems': 40, 'items': {**S, 'maxLength': 4000}},
+    'change': {**S, 'maxLength': 4000}, 'condition_check': {**S, 'maxLength': 4000}}
+REPORT['experience_uses'] = {'type': ['array', 'null'], 'maxItems': 40, 'items': {
+    'type': 'object', 'properties': LEARNING_USE, 'required': list(LEARNING_USE), 'additionalProperties': False}}
 BOT_ANSWER = {'type': 'object', 'properties': {**REPORT, 'edits': {'type': 'array', 'maxItems': 100, 'items': EDIT}},
-              'required': [*REPORT, 'edits'], 'additionalProperties': False}
+              'required': [*REPORT_REQUIRED, 'edits'], 'additionalProperties': False}
 register('configure_bot_project', {'session_id': S, 'organization_id': S, 'version': VERSION,
     'goal': S, 'acceptance': A, 'lead_bot_id': S, 'enabled': FLAG},
     ['session_id', 'organization_id', 'version', 'goal', 'acceptance', 'lead_bot_id', 'enabled'])
@@ -46,7 +53,7 @@ register('checkpoint_bot_task', {'task_id': S, 'fence': S, 'snapshot': S, 'summa
     'rationale': S, 'unfinished': A, 'capture': CAPTURE, 'context': CONTEXT},
     ['task_id', 'fence', 'snapshot', 'summary', 'rationale', 'unfinished', 'capture'])
 register('finish_bot_task', {'task_id': S, 'fence': S, 'report': {
-    'type': 'object', 'properties': REPORT, 'required': list(REPORT), 'additionalProperties': False}},
+    'type': 'object', 'properties': REPORT, 'required': REPORT_REQUIRED, 'additionalProperties': False}},
     ['task_id', 'fence', 'report'])
 register('hold_bot_task', {'task_id': S, 'fence': S, 'reason': S}, ['task_id', 'fence', 'reason'])
 register('recover_bot_task', {'task_id': S, 'version': I, 'runtime_fence': S, 'confirm_stopped': S},
@@ -357,6 +364,15 @@ class BotDevelopmentMixin:
                     'dependency_pending', 'Resolve blocking discussion before completing work')
             require(all(s['bot_tasks'][i]['status'] in TERMINAL for i in task['children']),
                     'dependency_pending', 'Child work is still active')
+        # Reports are shared with project peers; these explanations are private
+        # to the executor and owner, through the existing learning-use records.
+        uses = report.pop('experience_uses', None) or []
+        require(len({u['memory_id'] for u in uses}) == len(uses), 'invalid_input', 'Duplicate memory use in report')
+        for use in uses:
+            # Same transaction as the report: invalid links or later failures
+            # roll back all links. Never infer use or bypass the standalone checks.
+            self.cmd_record_bot_learning_use(s, actor,
+                {'task_id': task['id'], 'fence': a['fence'], **use}, fx, n, con)
         require(not report['assignments'] or report['status'] == 'waiting', 'invalid_input', 'Parent must wait for assigned work')
         for assignment in report['assignments']:
             child = self._bd_assign(s, actor, {**assignment, 'session_id': task['session_id'],

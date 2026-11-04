@@ -142,10 +142,26 @@ provides paginated experience/action links to the Bot and owner. Single-response
 bridges can call these APIs explicitly; they do not capture nonexistent intermediate
 actions automatically.
 
+When finishing, prefer the optional `experience_uses` array in `finish_bot_task.report`
+(or the iterative `finish` action) instead of spending another model turn solely
+on recording use. Each item contains `memory_id`, `action_ids`, `change` and
+`condition_check`, with the same validation as `record_bot_learning_use`.
+Only non-rejected planned memories and actual actions from this attempt qualify.
+Omit the field, or use `[]`/`null`, when no explicit use is being reported; merely
+recalling a memory does not establish use. At most 40 distinct memories per report.
+
+Core saves all links and the report in one transaction. An invalid link or failed
+completion leaves no partial links. Reuse the same idempotency key after response
+loss. These explanations remain private to the executor and owner through
+`get_bot_records(kind="learning_uses")`; the shared task report omits them and raw
+finish action details are private. Completion remains separate from adoption.
+The existing standalone action remains available for meaningful mid-task updates.
+See the [measured comparison and limits](BOT_LEARNING_EFFICIENCY_VALIDATION.md).
+
 ## Reflection, failures and recovery
 
 Reflections receive the report, planning intent, at most 20 action receipts and
-20 experience-use receipts, with access to paginated history. Explicit evidence
+40 experience-use receipts, with access to paginated history. Explicit evidence
 rules distinguish intent, saved files, executor reports and tool observations.
 A procedure can include ordered steps and applicability limits. Self-assessment
 and claimed usefulness remain unverified statements; a plan or remembered success

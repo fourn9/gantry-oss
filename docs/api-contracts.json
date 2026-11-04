@@ -4416,6 +4416,49 @@
               "maxItems": 16,
               "type": "array"
             },
+            "experience_uses": {
+              "items": {
+                "additionalProperties": false,
+                "properties": {
+                  "action_ids": {
+                    "items": {
+                      "maxLength": 4000,
+                      "minLength": 1,
+                      "type": "string"
+                    },
+                    "maxItems": 40,
+                    "minItems": 1,
+                    "type": "array"
+                  },
+                  "change": {
+                    "maxLength": 4000,
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "condition_check": {
+                    "maxLength": 4000,
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "memory_id": {
+                    "minLength": 1,
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "memory_id",
+                  "action_ids",
+                  "change",
+                  "condition_check"
+                ],
+                "type": "object"
+              },
+              "maxItems": 40,
+              "type": [
+                "array",
+                "null"
+              ]
+            },
             "integrate_changes": {
               "items": {
                 "additionalProperties": false,

@@ -59,7 +59,9 @@ class CrewCoordinationMixin:
         own = actor['id'] == task['principal_id'] and self._binding_access(s, actor,
             self._bd_binding(s, task['session_id'], task['bot_id']))
         if not (own or self._bd_owner(actor, project)) and record['kind'] in {
-                'working_state', 'experience_use', 'remember', 'context', 'records', 'inspect'}:
+                'working_state', 'experience_use', 'remember', 'context', 'records', 'inspect', 'finish'}:
+            # Raw finish arguments may contain private experience receipts.
+            # The shared, sanitized task report remains available separately.
             return {**record, 'details': {'private': True, 'reason': 'Bot working context or memory'}}
         return record
 

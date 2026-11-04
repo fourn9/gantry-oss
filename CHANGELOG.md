@@ -5,6 +5,9 @@ This file records changes after v3.3.0. Earlier release notes remain in the
 
 ## Unreleased
 
+- Bot completion reports can atomically record explicit experience/action links,
+  avoiding a separate bookkeeping inference turn. Preserve same-attempt evidence,
+  private memory access, retry safety, and compatibility with existing reports.
 - Studio Team and version-bound **Ask a Bot / Assign work**. Answers return to the
   original selection and Inbox; edits return as separate shared candidates.
   Existing customer runtimes execute the work; ordinary comments do not dispatch.

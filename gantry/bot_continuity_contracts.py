@@ -1,6 +1,6 @@
 """Working context, explicit standing delegation and experience/action links."""
 from .contracts import register, S
-from .bot_development import PAGE
+from .bot_development import PAGE, LEARNING_USE
 from .bot_learning_contracts import TEXT, STRINGS, REF
 
 CONTENT = {'focus': TEXT, 'next_steps': STRINGS, 'commitments': STRINGS, 'unknowns': STRINGS,
@@ -14,5 +14,4 @@ register('configure_bot_continuation', {'session_id':S, 'bot_id':S,
     'write_scope':STRINGS, 'dependencies':STRINGS, 'completion':{**STRINGS, 'minItems':1}},
     ['session_id','bot_id','version','enabled','write_scope','dependencies','completion'])
 register('poll_bot_continuations', {'bot_id':S, 'runtime_fence':S, **PAGE}, ['bot_id','runtime_fence'])
-register('record_bot_learning_use', {**REF, 'memory_id':S, 'action_ids':{**STRINGS,'minItems':1},
-    'change':TEXT, 'condition_check':TEXT}, [*REF,'memory_id','action_ids','change','condition_check'])
+register('record_bot_learning_use', {**REF, **LEARNING_USE}, [*REF, *LEARNING_USE])

@@ -130,11 +130,12 @@ class BotLearningMixin:
             'experience_actions': self._learning_observations(s, record, con, 'bot_learning_uses'),
             'feedback_rules': {'eligible_memory_ids': [d['memory_id'] for d in plan['output']['decisions'] if d['use'] != 'reject'],
                 'limits': 'Each eligible memory at most once. Reject memories are ineligible; usefulness is not causal proof.'},
-            'observations_coverage': 'At most 20 action and 20 experience-use receipts from this attempt before its report; get_bot_records pages full history'}
+            'observations_coverage': 'At most 20 action and 40 experience-use receipts from this attempt before its report; get_bot_records pages full history'}
 
     def _learning_observations(self, s, record, con, table='bot_actions'):
+        limit = 40 if table == 'bot_learning_uses' else 20
         rows = con.execute('SELECT id FROM records WHERE collection=? AND subject_id=? AND created_seq<=? '
-            'ORDER BY created_seq DESC,id DESC LIMIT 20', (table, record['task_id'], record['created_seq']))
+            'ORDER BY created_seq DESC,id DESC LIMIT ?', (table, record['task_id'], record['created_seq'], limit))
         values = [self._dev_get(s, table, r[0]) for r in rows]
         return [v for v in values if v['attempt'] == record['report_record']['attempt']]
 
