@@ -14,9 +14,9 @@ DEVELOP_TOOLS = set('record capture_artifact begin_change checkpoint_change shar
 DEVELOP_TOOLS.update({'studio_comment','studio_acknowledge','studio_import_update','studio_share_update','studio_sync_update','record_state_restore'})
 REVIEW_TOOLS = set('claim_change_review submit_specialist_review complete_change_review propose_review_work reflect_change_review claim_mentor_job check_mentor_job finish_mentor_job fail_mentor_job'.split())
 REVIEW_TOOLS.add('recover_mentor_job')
-READ_TOOLS.update({'get_bot_context', 'list_bot_memories', 'list_team_messages', 'get_team_proposal'})
+READ_TOOLS.update({'get_bot_context', 'list_bot_memories', 'list_team_messages', 'get_team_proposal', 'get_crew_setup', 'list_crew_setups'})
 TEAM_TOOLS = {'start_bot_runtime', 'heartbeat_bot_runtime', 'stop_bot_runtime', 'propose_review_team', 'send_team_message', 'resolve_team_message', 'record_bot_memory'}
-DEVELOP_TOOLS.add('propose_onboarding')
+DEVELOP_TOOLS.update({'propose_onboarding','propose_crew_setup'})
 DEVELOP_TOOLS.update(TEAM_TOOLS | {'claim_mentor_job', 'check_mentor_job', 'finish_mentor_job', 'fail_mentor_job', 'recover_mentor_job'})
 REVIEW_TOOLS.update(TEAM_TOOLS)
 PROFILES = {'read-only': READ_TOOLS, 'developer': READ_TOOLS | DEVELOP_TOOLS,
@@ -35,10 +35,11 @@ PROFILES['bot'].update({'get_bot_learning_plan', 'prepare_bot_learning', 'submit
 PROFILES['bot'].update({'refresh_bot_task', 'ask_bot', 'record_bot_decision', 'record_bot_action', 'record_bot_experience'})
 PROFILES['bot'].update({'propose_bot_team', 'get_bot_team_proposal', 'get_bot_records'})
 PROFILES['bot'].update({'resolve_bot_question', 'stop_bot_task'})
+PROFILES['bot'].update({'get_crew_setup','list_crew_setups','propose_crew_setup'})
 # Standalone review does not expose organizational setup or Bot execution.
 PROFILES['review'] = (READ_TOOLS | REVIEW_TOOLS) - (TEAM_TOOLS | {
     'get_persistent_bot', 'list_persistent_memories', 'bot_inbox', 'get_bot_context',
-    'list_bot_memories', 'list_team_messages', 'get_team_proposal'})
+    'list_bot_memories', 'list_team_messages', 'get_team_proposal', 'get_crew_setup', 'list_crew_setups'})
 
 
 def connection_config(client, url, token_file, profile, executable):

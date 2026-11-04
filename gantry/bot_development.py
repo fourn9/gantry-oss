@@ -305,6 +305,7 @@ class BotDevelopmentMixin:
             from .bot_experience_checks import view
             result['experience_check'] = view(self, s, actor, task, con)
         result.update(self._studio_bot_context(s, task))
+        result['onboarding'] = self._crew_setup_context(s, actor, task)
         if task.get('handoff_from'):
             result['handoff'] = copy.deepcopy(s['bot_handoffs'][task['handoff_from']])
             result['predecessors'] = [self._bd_public(s['bot_tasks'][ident]) for ident in task.get('predecessor_task_ids',[])]

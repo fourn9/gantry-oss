@@ -51,6 +51,8 @@ class BotLearningTests(BotDevelopmentTests):
             self.assertEqual(len(jobs),1)
             packet = self.clients['designer'].call('get_bot_reflection', {'reflection_id':jobs[0]['id']})
             self.assertEqual(packet['report']['status'],'failed')
+            self.assertIn(task['id'], packet['evidence_rules']['visible_evidence_ids'])
+            self.assertIn(packet['plan_id'], packet['evidence_rules']['visible_evidence_ids'])
             lesson = {'kind':'procedure', 'observation':'Clamp interfered with route',
                 'strategy':'Inspect clearance before detailed routing', 'when_to_use':'This assembly routing',
                 'when_not_to_use':['Different fixture geometry'], 'paths':['mechanical.txt'], 'tags':['clamp'],
@@ -112,11 +114,11 @@ class BotLearningTests(BotDevelopmentTests):
     def test_worker_uses_plan_reflects_and_next_fresh_context_changes_order(self):
         self.enable_learning(); contexts=[]
         first=self.task('designer',title='Route clamp',dependencies=['mechanical.txt'])
-        with self.worker('designer',self.learning_infer(contexts)) as worker: worker.tick()
+        with self.worker('designer',self.learning_infer(contexts)) as worker: first_results=worker.tick()
         second=self.task('designer',title='Route clamp again',dependencies=['mechanical.txt'])
-        with self.worker('designer',self.learning_infer(contexts)) as worker: worker.tick()
+        with self.worker('designer',self.learning_infer(contexts)) as worker: second_results=worker.tick()
         work=[c for c in contexts if not c.get('operation')]
-        self.assertEqual(len(work),2)
+        self.assertEqual(len(work),2, (first_results, second_results))
         self.assertNotEqual(work[0]['learning_plan']['output']['steps'],work[1]['learning_plan']['output']['steps'])
         self.assertTrue(work[1]['learning_plan']['recall']['items'])
         self.assertEqual(self.clients['designer'].call('list_bot_reflections',{'bot_id':'designer'})['items'],[])
@@ -151,6 +153,9 @@ class BotLearningTests(BotDevelopmentTests):
         self.fault('unauthorized',lambda:self.clients['control'].call('get_bot_reflection',{'reflection_id':item['id']}))
         lesson={'kind':'procedure','observation':'Guessed','strategy':'Guess','when_to_use':'Always',
             'when_not_to_use':[],'paths':[],'tags':[],'evidence':[unrelated['id']],'supersedes':[],'contradicts':[]}
+        self.fault('invalid_input',lambda:self.clients['designer'].call('complete_bot_reflection',{
+            'reflection_id':item['id'],'version':item['version'],'output':{'lessons':[lesson],'feedback':[],'unknowns':[]}}))
+        lesson['evidence'] = ['assessment_not_an_observation']
         self.fault('invalid_input',lambda:self.clients['designer'].call('complete_bot_reflection',{
             'reflection_id':item['id'],'version':item['version'],'output':{'lessons':[lesson],'feedback':[],'unknowns':[]}}))
 

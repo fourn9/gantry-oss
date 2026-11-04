@@ -96,6 +96,7 @@ def reflect(client, item, infer, root):
         saved['input'] = {'operation': 'reflect_on_experience', 'packet': current,
             'instruction': 'You are the same customer Bot reflecting on its actual saved report and observations. '
                 'Extract conditional lessons, or none if evidence is insufficient. Cite recorded object IDs under evidence_rules. '
+                'Prefer evidence_rules.visible_evidence_ids; do not cite nested assessment IDs as observations. '
                 'Use experience_actions to assess which remembered procedure influenced actual work; reported links are not causal proof. '
                 'For reusable procedures, provide ordered procedure_steps and explicit applicability limits. '
                 'Correct a contradicted strategy with supersedes/contradicts IDs, retaining the failure and uncertainty. '

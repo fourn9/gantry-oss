@@ -6,27 +6,32 @@ import {parseMesh,mountMesh} from './studio_mesh.js';
 import {createActivityMonitor} from './studio_activity.js';
 
 export function createStudio({api,modal,toast,fail}){
-  let onboarding;
+  let onboarding,crewSetup;
   let overview,detail,project,node,viewEpoch=0,artifactEpoch=0,mesh,tab='cad',compare=false,compareState='',file='',selectedPart='',conversation=null,lastWork='',draft='',mentions=[],threadDetail;
   let downloadState=null,recent=[],cache=new Map(),drafts=new Map(),cameras=new Map(),meshKey='';
   const route=()=>location.hash.slice(1).split('/').map(x=>decodeURIComponent(x));
-  const handles=()=>['studio','studio-work','studio-inbox','studio-recent','studio-start'].includes(route()[0]||'studio');
+  const handles=()=>['studio','studio-work','studio-inbox','studio-recent','studio-start','studio-crew'].includes(route()[0]||'studio');
   const a=view.action;
   const activity=createActivityMonitor({api,notice:text=>{const el=$('#studio-live-notice');if(el){el.hidden=!text;el.querySelector('span').textContent=text;}}});
-  function reset(){onboarding?.leave();activity.clear();viewEpoch++;artifactEpoch++;disposeMesh();cache.clear();drafts.clear();cameras.clear();overview=detail=undefined;recent=[];lastWork='';conversation=null;threadDetail=null;draft='';mentions=[];}
+  function reset(){onboarding?.leave();crewSetup?.leave();activity.clear();viewEpoch++;artifactEpoch++;disposeMesh();cache.clear();drafts.clear();cameras.clear();overview=detail=undefined;recent=[];lastWork='';conversation=null;threadDetail=null;draft='';mentions=[];}
   function disposeMesh(){if(mesh){if(mesh.camera)cameras.set(meshKey,mesh.camera());mesh.destroy();mesh=null;while(cameras.size>50)cameras.delete(cameras.keys().next().value);}}
   function chooseFile(path){file=path;selectedPart=path;selectConversation(null);threadDetail=null;drawWork();}
   function remember(){if(conversation)drafts.set(JSON.stringify([detail.work.id,conversation]),{draft,mentions:[...mentions]});}
   function selectConversation(value){remember();conversation=value;const saved=drafts.get(JSON.stringify([detail.work.id,value]));draft=saved?.draft||'';mentions=saved?.mentions||[];}
   function sidebar(){const side=view.sidebar(overview,recent,{project:project?.id});$('#nav').innerHTML=side.nav;$('#sidebar-projects').innerHTML=side.projects;$('#recent-sessions').innerHTML=side.recent;}
   async function render(){
-    onboarding?.leave();remember();activity.clear();const current=++viewEpoch,parts=route(),kind=parts[0]||'studio';artifactEpoch++;disposeMesh();
+    onboarding?.leave();crewSetup?.leave();remember();activity.clear();const current=++viewEpoch,parts=route(),kind=parts[0]||'studio';artifactEpoch++;disposeMesh();
     document.body.classList.add('studio-mode');$('#main').className='studio-main';
     $('#main').innerHTML=view.hint('Loading workspace…');
     const loaded=await api('studio_overview');if(current!==viewEpoch||!handles())return;overview=loaded;activity.set('studio_overview',{},loaded);
     if(kind==='studio-start'){
       sidebar();if(!onboarding){const {createOnboarding}=await import('./onboarding.js');onboarding=createOnboarding({api,modal,toast,fail});}
       if(current!==viewEpoch)return;await onboarding.render(parts[1],overview);return;
+    }
+    if(kind==='studio-crew'){
+      project=overview.projects.find(p=>p.sessions?.some(s=>s.id===parts[1]));node=null;
+      sidebar();if(!crewSetup){const {createCrewSetup}=await import('./crew_setup.js');crewSetup=createCrewSetup({api,toast,fail});}
+      if(current!==viewEpoch)return;await crewSetup.render(parts[1],parts[2]);return;
     }
     if(kind==='studio-work'){
       const value=await api('studio_work',{work_id:parts[1],...(parts[2]?{state_id:parts[2]}:{})});if(current!==viewEpoch||!handles())return;
@@ -189,5 +194,5 @@ export function createStudio({api,modal,toast,fail}){
       conversation.thread_id=result.thread_id;remember();await drawWork();toast('Comment saved');
     }catch(err){if(sameTarget()&&$('#studio-comment-error'))$('#studio-comment-error').textContent=err.message;else fail(err);}finally{submit.disabled=false;}
   });
-  return {handles,render,reset,checkUpdates:()=>handles()&&!document.hidden?activity.check():undefined,leave:()=>{onboarding?.leave();activity.clear();remember();viewEpoch++;artifactEpoch++;disposeMesh();document.body.classList.remove('studio-mode');$('#main').className='';}};
+  return {handles,render,reset,checkUpdates:()=>handles()&&!document.hidden?activity.check():undefined,leave:()=>{onboarding?.leave();crewSetup?.leave();activity.clear();remember();viewEpoch++;artifactEpoch++;disposeMesh();document.body.classList.remove('studio-mode');$('#main').className='';}};
 }

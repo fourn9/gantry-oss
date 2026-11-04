@@ -134,14 +134,20 @@ class BotLearningMixin:
 
     def cmd_get_bot_reflection(self, s, actor, a, fx, n, con):
         record, task, plan = self._learning_reflection_access(s, actor, a['reflection_id'])
+        observations = self._learning_observations(s, record, con)
+        uses = self._learning_observations(s, record, con, 'bot_learning_uses')
+        visible_evidence = [task['id'], plan['id'], record['report_record']['state_id']]
+        visible_evidence.extend(v['id'] for v in observations + uses)
         return {**copy.deepcopy(record), 'plan': copy.deepcopy(plan),
             'task': {'id': task['id'], 'title': task['title'], 'completion': task['completion']},
             'evidence_rules': {'planning_intent_id': plan['id'], 'executor_report_task_id': task['id'],
                 'saved_state_id': record['report_record']['state_id'],
+                'visible_evidence_ids': sorted({v for v in visible_evidence if v}),
+                'not_evidence': 'Nested assessment IDs, requirement IDs, Bot IDs and this reflection ID are not observation citations.',
                 'observations': 'Same-attempt action, decision and experience-use IDs before this report; output_artifact IDs linked by those tool receipts',
                 'limits': 'Plans are intent; states are saved bytes; reports and use links are executor claims. None establishes physical correctness.'},
-            'observations': self._learning_observations(s, record, con),
-            'experience_actions': self._learning_observations(s, record, con, 'bot_learning_uses'),
+            'observations': observations,
+            'experience_actions': uses,
             'feedback_rules': {'eligible_memory_ids': [d['memory_id'] for d in plan['output']['decisions'] if d['use'] != 'reject'],
                 'limits': 'Each eligible memory at most once. Reject memories are ineligible; usefulness is not causal proof.'},
             'observations_coverage': 'At most 20 action and 40 experience-use receipts from this attempt before its report; get_bot_records pages full history'}

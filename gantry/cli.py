@@ -45,6 +45,8 @@ def main(service=None):
     project_mcp.add_argument('--root', required=True)
     from .onboarding_cli import add_parser as add_onboarding_parser
     add_onboarding_parser(sub)
+    from .crew_setup_cli import add_parser as add_crew_setup_parser
+    add_crew_setup_parser(sub)
     workspace = sub.add_parser('workspace', help='Connect saved CAD/code files to shared Studio work')
     workspace.add_argument('action', choices=['import','attach','status','sync','watch','share','continue'])
     workspace.add_argument('--root', default='.')
@@ -210,7 +212,7 @@ def main(service=None):
     if service:
         common = {'workspace', 'serve-cloud', 'init', 'serve', 'call', 'mcp', 'agent-config', 'agent-request', 'credential',
                   'export', 'restore-backup', 'capture-workspace', 'restore-development-state', 'restore-artifact'}
-        allowed = common | ({'bot-worker', 'bot-service', 'evaluate-learning', 'learning-evaluation-report'} if service == 'bots' else
+        allowed = common | ({'crew-setup', 'bot-worker', 'bot-service', 'evaluate-learning', 'learning-evaluation-report'} if service == 'bots' else
             {'connect', 'disconnect', 'project', 'project-mcp', 'mentor-worker', 'recover-mentor-job'})
         for name in list(sub.choices):
             if name not in allowed: del sub.choices[name]
@@ -379,6 +381,9 @@ def main(service=None):
             if args.command == 'onboard':
                 from .onboarding_cli import run as run_onboarding
                 print(json.dumps(run_onboarding(client,args),ensure_ascii=False,indent=2)); return
+            if args.command == 'crew-setup':
+                from .crew_setup_cli import run as run_crew_setup
+                print(json.dumps(run_crew_setup(client,args),ensure_ascii=False,indent=2)); return
             if args.command == 'workspace':
                 from .workspace import Workspace, import_workspace, continue_workspace, watch_workspace
                 from .model import require
