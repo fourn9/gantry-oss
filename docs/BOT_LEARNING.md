@@ -9,6 +9,9 @@ with a commercial personal assistant.
 See [persistent work and selective continuation](BOT_CONTINUITY.md) for ongoing
 commitments, experience/action links, procedural corrections and safe reflection recovery.
 
+See [selective learning and generated-lesson transfer](BOT_LEARNING_TRANSFER.md)
+for opt-in effort reduction, peer checks and a failure-first comparison.
+
 ## Execution path
 
 ```mermaid

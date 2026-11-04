@@ -35,6 +35,10 @@ LEARNING_USE = {'memory_id': S,
     'change': {**S, 'maxLength': 4000}, 'condition_check': {**S, 'maxLength': 4000}}
 REPORT['experience_uses'] = {'type': ['array', 'null'], 'maxItems': 40, 'items': {
     'type': 'object', 'properties': LEARNING_USE, 'required': list(LEARNING_USE), 'additionalProperties': False}}
+REPORT['experience_check'] = {'type': ['object', 'null'], 'properties': {
+    'verdict': {'enum':['supported_for_scope','contradicted','inconclusive']}, 'reason': S,
+    'action_ids': {'type':'array','minItems':1,'maxItems':40,'items':S}},
+    'required':['verdict','reason','action_ids'], 'additionalProperties':False}
 BOT_ANSWER = {'type': 'object', 'properties': {**REPORT, 'edits': {'type': 'array', 'maxItems': 100, 'items': EDIT}},
               'required': [*REPORT_REQUIRED, 'edits'], 'additionalProperties': False}
 register('configure_bot_project', {'session_id': S, 'organization_id': S, 'version': VERSION,
@@ -224,6 +228,8 @@ class BotDevelopmentMixin:
 
     def _bd_stamp(self, s, actor, task, con):
         self._check_continuation_task(s, actor, task)
+        from .bot_experience_checks import validate
+        validate(self, s, task, con)
         b, bot, p, d = self._bd_actor(s, actor, task['session_id'], task['bot_id'])
         require(not task.get('studio_request_id') or actor['kind']=='agent','unauthorized','Studio Bot execution requires an agent identity')
         require(d['mode'] == 'execute', 'mode_disabled', 'Bot execution is not delegated')
@@ -295,7 +301,11 @@ class BotDevelopmentMixin:
             result['learning_plan'] = self._learning_context(s, actor, task)
         result['working_state'] = self._working_context(s, actor, task)
         result.update(self._crew_context(s, actor, task, con))
+        if task.get('experience_check'):
+            from .bot_experience_checks import view
+            result['experience_check'] = view(self, s, actor, task, con)
         result.update(self._studio_bot_context(s, task))
+        result['onboarding'] = self._crew_setup_context(s, actor, task)
         if task.get('handoff_from'):
             result['handoff'] = copy.deepcopy(s['bot_handoffs'][task['handoff_from']])
             result['predecessors'] = [self._bd_public(s['bot_tasks'][ident]) for ident in task.get('predecessor_task_ids',[])]
@@ -373,6 +383,8 @@ class BotDevelopmentMixin:
             # roll back all links. Never infer use or bypass the standalone checks.
             self.cmd_record_bot_learning_use(s, actor,
                 {'task_id': task['id'], 'fence': a['fence'], **use}, fx, n, con)
+        from .bot_experience_checks import finish
+        finish(self, s, actor, task, report, fx, con)
         require(not report['assignments'] or report['status'] == 'waiting', 'invalid_input', 'Parent must wait for assigned work')
         for assignment in report['assignments']:
             child = self._bd_assign(s, actor, {**assignment, 'session_id': task['session_id'],
@@ -494,6 +506,14 @@ class BotDevelopmentMixin:
             self._bd_actor(s, actor, msg['session_id'], msg['from_bot_id'])
             require(actor['id'] == msg['principal_id'], 'unauthorized', 'Only author or owner can resolve')
         self._bd_evidence(s, actor, msg['session_id'], a['evidence'])
+        if msg.get('response_task_id'):
+            from .bot_experience_checks import view
+            check = view(self, s, actor, self._dev_get(s, 'bot_tasks', msg['response_task_id']), con)
+            if check is not None:
+                # Resolving acknowledges/discards a response; it cannot make a
+                # stale opinion usable. Preserve that distinction in history.
+                msg['experience_check_resolution'] = {'available': check['available'],
+                    'reason': check.get('reason'), 'formal_adoption': False}
         require(not msg.get('response_task_id') or msg['status'] == 'answered',
                 'dependency_pending', 'Read the consultation response before resolving')
         require(msg['status'] in {'open', 'answered'}, 'conflict', 'Already resolved')

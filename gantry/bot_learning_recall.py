@@ -76,7 +76,12 @@ def recall(core, s, actor, task, con, after='', limit=20):
             try: core._dev_session(s, actor, entry['session_id'])
             except Fault: continue
             counts[entry['outcome']] += 1
+        from .bot_experience_checks import recalled
+        peer_checks = recalled(core, s, actor, task, memory, con)
+        if peer_checks and any(not c['same_basis'] or c['verdict'] != 'supported_for_scope' for c in peer_checks):
+            flags.append('peer_check_requires_reassessment')
         result = copy.deepcopy(memory)
+        if peer_checks: result['peer_checks'] = peer_checks
         result.update(relevance={'tokens': sorted(overlap), 'paths': sorted(matching_paths),
             'requirements': sorted(matching_requirements)}, applicability_flags=flags,
             allowed_uses=['recheck', 'reject'] if flags else ['apply', 'recheck', 'reject'],
@@ -95,7 +100,20 @@ def planning_view(packet):
     """Keep complete source inventories in Core, not repeated in model prompts."""
     result = copy.deepcopy(packet)
     result['full_packet'] = {'operation': 'get_bot_learning_plan', 'plan_id': packet['id'], 'sha256': digest(packet)}
-    for memory in result['recall']['items']:
+    groups = {}
+    for index, memory in enumerate(result['recall']['items']):
+        if result.get('compact') and not memory.get('related_updates') and not memory.get('duplicate_of') and not any(
+                memory.get(r) or memory.get('lesson', {}).get(r) for r in ('supersedes', 'contradicts')):
+            # Exact equivalence only: include evidence, author, source state,
+            # conditions, feedback and applicability. Never merge by similarity.
+            signature = digest({k: v for k, v in memory.items() if k not in {'id', 'at', 'created_seq', 'share_id'}})
+            if signature in groups:
+                result['recall']['items'][index] = {k: memory[k] for k in (
+                    'id','applicability_flags','allowed_uses','evidence_status')}
+                result['recall']['items'][index].update(duplicate_of=groups[signature],
+                    source_reference={'operation':'get_bot_learning_plan', 'plan_id':packet['id'], 'memory_id':memory['id']})
+                continue
+            groups[signature] = memory['id']
         hashes = memory.get('input_hashes', {})
         paths = memory.get('paths', [])
         memory['input_hash_count'] = len(hashes)
@@ -103,4 +121,6 @@ def planning_view(packet):
         memory['path_count'] = len(paths)
         memory['paths'] = paths[:20]
         memory['inventory_preview_truncated'] = len(hashes)>20 or len(paths)>20
+    if result.get('compact'):
+        result['recall']['presentation'] = 'Exact duplicate bodies refer to the first item; every ID still requires its own decision. Full evidence remains in full_packet.'
     return result

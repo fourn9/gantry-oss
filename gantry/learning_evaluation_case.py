@@ -46,7 +46,7 @@ def freeze_case(path):
         type(verifier['timeout_seconds']) is int and 1 <= verifier['timeout_seconds'] <= 300,
         'invalid_input', 'Select a read-only Python verifier and a 1–300 second timeout')
     notes = case['experiences']
-    require(isinstance(notes, list) and 0 < len(notes) <= 20, 'invalid_input', 'Select 1–20 prior experience notes')
+    require(isinstance(notes, list) and 0 <= len(notes) <= 20, 'invalid_input', 'Select 0–20 prior experience notes')
     for note in notes:
         require(isinstance(note, dict) and set(note) == {'observation', 'applicability', 'source', 'limitations'} and
             all(isinstance(note[k], str) and 0 < len(note[k]) <= 4000 for k in ('observation','applicability','source')) and

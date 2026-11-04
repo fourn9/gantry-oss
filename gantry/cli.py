@@ -45,6 +45,10 @@ def main(service=None):
     project_mcp.add_argument('--root', required=True)
     from .onboarding_cli import add_parser as add_onboarding_parser
     add_onboarding_parser(sub)
+    from .crew_setup_cli import add_parser as add_crew_setup_parser
+    add_crew_setup_parser(sub)
+    from .crew_setup_host_cli import add_parser as add_crew_setup_host_parser
+    add_crew_setup_host_parser(sub)
     workspace = sub.add_parser('workspace', help='Connect saved CAD/code files to shared Studio work')
     workspace.add_argument('action', choices=['import','attach','status','sync','watch','share','continue'])
     workspace.add_argument('--root', default='.')
@@ -160,6 +164,8 @@ def main(service=None):
     bot_worker.add_argument('--collect-interrupted-verification', action='store_true')
     evaluation = sub.add_parser('evaluate-learning', help='Paired isolated Bot experience experiment (uses your ChatGPT login)')
     evaluation.add_argument('--case', required=True, help='Trusted experiment JSON; selected source and acceptance verifier')
+    evaluation.add_argument('--learning-mode', choices=['always','selective'], default='always')
+    evaluation.add_argument('--training-case', help='Generate lessons from this separate case before evaluating --case; both start with experiences=[]')
     evaluation.add_argument('--output', required=True, help='New private directory, outside the source project')
     evaluation.add_argument('--model', required=True)
     evaluation.add_argument('--reasoning-effort', required=True, choices=['minimal','low','medium','high','xhigh'])
@@ -208,7 +214,7 @@ def main(service=None):
     if service:
         common = {'workspace', 'serve-cloud', 'init', 'serve', 'call', 'mcp', 'agent-config', 'agent-request', 'credential',
                   'export', 'restore-backup', 'capture-workspace', 'restore-development-state', 'restore-artifact'}
-        allowed = common | ({'bot-worker', 'bot-service', 'evaluate-learning', 'learning-evaluation-report'} if service == 'bots' else
+        allowed = common | ({'crew-setup', 'crew-setup-host', 'bot-worker', 'bot-service', 'evaluate-learning', 'learning-evaluation-report'} if service == 'bots' else
             {'connect', 'disconnect', 'project', 'project-mcp', 'mentor-worker', 'recover-mentor-job'})
         for name in list(sub.choices):
             if name not in allowed: del sub.choices[name]
@@ -219,9 +225,17 @@ def main(service=None):
     try:
         if args.command == 'evaluate-learning':
             from .learning_evaluation import run_evaluation
-            report = run_evaluation(args.case, args.output, model=args.model, reasoning_effort=args.reasoning_effort,
-                max_calls=args.max_calls, seconds=args.seconds, repetitions=args.repetitions, seed=args.seed)
-            result = {'report': str(Path(args.output).resolve()/'report.md'), 'summary': report['summary']}
+            options = dict(model=args.model, reasoning_effort=args.reasoning_effort,
+                max_calls=args.max_calls, seconds=args.seconds, repetitions=args.repetitions, seed=args.seed, learning_mode=args.learning_mode)
+            if args.training_case:
+                from .learning_transfer import run_transfer_evaluation
+                report = run_transfer_evaluation(args.training_case, [args.case], args.output, **options)
+                result = {'report': str(Path(args.output).resolve()/'transfer.json'), 'status': report['status'],
+                    'generated_lesson_count': len(report['generated_lessons']),
+                    'summaries': [r['summary'] for r in report['evaluations']]}
+            else:
+                report = run_evaluation(args.case, args.output, **options)
+                result = {'report': str(Path(args.output).resolve()/'report.md'), 'summary': report['summary']}
         elif args.command == 'learning-evaluation-report':
             from .learning_evaluation_report import regenerate
             result = regenerate(args.directory)['summary']
@@ -315,6 +329,9 @@ def main(service=None):
                     os.chmod(args.output,0o600); json.dump(metrics.report(),f,indent=2)
                 result={'preview_file':str(Path(args.output).absolute()),'sent':False,
                         'next':'Inspect this report and share voluntarily through your chosen channel.'}
+        elif args.command == 'crew-setup-host':
+            from .crew_setup_host_cli import run as run_crew_setup_host
+            run_crew_setup_host(args); return
         elif args.command == 'bot-service':
             from .bot_worker import service_manifest
             content = service_manifest(args.config, args.journal, args.executable, args.platform,
@@ -369,6 +386,9 @@ def main(service=None):
             if args.command == 'onboard':
                 from .onboarding_cli import run as run_onboarding
                 print(json.dumps(run_onboarding(client,args),ensure_ascii=False,indent=2)); return
+            if args.command == 'crew-setup':
+                from .crew_setup_cli import run as run_crew_setup
+                print(json.dumps(run_crew_setup(client,args),ensure_ascii=False,indent=2)); return
             if args.command == 'workspace':
                 from .workspace import Workspace, import_workspace, continue_workspace, watch_workspace
                 from .model import require

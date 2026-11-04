@@ -98,6 +98,110 @@
       "type": "object"
     }
   },
+  "activate_crew_setup": {
+    "description": "Owner approves exact hierarchy and scopes. Atomically reuse membership and persistent Bot contracts; runtimes remain offline.",
+    "schema": {
+      "additionalProperties": false,
+      "properties": {
+        "basis": {
+          "type": "object"
+        },
+        "bindings": {
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "principal_id": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "request": {
+                "additionalProperties": false,
+                "properties": {
+                  "ledger_id": {
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "member_id": {
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "role": {
+                    "enum": [
+                      "reader",
+                      "contributor",
+                      "agent-developer",
+                      "agent-reviewer",
+                      "agent-bot"
+                    ]
+                  },
+                  "token_hash": {
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "valid_until": {
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "zones": {
+                    "items": {
+                      "minLength": 1,
+                      "type": "string"
+                    },
+                    "maxItems": 32,
+                    "minItems": 1,
+                    "type": "array"
+                  }
+                },
+                "required": [
+                  "member_id",
+                  "ledger_id",
+                  "token_hash",
+                  "role",
+                  "zones",
+                  "valid_until"
+                ],
+                "type": "object"
+              },
+              "role_id": {
+                "minLength": 1,
+                "type": "string"
+              }
+            },
+            "required": [
+              "role_id",
+              "principal_id"
+            ],
+            "type": "object"
+          },
+          "maxItems": 32,
+          "minItems": 1,
+          "type": "array"
+        },
+        "intent": {
+          "type": "object"
+        },
+        "proposal_hash": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "setup_id": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "version": {
+          "minimum": 1,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "setup_id",
+        "version",
+        "proposal_hash",
+        "bindings"
+      ],
+      "type": "object"
+    }
+  },
   "activate_team_proposal": {
     "description": "activate team proposal",
     "schema": {
@@ -390,6 +494,10 @@
         },
         "intent": {
           "type": "object"
+        },
+        "memory_id": {
+          "minLength": 1,
+          "type": "string"
         },
         "question": {
           "minLength": 1,
@@ -858,6 +966,29 @@
         "task_id",
         "version",
         "reason"
+      ],
+      "type": "object"
+    }
+  },
+  "cancel_crew_setup_job": {
+    "description": "Cancel only a queued or held operation that has never been claimed by a customer host.",
+    "schema": {
+      "additionalProperties": false,
+      "properties": {
+        "basis": {
+          "type": "object"
+        },
+        "intent": {
+          "type": "object"
+        },
+        "job_id": {
+          "maxLength": 160,
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "required": [
+        "job_id"
       ],
       "type": "object"
     }
@@ -1447,6 +1578,35 @@
       "required": [
         "submission_id",
         "lease_seconds"
+      ],
+      "type": "object"
+    }
+  },
+  "claim_crew_setup_job": {
+    "description": "Atomically claim for the live host instance. Interrupted jobs require explicit owner resume.",
+    "schema": {
+      "additionalProperties": false,
+      "properties": {
+        "basis": {
+          "type": "object"
+        },
+        "host_id": {
+          "maxLength": 160,
+          "minLength": 1,
+          "type": "string"
+        },
+        "instance_id": {
+          "maxLength": 160,
+          "minLength": 1,
+          "type": "string"
+        },
+        "intent": {
+          "type": "object"
+        }
+      },
+      "required": [
+        "host_id",
+        "instance_id"
       ],
       "type": "object"
     }
@@ -2175,6 +2335,38 @@
         "summary",
         "output_hash",
         "details"
+      ],
+      "type": "object"
+    }
+  },
+  "complete_empty_bot_learning": {
+    "description": "complete empty bot learning",
+    "schema": {
+      "additionalProperties": false,
+      "properties": {
+        "basis": {
+          "type": "object"
+        },
+        "fence": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "intent": {
+          "type": "object"
+        },
+        "plan_id": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "task_id": {
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "required": [
+        "task_id",
+        "fence",
+        "plan_id"
       ],
       "type": "object"
     }
@@ -4122,6 +4314,35 @@
       "type": "object"
     }
   },
+  "disconnect_crew_setup_host": {
+    "description": "disconnect crew setup host",
+    "schema": {
+      "additionalProperties": false,
+      "properties": {
+        "basis": {
+          "type": "object"
+        },
+        "host_id": {
+          "maxLength": 160,
+          "minLength": 1,
+          "type": "string"
+        },
+        "instance_id": {
+          "maxLength": 160,
+          "minLength": 1,
+          "type": "string"
+        },
+        "intent": {
+          "type": "object"
+        }
+      },
+      "required": [
+        "host_id",
+        "instance_id"
+      ],
+      "type": "object"
+    }
+  },
   "discuss": {
     "description": "Record a discussion with fixed evidence revision IDs. basis is the common event provenance object; evidence is a list of immutable references.",
     "schema": {
@@ -4416,6 +4637,40 @@
               "maxItems": 16,
               "type": "array"
             },
+            "experience_check": {
+              "additionalProperties": false,
+              "properties": {
+                "action_ids": {
+                  "items": {
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "maxItems": 40,
+                  "minItems": 1,
+                  "type": "array"
+                },
+                "reason": {
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "verdict": {
+                  "enum": [
+                    "supported_for_scope",
+                    "contradicted",
+                    "inconclusive"
+                  ]
+                }
+              },
+              "required": [
+                "verdict",
+                "reason",
+                "action_ids"
+              ],
+              "type": [
+                "object",
+                "null"
+              ]
+            },
             "experience_uses": {
               "items": {
                 "additionalProperties": false,
@@ -4524,6 +4779,121 @@
         "task_id",
         "fence",
         "report"
+      ],
+      "type": "object"
+    }
+  },
+  "finish_crew_setup_job": {
+    "description": "Retain only a sanitized public receipt; no provider exceptions or private journal data.",
+    "schema": {
+      "additionalProperties": false,
+      "properties": {
+        "basis": {
+          "type": "object"
+        },
+        "host_id": {
+          "maxLength": 160,
+          "minLength": 1,
+          "type": "string"
+        },
+        "instance_id": {
+          "maxLength": 160,
+          "minLength": 1,
+          "type": "string"
+        },
+        "intent": {
+          "type": "object"
+        },
+        "job_id": {
+          "maxLength": 160,
+          "minLength": 1,
+          "type": "string"
+        },
+        "prepared": {
+          "additionalProperties": false,
+          "properties": {
+            "proposal_hash": {
+              "maxLength": 64,
+              "minLength": 64,
+              "type": "string"
+            },
+            "roles": {
+              "items": {
+                "additionalProperties": false,
+                "properties": {
+                  "name": {
+                    "maxLength": 160,
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "principal_id": {
+                    "maxLength": 160,
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "reused": {
+                    "type": "boolean"
+                  },
+                  "role_id": {
+                    "maxLength": 160,
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "tools": {
+                    "items": {
+                      "maxLength": 80,
+                      "minLength": 1,
+                      "type": "string"
+                    },
+                    "maxItems": 40,
+                    "type": "array"
+                  }
+                },
+                "required": [
+                  "role_id",
+                  "principal_id",
+                  "reused",
+                  "name",
+                  "tools"
+                ],
+                "type": "object"
+              },
+              "maxItems": 32,
+              "minItems": 1,
+              "type": "array"
+            },
+            "runtime_plan_hash": {
+              "maxLength": 64,
+              "minLength": 64,
+              "type": "string"
+            }
+          },
+          "required": [
+            "proposal_hash",
+            "runtime_plan_hash",
+            "roles"
+          ],
+          "type": "object"
+        },
+        "status": {
+          "enum": [
+            "succeeded",
+            "held",
+            "cancelled"
+          ]
+        },
+        "summary": {
+          "maxLength": 300,
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "required": [
+        "host_id",
+        "instance_id",
+        "job_id",
+        "status",
+        "summary"
       ],
       "type": "object"
     }
@@ -4912,6 +5282,51 @@
       "type": "object"
     }
   },
+  "get_crew_setup": {
+    "description": "get crew setup",
+    "schema": {
+      "additionalProperties": false,
+      "properties": {
+        "basis": {
+          "type": "object"
+        },
+        "intent": {
+          "type": "object"
+        },
+        "setup_id": {
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "required": [
+        "setup_id"
+      ],
+      "type": "object"
+    }
+  },
+  "get_crew_setup_control": {
+    "description": "get crew setup control",
+    "schema": {
+      "additionalProperties": false,
+      "properties": {
+        "basis": {
+          "type": "object"
+        },
+        "intent": {
+          "type": "object"
+        },
+        "setup_id": {
+          "maxLength": 160,
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "required": [
+        "setup_id"
+      ],
+      "type": "object"
+    }
+  },
   "get_design_assessment": {
     "description": "get design assessment",
     "schema": {
@@ -5280,6 +5695,35 @@
       "required": [
         "bot_id",
         "fence"
+      ],
+      "type": "object"
+    }
+  },
+  "heartbeat_crew_setup_host": {
+    "description": "heartbeat crew setup host",
+    "schema": {
+      "additionalProperties": false,
+      "properties": {
+        "basis": {
+          "type": "object"
+        },
+        "host_id": {
+          "maxLength": 160,
+          "minLength": 1,
+          "type": "string"
+        },
+        "instance_id": {
+          "maxLength": 160,
+          "minLength": 1,
+          "type": "string"
+        },
+        "intent": {
+          "type": "object"
+        }
+      },
+      "required": [
+        "host_id",
+        "instance_id"
       ],
       "type": "object"
     }
@@ -5892,6 +6336,28 @@
           "maximum": 100,
           "minimum": 1,
           "type": "integer"
+        },
+        "session_id": {
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "required": [
+        "session_id"
+      ],
+      "type": "object"
+    }
+  },
+  "list_crew_setups": {
+    "description": "list crew setups",
+    "schema": {
+      "additionalProperties": false,
+      "properties": {
+        "basis": {
+          "type": "object"
+        },
+        "intent": {
+          "type": "object"
         },
         "session_id": {
           "minLength": 1,
@@ -6529,6 +6995,9 @@
         "basis": {
           "type": "object"
         },
+        "compact": {
+          "type": "boolean"
+        },
         "fence": {
           "minLength": 1,
           "type": "string"
@@ -6842,6 +7311,320 @@
         "acceptance",
         "members",
         "rationale"
+      ],
+      "type": "object"
+    }
+  },
+  "propose_crew_setup": {
+    "description": "Propose sourced organization/roles using the frozen project and organization evidence. No permission grants.",
+    "schema": {
+      "additionalProperties": false,
+      "properties": {
+        "basis": {
+          "type": "object"
+        },
+        "input_basis": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "intent": {
+          "type": "object"
+        },
+        "proposal": {
+          "additionalProperties": false,
+          "properties": {
+            "acceptance": {
+              "items": {
+                "maxLength": 2000,
+                "minLength": 1,
+                "type": "string"
+              },
+              "maxItems": 30,
+              "minItems": 1,
+              "type": "array"
+            },
+            "first_task": {
+              "additionalProperties": false,
+              "properties": {
+                "completion": {
+                  "items": {
+                    "maxLength": 2000,
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "maxItems": 30,
+                  "minItems": 1,
+                  "type": "array"
+                },
+                "title": {
+                  "maxLength": 240,
+                  "minLength": 1,
+                  "type": "string"
+                }
+              },
+              "required": [
+                "title",
+                "completion"
+              ],
+              "type": "object"
+            },
+            "goal": {
+              "maxLength": 2000,
+              "minLength": 1,
+              "type": "string"
+            },
+            "lead_role_id": {
+              "maxLength": 240,
+              "minLength": 1,
+              "type": "string"
+            },
+            "organization_profile": {
+              "additionalProperties": false,
+              "properties": {
+                "focus_paths": {
+                  "items": {
+                    "maxLength": 4000,
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "maxItems": 20,
+                  "type": "array"
+                },
+                "mission": {
+                  "maxLength": 4000,
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "onboarding": {
+                  "items": {
+                    "maxLength": 4000,
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "maxItems": 20,
+                  "type": "array"
+                },
+                "report_when": {
+                  "items": {
+                    "maxLength": 4000,
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "maxItems": 20,
+                  "type": "array"
+                },
+                "responsibilities": {
+                  "items": {
+                    "maxLength": 4000,
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "maxItems": 20,
+                  "type": "array"
+                },
+                "style": {
+                  "maxLength": 4000,
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "workflow": {
+                  "items": {
+                    "maxLength": 4000,
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "maxItems": 20,
+                  "type": "array"
+                }
+              },
+              "required": [
+                "mission",
+                "responsibilities",
+                "focus_paths",
+                "workflow",
+                "report_when",
+                "style",
+                "onboarding"
+              ],
+              "type": "object"
+            },
+            "roles": {
+              "items": {
+                "additionalProperties": false,
+                "properties": {
+                  "can_assign": {
+                    "type": "boolean"
+                  },
+                  "can_integrate": {
+                    "type": "boolean"
+                  },
+                  "evidence_ids": {
+                    "items": {
+                      "minLength": 1,
+                      "type": "string"
+                    },
+                    "maxItems": 30,
+                    "minItems": 1,
+                    "type": "array"
+                  },
+                  "existing_bot_id": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "name": {
+                    "maxLength": 240,
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "parent_role_id": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "profile": {
+                    "additionalProperties": false,
+                    "properties": {
+                      "focus_paths": {
+                        "items": {
+                          "maxLength": 4000,
+                          "minLength": 1,
+                          "type": "string"
+                        },
+                        "maxItems": 20,
+                        "type": "array"
+                      },
+                      "mission": {
+                        "maxLength": 4000,
+                        "minLength": 1,
+                        "type": "string"
+                      },
+                      "onboarding": {
+                        "items": {
+                          "maxLength": 4000,
+                          "minLength": 1,
+                          "type": "string"
+                        },
+                        "maxItems": 20,
+                        "type": "array"
+                      },
+                      "report_when": {
+                        "items": {
+                          "maxLength": 4000,
+                          "minLength": 1,
+                          "type": "string"
+                        },
+                        "maxItems": 20,
+                        "type": "array"
+                      },
+                      "responsibilities": {
+                        "items": {
+                          "maxLength": 4000,
+                          "minLength": 1,
+                          "type": "string"
+                        },
+                        "maxItems": 20,
+                        "type": "array"
+                      },
+                      "style": {
+                        "maxLength": 4000,
+                        "minLength": 1,
+                        "type": "string"
+                      },
+                      "workflow": {
+                        "items": {
+                          "maxLength": 4000,
+                          "minLength": 1,
+                          "type": "string"
+                        },
+                        "maxItems": 20,
+                        "type": "array"
+                      }
+                    },
+                    "required": [
+                      "mission",
+                      "responsibilities",
+                      "focus_paths",
+                      "workflow",
+                      "report_when",
+                      "style",
+                      "onboarding"
+                    ],
+                    "type": "object"
+                  },
+                  "rationale": {
+                    "maxLength": 2000,
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "role_id": {
+                    "maxLength": 240,
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "write_scope": {
+                    "items": {
+                      "minLength": 1,
+                      "type": "string"
+                    },
+                    "type": "array"
+                  }
+                },
+                "required": [
+                  "role_id",
+                  "name",
+                  "parent_role_id",
+                  "existing_bot_id",
+                  "profile",
+                  "write_scope",
+                  "can_assign",
+                  "can_integrate",
+                  "rationale",
+                  "evidence_ids"
+                ],
+                "type": "object"
+              },
+              "maxItems": 32,
+              "minItems": 1,
+              "type": "array"
+            },
+            "unknowns": {
+              "items": {
+                "maxLength": 2000,
+                "minLength": 1,
+                "type": "string"
+              },
+              "maxItems": 30,
+              "type": "array"
+            }
+          },
+          "required": [
+            "organization_profile",
+            "goal",
+            "acceptance",
+            "lead_role_id",
+            "roles",
+            "unknowns",
+            "first_task"
+          ],
+          "type": "object"
+        },
+        "setup_id": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "version": {
+          "minimum": 1,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "setup_id",
+        "version",
+        "input_basis",
+        "proposal"
       ],
       "type": "object"
     }
@@ -8571,6 +9354,64 @@
       "type": "object"
     }
   },
+  "register_crew_setup_host": {
+    "description": "Register this human owner's customer host instance. No credentials or commands are retained.",
+    "schema": {
+      "additionalProperties": false,
+      "properties": {
+        "backend": {
+          "enum": [
+            "codex-subscription",
+            "customer-command"
+          ]
+        },
+        "basis": {
+          "type": "object"
+        },
+        "config_hash": {
+          "maxLength": 64,
+          "minLength": 64,
+          "type": "string"
+        },
+        "host_id": {
+          "maxLength": 160,
+          "minLength": 1,
+          "type": "string"
+        },
+        "instance_id": {
+          "maxLength": 160,
+          "minLength": 1,
+          "type": "string"
+        },
+        "intent": {
+          "type": "object"
+        },
+        "name": {
+          "maxLength": 160,
+          "minLength": 1,
+          "type": "string"
+        },
+        "tools": {
+          "items": {
+            "maxLength": 80,
+            "minLength": 1,
+            "type": "string"
+          },
+          "maxItems": 40,
+          "type": "array"
+        }
+      },
+      "required": [
+        "host_id",
+        "instance_id",
+        "name",
+        "config_hash",
+        "backend",
+        "tools"
+      ],
+      "type": "object"
+    }
+  },
   "related_review_context": {
     "description": "related review context",
     "schema": {
@@ -8854,6 +9695,70 @@
       "type": "object"
     }
   },
+  "request_crew_setup_job": {
+    "description": "Queue one bounded customer-host action. Activation/start require exact proposal and runtime plan approval; start also requires the reviewed execution session version.",
+    "schema": {
+      "additionalProperties": false,
+      "properties": {
+        "action": {
+          "enum": [
+            "analyze",
+            "prepare",
+            "activate",
+            "start",
+            "stop"
+          ]
+        },
+        "basis": {
+          "type": "object"
+        },
+        "config_hash": {
+          "maxLength": 64,
+          "minLength": 64,
+          "type": "string"
+        },
+        "host_id": {
+          "maxLength": 160,
+          "minLength": 1,
+          "type": "string"
+        },
+        "intent": {
+          "type": "object"
+        },
+        "proposal_hash": {
+          "maxLength": 64,
+          "minLength": 64,
+          "type": "string"
+        },
+        "runtime_plan_hash": {
+          "maxLength": 64,
+          "minLength": 64,
+          "type": "string"
+        },
+        "session_version": {
+          "minimum": 1,
+          "type": "integer"
+        },
+        "setup_id": {
+          "maxLength": 160,
+          "minLength": 1,
+          "type": "string"
+        },
+        "version": {
+          "minimum": 1,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "setup_id",
+        "version",
+        "host_id",
+        "config_hash",
+        "action"
+      ],
+      "type": "object"
+    }
+  },
   "request_mentor": {
     "description": "request mentor",
     "schema": {
@@ -9130,6 +10035,29 @@
       },
       "required": [
         "revision_id"
+      ],
+      "type": "object"
+    }
+  },
+  "resume_crew_setup_job": {
+    "description": "Resume this held job ID against its original customer journal. A claimed Start with stale execution approval becomes stop-only recovery, never new execution authority.",
+    "schema": {
+      "additionalProperties": false,
+      "properties": {
+        "basis": {
+          "type": "object"
+        },
+        "intent": {
+          "type": "object"
+        },
+        "job_id": {
+          "maxLength": 160,
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "required": [
+        "job_id"
       ],
       "type": "object"
     }
@@ -9821,6 +10749,111 @@
         "version",
         "instance_id",
         "environment_hash"
+      ],
+      "type": "object"
+    }
+  },
+  "start_crew_setup": {
+    "description": "Owner selects organizational exports; preserve originals separately from project files. Never execute or grant authority.",
+    "schema": {
+      "additionalProperties": false,
+      "properties": {
+        "basis": {
+          "type": "object"
+        },
+        "files": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "maxProperties": 1000,
+          "type": "object"
+        },
+        "intent": {
+          "type": "object"
+        },
+        "notes": {
+          "maxLength": 12000,
+          "type": "string"
+        },
+        "organization_id": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "organization_name": {
+          "maxLength": 240,
+          "minLength": 1,
+          "type": "string"
+        },
+        "session_id": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "sources": {
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "path": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "provider": {
+                "enum": [
+                  "generic",
+                  "notion",
+                  "linear",
+                  "jira",
+                  "spreadsheet"
+                ]
+              }
+            },
+            "required": [
+              "path",
+              "provider"
+            ],
+            "type": "object"
+          },
+          "maxItems": 30,
+          "type": "array"
+        },
+        "state_id": {
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "required": [
+        "session_id",
+        "state_id",
+        "organization_name",
+        "notes",
+        "files",
+        "sources"
+      ],
+      "type": "object"
+    }
+  },
+  "start_crew_setup_work": {
+    "description": "Owner explicitly queues first planning task; requires existing execution delegation and a ready runtime. Never triggered by import.",
+    "schema": {
+      "additionalProperties": false,
+      "properties": {
+        "basis": {
+          "type": "object"
+        },
+        "intent": {
+          "type": "object"
+        },
+        "setup_id": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "version": {
+          "minimum": 1,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "setup_id",
+        "version"
       ],
       "type": "object"
     }

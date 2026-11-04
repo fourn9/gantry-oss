@@ -7,6 +7,9 @@ def pending_inference(directory, journal, config):
     plan = directory/'learning'/'plan.json'
     if config.get('experience_learning') and plan.exists():
         saved = json.loads(plan.read_text())
+        packet=saved.get('packet', {})
+        if config.get('learning_mode') == 'selective' and packet and not packet['recall']['items'] and not packet['recall']['truncated'] and 'result' not in saved:
+            return None  # Transport reconciliation, no selection-model invocation exists.
         if 'receipt' not in saved and 'result' not in saved and not (directory/'learning'/'inference'/'receipt.json').exists():
             return directory/'learning'/'inference'/'model'
     if config.get('agent_loop'):

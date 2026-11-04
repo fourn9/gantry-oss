@@ -8,6 +8,7 @@ Start with the task you want to perform. Verification reports and implementation
 | --- | --- |
 | Connect Codex, Claude, Cursor or another local agent | [Agent setup](AGENTS.md) |
 | Bring an existing project into Studio | [Guided onboarding](GUIDED_ONBOARDING.md) |
+| Create persistent Bots from project and organization sources | [Crew setup](CREW_SETUP.md) |
 | Navigate artifacts, changes and conversations | [Studio](STUDIO_UI.md) |
 | Capture, share, restore and continue saved work | [Connected workspaces](CONNECTED_WORKSPACE.md) |
 | Follow the normal development/review loop | [Workflow](WORKFLOW.md) |

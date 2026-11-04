@@ -5,6 +5,15 @@ This file records changes after v3.3.0. Earlier release notes remain in the
 
 ## Unreleased
 
+- Studio team onboarding: Sources → Team review → Start. Import selected saved
+  organization exports, review and edit role hierarchies, and separately create
+  and start a persistent team. No live Notion/Linear/Jira synchronization is implied.
+- Customer setup hosts connect once and handle Studio requests with owner-bound
+  private journals, exact version checks, and explicit stop/resume recovery. Use
+  existing subscription runtimes; no publisher-funded model or API-key fallback.
+- Bot experience evaluation now includes generated lessons on isolated held-out
+  tasks and selective independent evidence checks. These checks do not establish
+  faster real-world engineering.
 - Bot completion reports can atomically record explicit experience/action links,
   avoiding a separate bookkeeping inference turn. Preserve same-attempt evidence,
   private memory access, retry safety, and compatibility with existing reports.

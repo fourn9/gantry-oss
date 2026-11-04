@@ -130,7 +130,8 @@ def process_bot_task(client, queued, root, infer_fn, runtime_fence, recovered=No
         if journal['phase'] == 'inference':
             if loop_config and loop_config.get('experience_learning') and task.get('studio_mode')!='ask':
                 from .bot_learning_runtime import plan_task
-                journal['input']['learning_plan'] = plan_task(client, ref, journal['input'], infer_fn, directory/'learning')
+                journal['input']['learning_plan'] = plan_task(client, ref, journal['input'], infer_fn, directory/'learning',
+                    mode=loop_config.get('learning_mode', 'always'))
                 persist(marker, journal)
             if loop_config and loop_config.get('agent_loop'):
                 from .crew_runtime import run_actions

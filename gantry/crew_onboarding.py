@@ -63,8 +63,12 @@ class CrewOnboardingMixin:
             require(ready, 'invalid_input', 'Invalid organization graph')
             for member in ready:
                 bid = member['bot_id']
-                self.cmd_configure_bot(s, actor, {k: member[k] for k in ('bot_id', 'name', 'parent_bot_id', 'profile')} |
-                    {'organization_id': org['id'], 'version': versions['bots'][bid], 'enabled': True}, fx, n, con)
+                old = s.get('persistent_bots', {}).get(bid)
+                # Reusing an unchanged organizational identity in another project
+                # must not invalidate its runtime/tasks by bumping the Bot version.
+                if not old or not old['enabled'] or any(old[k] != member[k] for k in ('name', 'parent_bot_id', 'profile')):
+                    self.cmd_configure_bot(s, actor, {k: member[k] for k in ('bot_id', 'name', 'parent_bot_id', 'profile')} |
+                        {'organization_id': org['id'], 'version': versions['bots'][bid], 'enabled': True}, fx, n, con)
                 configured.add(bid); del pending[bid]
         self.cmd_configure_bot_project(s, actor, {k: config[k] for k in ('session_id', 'organization_id', 'lead_bot_id', 'goal', 'acceptance')} |
             {'version': versions['project'], 'enabled': True}, fx, n, con)

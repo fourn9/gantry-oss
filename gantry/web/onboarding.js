@@ -42,7 +42,7 @@ export function createOnboarding({api,modal,toast,fail}){
     if(!active||current!==epoch)return;pending=null;location.hash='#studio-start/'+result.id;return;
    }
    if(form.id==='onboarding-complete'){result=await api('complete_onboarding',{...ref(),title:form.title.value,purpose:form.purpose.value});
-    if(!active||current!==epoch)return;toast('Project ready · Not tested or adopted');location.hash='#studio-work/'+result.result.change.id;return;}
+    if(!active||current!==epoch)return;toast('Project ready · Not tested or adopted');location.hash=event.submitter.dataset.next==='crew'?'#studio-crew/'+encodeURIComponent(result.result.change.session_id):'#studio-work/'+result.result.change.id;return;}
    if(form.id==='onboarding-collaborators'){result=await api('set_onboarding_collaborators',{...ref(),actors:form.actors.value.split(',').map(x=>x.trim()).filter(Boolean)});if(current===epoch&&active){data=result;show();}return;}
    result=await api('answer_onboarding',{...ref(),question_id:form.dataset.question,answer:form.answer.value});
    if(current===epoch&&active){data=result;show();$('#main h1')?.focus();}
