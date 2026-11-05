@@ -1,0 +1,25 @@
+html{scroll-padding-top:96px}
+.global-header{position:sticky;top:0;z-index:100;width:100%;background:var(--paper,#f5f5f2);color:var(--ink,#1b1b1a);border-bottom:1px solid var(--line,#deded8)}
+.gh-inner{width:min(1460px,calc(100% - 64px));height:76px;margin:auto;display:flex;align-items:center;gap:30px}
+.gh-brand{font:600 25px/1 -apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;letter-spacing:-1.4px;text-decoration:none!important;color:inherit}
+.gh-nav{display:flex;align-items:center;gap:25px;margin-left:auto}
+.gh-nav a,.gh-controls button{font:11px/1.4 ui-monospace,SFMono-Regular,Consolas,monospace;letter-spacing:.02em;text-transform:uppercase;color:inherit;white-space:nowrap}
+.gh-nav a{padding:12px 0;text-decoration:none}.gh-nav a:hover,.gh-nav a[aria-current]{text-decoration:underline;text-underline-offset:6px}
+.gh-nav .gh-start{padding:12px 15px;border:1px solid var(--ink,#1b1b1a);background:var(--ink,#1b1b1a);color:var(--paper,#f5f5f2);text-decoration:none}
+.gh-nav .gh-start:hover{background:transparent;color:var(--ink,#1b1b1a)}
+.gh-controls{display:flex;align-items:center;gap:18px}.gh-controls button{border:0;background:none;padding:12px 0;min-height:44px;cursor:pointer}
+.gh-theme{display:inline-flex;align-items:center;gap:8px}.gh-theme-mark{display:block;width:15px;height:15px;border:1px solid currentColor;border-radius:50%;background:linear-gradient(90deg,currentColor 50%,transparent 50%)}
+.gh-controls .gh-menu{display:none}.global-header a:focus-visible,.global-header button:focus-visible{outline:2px solid currentColor;outline-offset:5px}
+@media(max-width:1000px){.gh-inner{height:64px;width:calc(100% - 36px);gap:20px}.gh-controls{margin-left:auto}.gh-controls .gh-menu{display:block}.gh-nav{display:none;position:absolute;left:0;right:0;top:100%;padding:12px 18px 22px;background:var(--paper,#f5f5f2);border-bottom:1px solid var(--line,#deded8);margin:0}.global-header.is-open .gh-nav{display:flex;flex-direction:column;align-items:stretch;gap:0}.gh-nav a{padding:15px 0}.gh-nav .gh-start{margin-top:8px;text-align:center}.gh-brand{font-size:24px}html{scroll-padding-top:82px}}
+:root[data-theme=dark] .demo-overview{--paper:#1b1b1a;--ink:#f0f0eb;--muted:#b8b9b2;--line:#42443e;background:var(--paper);color:var(--ink);color-scheme:dark}
+:root[data-theme=dark]:has(.demo-overview){background:#1b1b1a}
+:root[data-theme=dark] .demo-overview :is(.intro p,.feature-copy p,.closing p,.closing small,.screen-caption,.eyebrow,footer){color:var(--muted)}
+:root[data-theme=dark] .demo-overview .button{background:var(--ink);color:var(--paper);border-color:var(--ink)}
+
+/* Use the supplied artwork unchanged, including its clear space. */
+.gh-brand{display:flex;align-items:center;flex-shrink:0;line-height:0}
+.gh-brand img{display:block;width:144px;height:auto}
+.gh-brand .gh-logo-dark{display:none}
+:root[data-theme=dark] .gh-brand .gh-logo-light{display:none}
+:root[data-theme=dark] .gh-brand .gh-logo-dark{display:block}
+@media(max-width:1000px){.gh-brand img{width:124px}}

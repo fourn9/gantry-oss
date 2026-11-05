@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Gantry Studio — Interactive demo</title>
+<meta name="description" content="Explore Gantry Studio: shared CAD, code, version history and conversations in an interactive sample workspace.">
+<meta name="referrer" content="no-referrer">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'none'; font-src 'self'; base-uri 'none'; form-action 'none'; object-src 'none'">
+<link rel="canonical" href="https://gantryrobotics.org/demo/workspace.html">
+<link rel="stylesheet" href="./style.css"><link rel="stylesheet" href="./studio.css?v=evidence-20261105"><link rel="stylesheet" href="./demo.css?v=evidence-20261105"><link rel="stylesheet" href="./demo-crew.css?v=team-setup-1">
+<script type="module" src="./demo.js?v=evidence-20261105"></script>
+<link rel="icon" type="image/png" sizes="96x96" href="/favicon.png">
+<link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png"></head>
+<body class="studio-mode">
+<a href="#main" class="skip-link">Skip to content</a>
+<div class="demo-banner"><a href="/" aria-label="Back to Gantry website">← gantry</a><span><strong>Sample · No live agents</strong><span class="demo-explainer"> · Changes stay in this tab.</span></span><div><a href="./">Feature overview</a><button id="demo-about">How to explore</button><button id="demo-reset">Reset demo</button></div></div>
+<div id="shell">
+<aside class="sidebar" aria-label="Workspace navigation">
+<a class="wordmark" href="#studio/bench/~/structure" aria-label="Gantry workspace"><img class="workspace-logo" src="/assets/brand/lockup-black.svg" width="124" height="48" alt=""></a><nav id="nav"></nav><nav aria-label="Team"><a id="demo-team-link" href="#studio-crew">Set up team</a></nav>
+<div class="sidebar-heading">Projects</div><div id="sidebar-projects" class="sidebar-projects"></div>
+<div class="sidebar-heading">Recent work</div><div id="recent-sessions" class="recent-sessions"></div>
+<div class="sidebar-footer"><span class="avatar">D</span><div><strong>designer</strong><div class="caption">Sample identity · No live agents</div></div></div>
+</aside>
+<div class="main-shell"><header class="topbar"><button class="icon-button" id="menu-button" aria-label="Toggle navigation" aria-expanded="false">☰</button><div id="breadcrumb">Studio</div></header>
+<div id="error-banner" role="alert" hidden></div><div id="studio-live-notice" hidden role="status"><span></span><button type="button" data-studio="load-updates">Load updates</button></div>
+<main id="main" tabindex="-1"><div class="studio-empty">Loading the sample workspace…</div><noscript>This interactive demo requires JavaScript.</noscript></main></div>
+</div>
+<dialog id="dialog" aria-labelledby="dialog-title"><form id="dialog-form"><header><h2 id="dialog-title"></h2><button type="button" class="icon-button" id="dialog-close" aria-label="Close dialog">×</button></header><div id="dialog-body"></div><p id="dialog-error" class="error-text" role="alert"></p><footer><button type="button" id="dialog-cancel">Close</button><button class="primary" id="dialog-submit" type="submit">Save</button></footer></form></dialog>
+<div id="toast" role="status" hidden></div>
+</body></html>

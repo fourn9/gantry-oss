@@ -12,6 +12,7 @@ Contributions are submitted under the project's MIT license. Provide only work y
 
 - `gantry/`: runtime, adapters and Studio UI.
 - `tests/`: automated regression tests.
+- [website/](website/README.md): public static website, browser-only demo and its tests.
 - [docs/](docs/README.md): usage guides, contracts and verification records.
 - [examples/](examples/README.md): anonymous demonstrations with explicit prerequisites.
 - [tasks/](tasks/README.md): implementation history and unresolved task-specific items.
