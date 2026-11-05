@@ -8,11 +8,11 @@ is excluded using a separate publication checkout and an explicit file list.
 
 ## Acceptance
 
-- [ ] Publish the reviewed source to GitHub main with current API contracts and
+- [x] Publish the reviewed source to GitHub main with current API contracts and
   a human-readable changelog; retain existing data and version semantics.
-- [ ] Add the three-step onboarding to the existing public browser-only demo,
+- [x] Add the three-step onboarding to the existing public browser-only demo,
   clearly identify sample responses, and retain its network-disabled boundary.
-- [ ] Verify published content and interactive flow; preserve rollback artifacts.
+- [x] Verify published content and interactive flow; preserve rollback artifacts.
 
 ## Verification and release boundaries
 
@@ -31,3 +31,18 @@ can also be rolled back through the existing Pages deployment history.
 No real files, live model connections, credentials, or private project state
 are copied into the static demo. Source publication does not deploy a customer
 runtime or enable inference. No new packaged version is declared by this change.
+
+## Publication result — 2026-11-05
+
+- Product source merged in PR #13: https://github.com/fourn9/gantry-oss/pull/13
+  (merge commit `803543e5d3cb8090c0cde407e60ff868f37ff09f`).
+- Public sample onboarding: https://gantryrobotics.org/demo/workspace#studio-crew
+- Website source revision `caad40f` deployed through the existing Cloudflare
+  Pages project. The deployment UI reported success. Nine public HTML/JS/CSS
+  responses, including unchanged home/news, exactly matched local release bytes.
+- Public browser verified Sources → Team review → Prepare → Create → Start →
+  Stop → Resume. Creation kept work unstarted; execution is explicitly simulated.
+- Static demo: 11 Node tests passed. Local browser also checked role editing,
+  keyboard entry/reset and widths 320/768/1024/1440 without horizontal overflow.
+- The source package uses the customer setup host for real execution. The public
+  demo accepts no project uploads and makes no model or runtime calls.
