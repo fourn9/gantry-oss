@@ -1,0 +1,3 @@
+/vlog /news/ 301
+/vlog/ /news/ 301
+/vlog/* /news/:splat 301

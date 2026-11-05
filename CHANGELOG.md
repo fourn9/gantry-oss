@@ -5,6 +5,10 @@ This file records changes after v3.3.0. Earlier release notes remain in the
 
 ## Unreleased
 
+- Published website/demo source and regression tests under `website/`. In the
+  browser-only demo, requests open their selected evidence and pinned comparison;
+  CAD/Code navigation retains the request context.
+
 - Studio team onboarding: Sources → Team review → Start. Import selected saved
   organization exports, review and edit role hierarchies, and separately create
   and start a persistent team. No live Notion/Linear/Jira synchronization is implied.
