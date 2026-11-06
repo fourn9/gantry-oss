@@ -1,6 +1,6 @@
 import {$,toast,esc} from './ui.js';
-import {createStudio} from './studio.js?v=evidence-20261105';
-import {createDemoAPI} from './demo-data.js?v=evidence-20261105';
+import {createStudio} from './studio.js?v=structure-20261106';
+import {createDemoAPI} from './demo-data.js?v=structure-20261106';
 import {createCrewDemo} from './demo-crew.js?v=team-setup-1';
 let submitHandler=null,studio,demo,crew;
 function modal(title,body,submit,label='Save'){

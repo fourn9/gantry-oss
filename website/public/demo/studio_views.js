@@ -1,5 +1,6 @@
+import {graphMarkup} from './studio_layout.js';
 import {esc as e,icon,short,time} from './ui.js';
-import {statusText,checkLabel,versionLabel,structureLayout,relatedWorks,cadFile,codeFile,primaryComponents} from './studio_model.js?v=evidence-20261105';
+import {statusText,checkLabel,versionLabel,structureLayout,relatedWorks,cadFile,codeFile,primaryComponents} from './studio_model.js?v=structure-20261106';
 export const action=(name,label,value='',extra='')=>`<button type="button" data-studio="${e(name)}" data-value="${e(value)}" ${extra}>${label}</button>`;
 export const link=(hash,label,cls='')=>`<a class="${e(cls)}" href="#${e(hash)}">${label}</a>`;
 export const hint=(title,body='')=>`<div class="studio-empty" role="status"><strong>${e(title)}</strong>${body?`<p>${e(body)}</p>`:''}</div>`;
@@ -21,16 +22,10 @@ export function projectWork(p,works,node,collaboration){
 
 }
 export function structure(p,selected,works){
-  const nodes=selected?[selected,...p.hierarchy.filter(n=>n.parent===selected.id)]:p.hierarchy;
-  if(!nodes.length)return hint('Structure not captured','Import a workspace with a saved component hierarchy.');
-  const graph=structureLayout(nodes.slice(0,100));
-  const mobileNodes=[],visited=new Set();
-  function walk(n,depth){if(visited.has(n.id))return;visited.add(n.id);mobileNodes.push({n,depth});graph.nodes.filter(c=>c.parent===n.id).forEach(c=>walk(c,depth+1));}
-  graph.nodes.filter(n=>!graph.nodes.some(p=>p.id===n.parent)).forEach(n=>walk(n,0));
-  graph.nodes.forEach(n=>walk(n,0));
-  const mobile=mobileNodes.map(({n,depth})=>{const count=relatedWorks(works,p.id,n.id,p.hierarchy).length;return `<button type="button" class="studio-part-card" data-studio="component" data-value="${e(n.id)}" aria-pressed="false" style="--depth:${Math.min(depth,3)}"><span><strong>${e(n.title)}</strong><small>${count?count+' related '+(count===1?'task':'tasks'):'View files'}</small></span><span aria-hidden="true">→</span></button>`;}).join('');
-  return `<section class="studio-structure"><div class="studio-structure-heading"><h2>Choose a part</h2><p>Open its work, agents, and files.</p></div><div class="studio-part-list" aria-label="Project components">${mobile}</div><div class="studio-map"><svg viewBox="0 0 ${graph.width} ${graph.height}" width="${graph.width}" height="${graph.height}" role="group" aria-label="Product components">${graph.nodes.map(n=>{const parent=graph.nodes.find(x=>x.id===n.parent);return parent?`<path d="M${parent.x} ${parent.y+64} V${parent.y+100} H${n.x} V${n.y}" class="studio-edge"/>`:'';}).join('')}${graph.nodes.map(n=>{const related=relatedWorks(works,p.id,n.id,p.hierarchy);const agents=related.filter(w=>w.owner.kind==='agent');const directAgents=agents.filter(w=>w.components.some(c=>c.id===n.id));const direct=directAgents[0];const label=directAgents.length>1?directAgents.length+' agents · Select to see work':direct?direct.owner.id+' · '+statusText(direct):agents.length?agents.length+' agent tasks':related.length?related.length+' change'+(related.length===1?'':'s'):n.kind;return `<g data-studio="component" data-value="${e(n.id)}" tabindex="0" role="button" aria-pressed="false" aria-label="${e(n.title+' — '+label)}" class="studio-node ${direct?'has-agent':''}"><rect x="${n.x-95}" y="${n.y}" width="190" height="64" rx="7"/><text x="${n.x-80}" y="${n.y+25}">${e(n.title.length>24?n.title.slice(0,23)+'…':n.title)}</text><text class="studio-node-meta" x="${n.x-80}" y="${n.y+46}">${e(label)}</text>${direct?`<circle class="studio-agent-dot" cx="${n.x+82}" cy="${n.y+15}" r="3"/>`:''}<title>${e(n.title+' — '+label)}</title></g>`;}).join('')}</svg></div><div id="studio-component-detail" class="studio-component-detail">Select a part above to see its details.</div>${nodes.length>100?'<p class="studio-small">Showing 100 components. Select a parent to narrow the view.</p>':''}</section>`;
+  if(!p.hierarchy?.length)return hint('Structure not captured','Import a workspace with a saved component hierarchy.');
+  return `<section class="structure-workspace">${graphMarkup(p,selected)}<aside class="structure-inspector" aria-label="Component details" hidden><div class="structure-inspector-close">${action('close-component','Close details ×')}</div><div id="studio-component-detail" class="studio-component-detail"></div></aside></section>`;
 }
+
 export function requestSummary(r){
  if(!r)return '';
  return `<section class="studio-request" aria-label="Agent change request"><div class="studio-request-main"><div><span class="studio-request-label">${r.replied?'Reply sent':'Decision needed'} · ${e(r.agent)}</span><h2>${e(r.question)}</h2></div>${action('request-step',r.replied?'View reply':'Reply','reply','class="primary"')}</div><details class="studio-request-details"><summary>Why you’re needed</summary><p>${e(r.summary)}</p><dl><div><dt>Decision</dt><dd>${e(r.reason)}</dd></div><div><dt>Changed</dt><dd>${e(r.changed)}</dd></div><div><dt>Next</dt><dd>${e(r.remaining)}</dd></div></dl><div class="studio-request-actions">${action('changes','Changed files')}${action('request-step','View checks','checks')}</div><p class="studio-small">Replying does not verify or adopt this change.</p></details></section>`;
