@@ -1,24 +1,27 @@
+import {createStudioLayout} from './studio_layout.js';
 import {$,esc as e,short,icon,download} from './ui.js';
-import {requestContext,componentScope} from './studio_context.js?v=evidence-20261105';
-import * as view from './studio_views.js?v=evidence-20261105';
-import {cadFile,meshFile,codeFile,versionLabel,fileChanges,lineDiff,linesOf,relatedWorks,commentCount} from './studio_model.js?v=evidence-20261105';
+import {requestContext,componentScope} from './studio_context.js?v=structure-20261106';
+import * as view from './studio_views.js?v=structure-20261106';
+import {cadFile,meshFile,codeFile,versionLabel,fileChanges,lineDiff,linesOf,relatedWorks,commentCount} from './studio_model.js?v=structure-20261106';
 import {parseMesh,mountMesh} from './studio_mesh.js';
 import {createActivityMonitor} from './studio_activity.js';
 
 export function createStudio({api,modal,toast,fail}){
+  const layout=createStudioLayout();
   let overview,detail,project,node,viewEpoch=0,artifactEpoch=0,mesh,tab='cad',compare=false,compareState='',file='',selectedPart='',conversation=null,lastWork='',draft='',mentions=[],threadDetail,evidenceFocus=null;
   let downloadState=null,recent=[],cache=new Map(),drafts=new Map(),cameras=new Map(),meshKey='';
   const route=()=>location.hash.slice(1).split('/').map(x=>decodeURIComponent(x));
   const handles=()=>['studio','studio-work','studio-inbox','studio-recent'].includes(route()[0]||'studio');
   const a=view.action;
   const activity=createActivityMonitor({api,notice:text=>{const el=$('#studio-live-notice');if(el){el.hidden=!text;el.querySelector('span').textContent=text;}}});
-  function reset(){activity.clear();viewEpoch++;artifactEpoch++;disposeMesh();cache.clear();drafts.clear();cameras.clear();overview=detail=undefined;recent=[];lastWork='';evidenceFocus=null;conversation=null;threadDetail=null;draft='';mentions=[];}
+  function reset(){layout.leave();activity.clear();viewEpoch++;artifactEpoch++;disposeMesh();cache.clear();drafts.clear();cameras.clear();overview=detail=undefined;recent=[];lastWork='';evidenceFocus=null;conversation=null;threadDetail=null;draft='';mentions=[];}
   function disposeMesh(){if(mesh){if(mesh.camera)cameras.set(meshKey,mesh.camera());mesh.destroy();mesh=null;while(cameras.size>50)cameras.delete(cameras.keys().next().value);}}
   function chooseFile(path){evidenceFocus=null;file=path;selectedPart=path;selectConversation(null);threadDetail=null;drawWork();}
   function remember(){if(conversation)drafts.set(JSON.stringify([detail.work.id,conversation]),{draft,mentions:[...mentions]});}
   function selectConversation(value){remember();conversation=value;const saved=drafts.get(JSON.stringify([detail.work.id,value]));draft=saved?.draft||'';mentions=saved?.mentions||[];}
   function sidebar(){const side=view.sidebar(overview,recent,{project:project?.id});$('#nav').innerHTML=side.nav;$('#sidebar-projects').innerHTML=side.projects;$('#recent-sessions').innerHTML=side.recent;}
   async function render(){
+    layout.leave();
     remember();activity.clear();const current=++viewEpoch,parts=route(),kind=parts[0]||'studio';artifactEpoch++;disposeMesh();
     document.body.classList.add('studio-mode');$('#main').className='studio-main';
     $('#main').innerHTML=view.hint('Loading workspace…');
@@ -48,6 +51,7 @@ export function createStudio({api,modal,toast,fail}){
     $('#main').innerHTML=(projectTab==='structure'?view.structure(project,node,overview.works):
       '<div class="studio-list-tools">'+a('new-work','New work')+'</div>'+view.projectWork(project,overview.works,node,overview.collaboration))+
       (overview.next?a('more-work','Load more work',overview.next,'class="studio-more"'):'');
+    layout.mount();
   }
   function drawWork(){
     disposeMesh();
@@ -55,9 +59,9 @@ export function createStudio({api,modal,toast,fail}){
     if(!versions.some(v=>v.id===compareState&&v.id!==detail.selected.state.id))compareState=versions[Math.max(0,index-1)]?.id;
     if(index===0)compare=false;
     $('#main').innerHTML=view.workDetail(detail,{tab,compare,compareState,conversation});
-    drawConversation();const epoch=viewEpoch;const load=loadArtifact();const request=artifactEpoch;return load.catch(error=>{if(epoch===viewEpoch&&request===artifactEpoch&&$('#studio-artifact'))$('#studio-artifact').innerHTML=view.hint('Unable to load artifact',error.message);});
+    drawConversation();layout.mount();const epoch=viewEpoch;const load=loadArtifact();const request=artifactEpoch;return load.catch(error=>{if(epoch===viewEpoch&&request===artifactEpoch&&$('#studio-artifact'))$('#studio-artifact').innerHTML=view.hint('Unable to load artifact',error.message);});
   }
-  function drawConversation(){if(conversation&&$('#studio-conversation')){const panel=$('#studio-conversation');panel.innerHTML=view.conversation(threadDetail||detail,conversation,draft,mentions);const messages=panel.querySelector('.studio-messages');messages.scrollTop=messages.scrollHeight;}}
+  function drawConversation(){if(conversation&&$('#studio-conversation')){const panel=$('#studio-conversation');panel.innerHTML=view.conversation(threadDetail||detail,conversation,draft,mentions);const messages=panel.querySelector('.studio-messages');messages.scrollTop=messages.scrollHeight;layout.mount();}}
   async function bytes(state,path,max=16*1024*1024){
     const info=state.manifest[path];if(!info)throw new Error('File not present in this version.');if(info.size>max)throw new Error('Preview size limit reached. Restore the saved file with the local adapter.');
     if(cache.has(info.hash))return cache.get(info.hash);
@@ -107,7 +111,7 @@ export function createStudio({api,modal,toast,fail}){
     const t=source.threads.find(t=>JSON.stringify(Object.entries(t.anchor).sort())===JSON.stringify(Object.entries(anchor).sort()));
     evidenceFocus={anchor,state_id:stateId};selectConversation({anchor,state_id:stateId,...(t?{thread_id:t.id}:{})});await drawWork();if(epoch!==viewEpoch)return;focusConversation();
   }
-  function focusConversation(){const panel=$('#studio-conversation');if(!panel)return;if(globalThis.innerWidth<=1024)panel.scrollIntoView({block:'start'});panel.focus({preventScroll:true});const messages=panel.querySelector('.studio-messages');if(messages)messages.scrollTop=messages.scrollHeight;}
+  function focusConversation(){const panel=$('#studio-conversation');if(!panel)return;if(globalThis.innerWidth<=1024)panel.scrollIntoView({block:'start'});panel.focus({preventScroll:true});const messages=panel.querySelector('.studio-messages');if(messages)messages.scrollTop=messages.scrollHeight;layout.mount();}
   async function closeConversation(){selectConversation(null);threadDetail=null;const epoch=viewEpoch;await drawWork();if(epoch!==viewEpoch)return;const target=$('#studio-canvas')||$('#studio-artifact');if(globalThis.innerWidth<=1024)target?.scrollIntoView({block:'start'});target?.focus({preventScroll:true});}
   async function loadUpdates(){
     if(route()[0]!=='studio-work')return render();
@@ -163,7 +167,8 @@ export function createStudio({api,modal,toast,fail}){
     'download-file':async path=>download(path.split('/').pop(),await bytes(downloadState,path,32*1024*1024),'application/octet-stream'),
     'import-help':()=>modal('About this demo','<p>Explore sample geometry, compare versions, and discuss a part or code line. Import changes loads a prepared sample edit. Share update makes it shared within this tab.</p><p>No live tools, agents, model calls, uploads, or teammates are connected. Comments and edits are held only in memory; reset or reload clears them.</p><p>Use Gantry locally to connect your own workspace and tools.</p><p><a href="https://github.com/fourn9/gantry-oss" target="_blank" rel="noopener noreferrer">Get Gantry on GitHub ↗</a></p>',null),
     details:()=>modal('Saved version',`<dl class="context-list"><dt>State</dt><dd>${e(detail.selected.state.id)}</dd><dt>Checkpoint note</dt><dd>${e(detail.selected.state.summary)}</dd><dt>Shared update notes</dt><dd>${e((detail.versions.find(v=>v.id===detail.selected.state.id)?.notes||[]).join(' · ')||'No note')}</dd><dt>Snapshot</dt><dd>${e(detail.selected.state.snapshot)}</dd><dt>Work</dt><dd>${e(detail.selected.status.work)}</dd><dt>Sharing</dt><dd>${e(detail.selected.status.sharing)}</dd><dt>Verification</dt><dd>${e(detail.selected.status.verification)}</dd><dt>Adoption</dt><dd>${e(detail.selected.status.adoption)}</dd><dt>Not captured</dt><dd>${e(detail.capture.missing.join(', ')||'No omissions declared')}</dd></dl><p>This is an illustrative version in a browser-only demo. In a connected workspace, saved artifacts can be restored through the local adapter.</p>`,null),
-    component:value=>{document.querySelectorAll('[data-studio=component]').forEach(el=>el.setAttribute('aria-pressed',String(el.dataset.value===value)));const n=project.hierarchy.find(n=>n.id===value);const works=relatedWorks(overview.works,project.id,value,project.hierarchy);$('#studio-component-detail').innerHTML=`<div class="studio-row"><strong>${e(n.title)}</strong>${view.link(view.projectURL(project.id,value,'work'),'View work →')}</div><div class="studio-small">${e(n.paths.join(' · ')||'No saved files mapped')}</div>${view.workList(works)}`;$('#studio-component-detail').scrollIntoView({block:'nearest',behavior:'smooth'});},
+    component:value=>{const n=project.hierarchy.find(n=>n.id===value);if(!n)return;const works=relatedWorks(overview.works,project.id,value,project.hierarchy);document.querySelectorAll('.structure-card').forEach(el=>{el.classList.toggle('selected',el.dataset.value===value);el.setAttribute('aria-pressed',String(el.dataset.value===value));});const panel=document.querySelector('.structure-inspector');panel.hidden=false;document.querySelector('.structure-workspace').classList.add('with-inspector');$('#studio-component-detail').innerHTML=`<div class="studio-row"><strong>${e(n.title)}</strong>${view.link(view.projectURL(project.id,value,'work'),'View work →')}</div><div class="studio-small">${e((n.paths||[]).join(' · ')||'No saved files mapped')}</div>${view.workList(works)}`;layout.mount();},
+    'close-component':()=>{document.querySelector('.structure-inspector').hidden=true;document.querySelector('.structure-workspace').classList.remove('with-inspector');document.querySelectorAll('.structure-card').forEach(el=>{el.classList.remove('selected');el.setAttribute('aria-pressed','false');});layout.mount();},
     'more-work':async cursor=>{const epoch=viewEpoch;const next=await api('studio_overview',{after:cursor});if(epoch!==viewEpoch)return;overview.works.push(...next.works);overview.next=next.next;const list=$('.studio-worklist');if(list)list.outerHTML=view.workList(relatedWorks(overview.works,project.id,node?.id,project.hierarchy));document.querySelector('[data-studio=more-work]')?.remove();if(next.next)$('#main').insertAdjacentHTML('beforeend',a('more-work','Load more work',next.next,'class="studio-more"'));},
     'more-inbox':async cursor=>{const epoch=viewEpoch;const next=await api('studio_inbox',{after:cursor});if(epoch!==viewEpoch)return;const wrapper=document.createElement('div');wrapper.innerHTML=view.inbox(next.items);$('.studio-worklist').insertAdjacentHTML('beforeend',wrapper.querySelector('.studio-worklist').innerHTML);document.querySelector('[data-studio=more-inbox]')?.remove();if(next.next)$('#main').insertAdjacentHTML('beforeend',a('more-inbox','Load more',next.next,'class="studio-more"'));},
     'new-work':async()=>{
@@ -205,5 +210,5 @@ export function createStudio({api,modal,toast,fail}){
       conversation.thread_id=result.thread_id;remember();await drawWork();toast('Comment saved');
     }catch(err){if(sameTarget()&&$('#studio-comment-error'))$('#studio-comment-error').textContent=err.message;else fail(err);}finally{submit.disabled=false;}
   });
-  return {handles,render,reset,checkUpdates:()=>handles()&&!document.hidden?activity.check():undefined,leave:()=>{activity.clear();remember();viewEpoch++;artifactEpoch++;disposeMesh();document.body.classList.remove('studio-mode');$('#main').className='';}};
+  return {handles,render,reset,checkUpdates:()=>handles()&&!document.hidden?activity.check():undefined,leave:()=>{layout.leave();activity.clear();remember();viewEpoch++;artifactEpoch++;disposeMesh();document.body.classList.remove('studio-mode');$('#main').className='';}};
 }

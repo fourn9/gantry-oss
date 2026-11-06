@@ -1,6 +1,6 @@
 // Public, invented sample data. This adapter never opens a network connection.
-import {fileChanges} from './studio_model.js?v=evidence-20261105';
-import {componentScope} from './studio_context.js?v=evidence-20261105';
+import {fileChanges} from './studio_model.js?v=structure-20261106';
+import {componentScope} from './studio_context.js?v=structure-20261106';
 const clone=value=>structuredClone(value);
 const members=[{id:'designer',kind:'human'},{id:'controls-agent',kind:'agent'},{id:'design-agent',kind:'agent'},{id:'mechanical-reviewer',kind:'human'}];
 const hierarchy=[

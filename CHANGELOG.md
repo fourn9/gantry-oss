@@ -1,5 +1,11 @@
 # Changelog
 
+## Studio structure navigation — 2026-11-06
+
+- Pan product structure by dragging or scrolling, and pinch to zoom around the cursor.
+- Inspect components without losing the full hierarchy; resize the sidebar and details.
+- The public sample workspace uses the same navigation, without connecting live tools.
+
 This file records changes after v3.3.0. Earlier release notes remain in the
 [GitHub releases](https://github.com/fourn9/gantry-oss/releases).
 

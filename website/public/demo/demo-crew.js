@@ -1,5 +1,5 @@
 import {$} from './ui.js';
-import {sidebar} from './studio_views.js?v=evidence-20261105';
+import {sidebar} from './studio_views.js?v=structure-20261106';
 import {createDemoCrew} from './demo-crew-model.js?v=team-setup-1';
 import {crewView} from './demo-crew-views.js?v=team-setup-1';
 

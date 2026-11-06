@@ -60,3 +60,11 @@ The demo has deliberate navigation, fixture and interaction differences. Review
 changes selectively; do not overwrite either implementation with the other.
 Do not copy private ledgers, local configuration, credentials, customer assets
 or runtime journals into this directory.
+
+## Structure navigation
+
+In the sample workspace's Structure tab, pinch the trackpad to zoom, drag the
+map or scroll with two fingers to pan, and click a component to inspect its work.
+Fit all restores the complete hierarchy. Zoom buttons and arrow / + / - / 0 keys
+remain available; touch users can drag the map and use zoom buttons.
+Sidebar and desktop detail dividers can be dragged or adjusted with arrow keys.
