@@ -1,27 +1,29 @@
-import {createStudioLayout} from './studio_layout.js';
-import {$,esc as e,short,icon,download} from './ui.js';
-import {requestContext,componentScope} from './studio_context.js?v=structure-20261106';
-import * as view from './studio_views.js?v=structure-20261106';
-import {cadFile,meshFile,codeFile,versionLabel,fileChanges,lineDiff,linesOf,relatedWorks,commentCount} from './studio_model.js?v=structure-20261106';
-import {parseMesh,mountMesh} from './studio_mesh.js';
-import {createActivityMonitor} from './studio_activity.js';
+import {createLibraryUI} from './studio_library_ui.js?v=library-20261107';
+import {createStudioLayout} from './studio_layout.js?v=library-20261107';
+import {$,esc as e,short,icon,download} from './ui.js?v=library-20261107';
+import {requestContext,componentScope} from './studio_context.js?v=library-20261107';
+import * as view from './studio_views.js?v=library-20261107';
+import {cadFile,meshFile,codeFile,versionLabel,fileChanges,lineDiff,linesOf,relatedWorks,commentCount,libraryURL,participantName} from './studio_model.js?v=library-20261107';
+import {parseMesh,mountMesh} from './studio_mesh.js?v=library-20261107';
+import {createActivityMonitor} from './studio_activity.js?v=library-20261107';
 
 export function createStudio({api,modal,toast,fail}){
   const layout=createStudioLayout();
+  const library=createLibraryUI({api,modal,toast,fail,bytes,layout});
   let overview,detail,project,node,viewEpoch=0,artifactEpoch=0,mesh,tab='cad',compare=false,compareState='',file='',selectedPart='',conversation=null,lastWork='',draft='',mentions=[],threadDetail,evidenceFocus=null;
   let downloadState=null,recent=[],cache=new Map(),drafts=new Map(),cameras=new Map(),meshKey='';
   const route=()=>location.hash.slice(1).split('/').map(x=>decodeURIComponent(x));
   const handles=()=>['studio','studio-work','studio-inbox','studio-recent'].includes(route()[0]||'studio');
   const a=view.action;
   const activity=createActivityMonitor({api,notice:text=>{const el=$('#studio-live-notice');if(el){el.hidden=!text;el.querySelector('span').textContent=text;}}});
-  function reset(){layout.leave();activity.clear();viewEpoch++;artifactEpoch++;disposeMesh();cache.clear();drafts.clear();cameras.clear();overview=detail=undefined;recent=[];lastWork='';evidenceFocus=null;conversation=null;threadDetail=null;draft='';mentions=[];}
+  function reset(){library.reset();layout.leave();activity.clear();viewEpoch++;artifactEpoch++;disposeMesh();cache.clear();drafts.clear();cameras.clear();overview=detail=undefined;recent=[];lastWork='';evidenceFocus=null;conversation=null;threadDetail=null;draft='';mentions=[];}
   function disposeMesh(){if(mesh){if(mesh.camera)cameras.set(meshKey,mesh.camera());mesh.destroy();mesh=null;while(cameras.size>50)cameras.delete(cameras.keys().next().value);}}
   function chooseFile(path){evidenceFocus=null;file=path;selectedPart=path;selectConversation(null);threadDetail=null;drawWork();}
   function remember(){if(conversation)drafts.set(JSON.stringify([detail.work.id,conversation]),{draft,mentions:[...mentions]});}
   function selectConversation(value){remember();conversation=value;const saved=drafts.get(JSON.stringify([detail.work.id,value]));draft=saved?.draft||'';mentions=saved?.mentions||[];}
   function sidebar(){const side=view.sidebar(overview,recent,{project:project?.id});$('#nav').innerHTML=side.nav;$('#sidebar-projects').innerHTML=side.projects;$('#recent-sessions').innerHTML=side.recent;}
   async function render(){
-    layout.leave();
+    library.leave();layout.leave();
     remember();activity.clear();const current=++viewEpoch,parts=route(),kind=parts[0]||'studio';artifactEpoch++;disposeMesh();
     document.body.classList.add('studio-mode');$('#main').className='studio-main';
     $('#main').innerHTML=view.hint('Loading workspace…');
@@ -36,7 +38,7 @@ export function createStudio({api,modal,toast,fail}){
       if(parts[3]){selectConversation(null);threadDetail=null;}
       if(context){tab=context.tab;file=context.file;selectedPart=context.part;compare=context.compare;compareState=context.compareState;evidenceFocus=context.conversation;selectConversation(context.conversation);}
 
-      sidebar();$('#breadcrumb').innerHTML=project?view.projectHeader(project,null,'work'):'Work';
+      sidebar();$('#breadcrumb').innerHTML=project?view.projectHeader(project,null,'work',detail.selected.state.id):'Work';
       await drawWork();if(current!==viewEpoch)return;if(showThread&&globalThis.innerWidth>1024)focusConversation();
       if(parts[4]&&detail.can_comment)api('studio_acknowledge',{notification_id:parts[4]}).catch(fail);
       return;
@@ -47,6 +49,7 @@ export function createStudio({api,modal,toast,fail}){
     }
     if(kind==='studio-recent'){$('#breadcrumb').textContent='Recent';$('#main').innerHTML='<div class="studio-page-title"><h1>Recent</h1><span class="studio-small">Work opened in this tab</span></div>'+view.workList(recent,'No recently opened work.');return;}
     if(!project){$('#breadcrumb').textContent='Projects';$('#main').innerHTML=view.hint('Start a shared project','Create a project, import saved files, then start work.')+'<div class="studio-empty"><button data-action="new-project">Create project</button></div>';return;}
+    if(['files','requirements'].includes(parts[3])){await library.render(project,node,parts);return;}
     const projectTab=parts[3]==='work'?'work':'structure';$('#breadcrumb').innerHTML=view.projectHeader(project,node,projectTab);
     $('#main').innerHTML=(projectTab==='structure'?view.structure(project,node,overview.works):
       '<div class="studio-list-tools">'+a('new-work','New work')+'</div>'+view.projectWork(project,overview.works,node,overview.collaboration))+
@@ -165,9 +168,9 @@ export function createStudio({api,modal,toast,fail}){
     'open-thread':id=>{const t=detail.discussion_index.find(t=>t.id===id);if(!t)return;$('#dialog').close();const url='#'+view.workURL(detail.work.id,t.state_id,t.id);if(location.hash===url)return render();location.hash=url;},
     changes:()=>modal('Changed files',`<p>Compared with the previous checkpoint.</p><div class="studio-share-files">${detail.selected.diffs.map(d=>`<div><span>${e(d.path)}</span><span>${e(d.kind)}</span></div>`).join('')||'<p>No file changes in this checkpoint.</p>'}</div>`,null),
     'download-file':async path=>download(path.split('/').pop(),await bytes(downloadState,path,32*1024*1024),'application/octet-stream'),
-    'import-help':()=>modal('About this demo','<p>Explore sample geometry, compare versions, and discuss a part or code line. Import changes loads a prepared sample edit. Share update makes it shared within this tab.</p><p>No live tools, agents, model calls, uploads, or teammates are connected. Comments and edits are held only in memory; reset or reload clears them.</p><p>Use Gantry locally to connect your own workspace and tools.</p><p><a href="https://github.com/fourn9/gantry-oss" target="_blank" rel="noopener noreferrer">Get Gantry on GitHub ↗</a></p>',null),
+    'import-help':()=>modal('About this demo','<p>Browse saved files and requirements, inspect shared context, compare versions, and discuss exact saved targets. Import changes loads a prepared sample edit. Share update makes it shared within this tab.</p><p>No live tools, agents, model calls, uploads, or teammates are connected. Comments and edits are held only in memory; reset or reload clears them.</p><p>Use Gantry locally to connect your own workspace and tools.</p><p><a href="https://github.com/fourn9/gantry-oss" target="_blank" rel="noopener noreferrer">Get Gantry on GitHub ↗</a></p>',null),
     details:()=>modal('Saved version',`<dl class="context-list"><dt>State</dt><dd>${e(detail.selected.state.id)}</dd><dt>Checkpoint note</dt><dd>${e(detail.selected.state.summary)}</dd><dt>Shared update notes</dt><dd>${e((detail.versions.find(v=>v.id===detail.selected.state.id)?.notes||[]).join(' · ')||'No note')}</dd><dt>Snapshot</dt><dd>${e(detail.selected.state.snapshot)}</dd><dt>Work</dt><dd>${e(detail.selected.status.work)}</dd><dt>Sharing</dt><dd>${e(detail.selected.status.sharing)}</dd><dt>Verification</dt><dd>${e(detail.selected.status.verification)}</dd><dt>Adoption</dt><dd>${e(detail.selected.status.adoption)}</dd><dt>Not captured</dt><dd>${e(detail.capture.missing.join(', ')||'No omissions declared')}</dd></dl><p>This is an illustrative version in a browser-only demo. In a connected workspace, saved artifacts can be restored through the local adapter.</p>`,null),
-    component:value=>{const n=project.hierarchy.find(n=>n.id===value);if(!n)return;const works=relatedWorks(overview.works,project.id,value,project.hierarchy);document.querySelectorAll('.structure-card').forEach(el=>{el.classList.toggle('selected',el.dataset.value===value);el.setAttribute('aria-pressed',String(el.dataset.value===value));});const panel=document.querySelector('.structure-inspector');panel.hidden=false;document.querySelector('.structure-workspace').classList.add('with-inspector');$('#studio-component-detail').innerHTML=`<div class="studio-row"><strong>${e(n.title)}</strong>${view.link(view.projectURL(project.id,value,'work'),'View work →')}</div><div class="studio-small">${e((n.paths||[]).join(' · ')||'No saved files mapped')}</div>${view.workList(works)}`;layout.mount();},
+    component:value=>{const n=project.hierarchy.find(n=>n.id===value);if(!n)return;const works=relatedWorks(overview.works,project.id,value,project.hierarchy);document.querySelectorAll('.structure-card').forEach(el=>{el.classList.toggle('selected',el.dataset.value===value);el.setAttribute('aria-pressed',String(el.dataset.value===value));});const panel=document.querySelector('.structure-inspector');panel.hidden=false;document.querySelector('.structure-workspace').classList.add('with-inspector');$('#studio-component-detail').innerHTML=`<div class="studio-row"><strong>${e(n.title)}</strong><div class="studio-actions">${view.link(view.projectURL(project.id,value,'files'),'Files')}${view.link(view.projectURL(project.id,value,'requirements'),'Requirements')}${view.link(view.projectURL(project.id,value,'work'),'Work →')}</div></div><div class="studio-small">${e((n.paths||[]).join(' · ')||'No saved files mapped')}</div>${view.workList(works)}`;layout.mount();},
     'close-component':()=>{document.querySelector('.structure-inspector').hidden=true;document.querySelector('.structure-workspace').classList.remove('with-inspector');document.querySelectorAll('.structure-card').forEach(el=>{el.classList.remove('selected');el.setAttribute('aria-pressed','false');});layout.mount();},
     'more-work':async cursor=>{const epoch=viewEpoch;const next=await api('studio_overview',{after:cursor});if(epoch!==viewEpoch)return;overview.works.push(...next.works);overview.next=next.next;const list=$('.studio-worklist');if(list)list.outerHTML=view.workList(relatedWorks(overview.works,project.id,node?.id,project.hierarchy));document.querySelector('[data-studio=more-work]')?.remove();if(next.next)$('#main').insertAdjacentHTML('beforeend',a('more-work','Load more work',next.next,'class="studio-more"'));},
     'more-inbox':async cursor=>{const epoch=viewEpoch;const next=await api('studio_inbox',{after:cursor});if(epoch!==viewEpoch)return;const wrapper=document.createElement('div');wrapper.innerHTML=view.inbox(next.items);$('.studio-worklist').insertAdjacentHTML('beforeend',wrapper.querySelector('.studio-worklist').innerHTML);document.querySelector('[data-studio=more-inbox]')?.remove();if(next.next)$('#main').insertAdjacentHTML('beforeend',a('more-inbox','Load more',next.next,'class="studio-more"'));},
@@ -178,7 +181,7 @@ export function createStudio({api,modal,toast,fail}){
       const session=await api('session_details',{session_id:state.state.session_id});if(epoch!==viewEpoch)return;
       const nodes=state.state.hierarchy;
       const label=n=>{const names=[n.title];let parent=nodes.find(x=>x.id===n.parent);const seen=new Set([n.id]);while(parent&&!seen.has(parent.id)){seen.add(parent.id);names.unshift(parent.title);parent=nodes.find(x=>x.id===parent.parent);}return names.join(' / ');};
-      modal('New work',`<label>Title<input name="title" required maxlength="240" placeholder="What are you working on?"></label><label>Component<select name="component" required><option value="">Choose a component</option>${nodes.map(n=>`<option value="${e(n.id)}" ${targetNode?.id===n.id?'selected':''}>${e(label(n))}</option>`).join('')}</select></label><label>Assignee<select name="assignee">${[...new Set([session.session.owner,...session.session.actors])].map(id=>`<option>${e(id)}</option>`).join('')}</select></label><label>Goal<textarea name="purpose" required maxlength="1000" placeholder="What should be different when this is done?"></textarea></label><details class="studio-scope-details"><summary>Advanced · Limit files</summary><label>Paths (optional, one per line)<textarea name="scope" placeholder="Leave empty to use the component’s mapped files"></textarea></label><p class="caption">Overrides can narrow the selected component’s scope.</p></details>`,async form=>{
+      modal('New work',`<label>Title<input name="title" required maxlength="240" placeholder="What are you working on?"></label><label>Component<select name="component" required><option value="">Choose a component</option>${nodes.map(n=>`<option value="${e(n.id)}" ${targetNode?.id===n.id?'selected':''}>${e(label(n))}</option>`).join('')}</select></label><label>Assignee<select name="assignee">${[...new Set([session.session.owner,...session.session.actors])].map(id=>`<option value="${e(id)}">${e(participantName(session.participants,id))}</option>`).join('')}</select></label><label>Goal<textarea name="purpose" required maxlength="1000" placeholder="What should be different when this is done?"></textarea></label><details class="studio-scope-details"><summary>Advanced · Limit files</summary><label>Paths (optional, one per line)<textarea name="scope" placeholder="Leave empty to use the component’s mapped files"></textarea></label><p class="caption">Overrides can narrow the selected component’s scope.</p></details>`,async form=>{
         const scope=componentScope(nodes,form.component.value,form.scope.value);
         const result=await api('begin_change',{state_id:state.state.id,title:form.title.value,purpose:form.purpose.value,assignee:form.assignee.value,component_id:form.component.value,write_scope:scope,dependencies:[]});
         location.hash=view.workURL(result.id);
@@ -186,16 +189,16 @@ export function createStudio({api,modal,toast,fail}){
     }
 
   };
-  document.addEventListener('click',async event=>{const el=event.target.closest('[data-studio]');if(!el||!handles()||el.disabled)return;const fn=handlers[el.dataset.studio];if(!fn)return;event.preventDefault();el.disabled=true;try{await fn(el.dataset.value,el);}catch(err){fail(err);}finally{el.disabled=false;}});
+  document.addEventListener('click',async event=>{if(library.active&&!event.target.closest('[data-studio=import-help]'))return;const el=event.target.closest('[data-studio]');if(!el||!handles()||el.disabled)return;const fn=handlers[el.dataset.studio];if(!fn)return;event.preventDefault();el.disabled=true;try{await fn(el.dataset.value,el);}catch(err){fail(err);}finally{el.disabled=false;}});
   document.addEventListener('keydown',event=>{if(event.target.matches('.studio-node')&&['Enter',' '].includes(event.key)){event.preventDefault();handlers.component(event.target.dataset.value);}});
-  document.addEventListener('input',event=>{if(event.target.id==='studio-draft'){draft=event.target.value;remember();}});
-  document.addEventListener('change',event=>{const el=event.target;const run=async()=>{
+  document.addEventListener('input',event=>{if(library.active)return;if(event.target.id==='studio-draft'){draft=event.target.value;remember();}});
+  document.addEventListener('change',event=>{if(library.active)return;const el=event.target;const run=async()=>{
     if(el.id==='studio-version'){evidenceFocus=null;selectConversation(null);threadDetail=null;file='';location.hash=view.workURL(detail.work.id,el.value);}
     if(el.id==='studio-compare-version'){compareState=el.value;drawWork();}
     if(el.id==='studio-file')chooseFile(el.value);
-    if(el.id==='studio-mention'&&el.value){if(!mentions.includes(el.value))mentions.push(el.value);draft+=(draft&&!draft.endsWith(' ')?' ':'')+'@'+el.value+' ';remember();drawConversation();$('#studio-draft').focus();}
+    if(el.id==='studio-mention'&&el.value){if(!mentions.includes(el.value))mentions.push(el.value);draft+=(draft&&!draft.endsWith(' ')?' ':'')+'@'+participantName(detail.participants,el.value)+' ';remember();drawConversation();$('#studio-draft').focus();}
   };run().catch(fail);});
-  document.addEventListener('submit',async event=>{if(event.target.id!=='studio-comment-form')return;event.preventDefault();const submit=event.submitter;submit.disabled=true;
+  document.addEventListener('submit',async event=>{if(library.active)return;if(event.target.id!=='studio-comment-form')return;event.preventDefault();const submit=event.submitter;submit.disabled=true;
     const epoch=viewEpoch,wid=detail.work.id,target={...conversation},body=draft;
     const sameTarget=()=>epoch===viewEpoch&&detail?.work.id===wid&&JSON.stringify(conversation)===JSON.stringify(target);
     const known=detail.participants.map(p=>p.id);const typed=known.filter(id=>body.split(/\s+/).some(word=>word==='@'+id));
@@ -210,5 +213,5 @@ export function createStudio({api,modal,toast,fail}){
       conversation.thread_id=result.thread_id;remember();await drawWork();toast('Comment saved');
     }catch(err){if(sameTarget()&&$('#studio-comment-error'))$('#studio-comment-error').textContent=err.message;else fail(err);}finally{submit.disabled=false;}
   });
-  return {handles,render,reset,checkUpdates:()=>handles()&&!document.hidden?activity.check():undefined,leave:()=>{layout.leave();activity.clear();remember();viewEpoch++;artifactEpoch++;disposeMesh();document.body.classList.remove('studio-mode');$('#main').className='';}};
+  return {handles,render,reset,checkUpdates:()=>handles()&&!document.hidden?(library.active?library.checkUpdates():activity.check()):undefined,leave:()=>{library.leave();layout.leave();activity.clear();remember();viewEpoch++;artifactEpoch++;disposeMesh();document.body.classList.remove('studio-mode');$('#main').className='';}};
 }

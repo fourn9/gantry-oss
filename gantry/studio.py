@@ -7,6 +7,7 @@ from .contracts import register, S, I
 from .development import in_scope
 from .model import Fault, require, uid, digest
 from .bot_handoff import BotHandoffMixin
+from .studio_library import StudioLibraryMixin
 from .studio_team import StudioTeamMixin
 from .studio_bots import StudioBotsMixin
 from .studio_discussion import StudioDiscussionMixin
@@ -22,7 +23,7 @@ register('studio_share_update', {'work_id':S,'version':I,'state_id':S,'note':{'t
     ['work_id','version','state_id','note'])
 
 
-class StudioMixin(BotHandoffMixin, StudioTeamMixin, StudioBotsMixin, StudioDiscussionMixin, StudioWorkspaceMixin, OnboardingMixin):
+class StudioMixin(StudioLibraryMixin, BotHandoffMixin, StudioTeamMixin, StudioBotsMixin, StudioDiscussionMixin, StudioWorkspaceMixin, OnboardingMixin):
     def _studio_work(self, s, actor, wid):
         change = self._dev_get(s, 'dev_changes', wid)
         session = self._dev_session(s, actor, change['session_id'])
@@ -98,10 +99,7 @@ class StudioMixin(BotHandoffMixin, StudioTeamMixin, StudioBotsMixin, StudioDiscu
             versions.append({'id':ref,'number':index,'summary':st['summary'],'created_at':st['created_at'],
                 'sharing':'shared' if receipts else 'baseline' if index==0 else 'unshared',
                 'notes':[x['note'] for x in receipts if x.get('note')]})
-        participants=[]
-        for pid in sorted(set(d['actors']+[d['owner']])):
-            person=s['principals'].get(pid,{})
-            if person.get('enabled',True): participants.append({'id':pid,'kind':person.get('kind','unknown')})
+        participants=self._studio_participants(s,actor,d,state)
         task=next((t for t in s.get('bot_tasks',{}).values() if t.get('change_id')==c['id']),None)
         source=self._dev_artifact(s,state['snapshot'])['data'].get('source') or {}
         permitted=lambda command: 'allowed_commands' not in actor or command in actor['allowed_commands']

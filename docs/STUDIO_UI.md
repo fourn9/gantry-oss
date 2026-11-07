@@ -15,6 +15,9 @@ scoped import, opt-in saved-file watching and continuation by another participan
 1. Open a project in the sidebar. **Structure** shows its saved component hierarchy,
    labelled with the source state; selecting a component shows associated work.
    **Work** lists change sets, owners (human or agent), component scope and recorded status.
+   **Files** browses actual saved bytes, parent diffs and state history. **Requirements**
+   shows the pinned requirements, applicable checks and missing evidence. The **Related**
+   panel connects these views using recorded check inputs and requirement references.
 2. Open work. Select **CAD**, **Code** or **Checks**. Choose a saved version and,
    for CAD/code, optionally compare another version. **Version details** exposes
    the capture omissions and restore command. The shared update note (or checkpoint
@@ -38,6 +41,11 @@ scoped import, opt-in saved-file watching and continuation by another participan
 6. **Recent** / **Recent work** show work opened in the current browser tab. This
    initial implementation does not persist browsing history across sign-out/reload.
 
+Files and Requirements also support conversations without creating work. Mention
+named members or Crew agents; mentions only notify. **Ask Crew agent** uses the
+existing read-only request queue; an explicit assignment requires existing delegated
+scope. See [Files, requirements and shared context](STUDIO_LIBRARY.md).
+
 Unshared describes publication status, not an additional privacy boundary: existing
 session authorization still determines who can inspect checkpoints. The browser
 cannot see unsaved local edits. It labels imported files as saved checkpoints and
@@ -58,12 +66,17 @@ adding tools to a profile does not silently widen an issued credential.
 | `studio_import_project` | Saved files, hierarchy/context and initial work scope; human-authenticated atomic project/session/state/change creation |
 | `studio_sync_update` | Expected work version and state, changed file bytes, explicit deletions, reason and optional updated context; scoped immutable checkpoint |
 | `studio_share_update` | Work ID, expected version, exact current state, note; existing share operation, no adoption |
-| `studio_comment` | Work ID, state ID, exact anchor, optional thread ID, body, recipient IDs |
+| `studio_library` | Project and optional exact state; paged files, requirements or saved states |
+| `studio_related` | Project, state and anchor; linked requirements/checks/files/work and paged conversations |
+| `studio_context` | Same pinned state, mandatory constraints/requirements/unknowns, bounded related records and optional state delta |
+| `studio_comment` | Work ID or project ID, state ID, exact anchor, optional thread ID, body, recipient IDs |
 | `studio_inbox` | Only the current recipient's accessible mentions, with exact target and cursor |
 | `studio_acknowledge` | Only the recipient can mark the request read |
 
-Anchors are `{kind: "work"}`, or `{kind: "cad", path, hash, part}`, or
-`{kind: "code", path, hash, line}`. `part` is currently the immutable mesh file path,
+Anchors include `{kind: "work"}`, `{kind: "project"}`, `{kind: "component", component_id}`,
+`{kind: "requirement", requirement_id, revision_id}`, `{kind: "file", path, hash}`,
+`{kind: "cad", path, hash, part}`, and `{kind: "code", path, hash, line}`.
+`part` is currently the immutable mesh file path,
 not a guessed native CAD face/feature. `line` is 1-based in the saved UTF-8 bytes.
 Deleted comparison lines bind to the old state. Replies cannot change an anchor.
 Recipients must have current access to the session and referenced state.
@@ -94,9 +107,10 @@ collision checker. Code preview/anchoring is limited to 256 KiB; large diffs use
 separate panes and truncated previews with a restore path. Existing **Import changes**
 accepts 1–200 files, at most 32 MiB each/48 MiB total. **Import project** and the new
 atomic saved-file connection use 1–1000 files, 16 MiB each/32 MiB total.
-Full chunked adapters can handle larger
-artifact workflows. Work/Inbox lists paginate; state history and conversations
-are not yet paginated and need further scaling for very long-lived projects.
+Full chunked adapters can handle larger artifact workflows. Work/Inbox and project
+library lists paginate. Project conversations load the latest 50 messages first,
+with older pages available. Legacy work-detail history/conversation reads still
+need pagination for very long-lived projects.
 
 Missing artifacts show **not captured/not connected** guidance; fetching shows a
 loading state; rejected imports retain the dialog and error; unsupported formats
@@ -110,8 +124,9 @@ existing overview/Inbox reads. This is a read-only poll, not a push service or a
 new external-tool synchronization path. A small notice offers **Load updates**;
 the selected work version, camera and unsent comment stay in place. **Open latest**
 explicitly switches to the newer version. An unavailable poll offers a retry;
-navigation and sign-out invalidate pending notices. History/conversation scans
-still need indexing/pagination before claiming large-project scaling.
+navigation and sign-out invalidate pending notices. Files/Requirements use bounded
+related reads for activity. Legacy work history/conversation scans still need
+indexing/pagination before claiming large-project scaling.
 
 The artifact-file selector and mesh selection identify the same file-part for
 comparison and discussion. Opening/closing a conversation preserves the view and

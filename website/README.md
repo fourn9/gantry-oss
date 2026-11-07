@@ -68,3 +68,52 @@ map or scroll with two fingers to pan, and click a component to inspect its work
 Fit all restores the complete hierarchy. Zoom buttons and arrow / + / - / 0 keys
 remain available; touch users can drag the map and use zoom buttons.
 Sidebar and desktop detail dividers can be dragged or adjusted with arrow keys.
+
+## Files, requirements and shared context
+
+The static demo includes project and component Files / Requirements tabs from the
+approved Studio library UI. Select an exact saved state, preview/download a file,
+compare its parent, or open Related to follow declared check and requirement links.
+Shared context displays the same mandatory requirements, constraints, open
+questions and capture omissions returned by the in-memory `studio_context` read.
+It includes no file bodies and makes no model request.
+
+Use the second Inbox sample to open `settling-time` at `timing-r1`. Project,
+component, file, mesh, code-line and requirement discussions keep their original
+state and anchor. Choose Alex Morgan in the mention picker to create a local Inbox
+entry. Alex Morgan and Sam Rivera are invented humans; Ari and Kai are invented
+Crew agents. Their stable IDs remain `designer`, `mechanical-reviewer`,
+`design-agent` and `controls-agent`. Ask/Assign are unavailable in this demo;
+mentions never start agent work. The existing Team setup has its own explicitly
+labelled simulation and still separates creation from starting.
+
+`demo-library.js` supplies the three library reads without a backend. It validates
+project/state/anchor identity, uses bounded file/work/message pages, and preserves
+all mandatory requirements even when related records are limited. The public
+fixture is deliberately small; this is not a benchmark or an authorization test
+of the authenticated product. The Restore panel shows an example command; invented
+demo state IDs cannot be restored by a real Gantry server.
+
+The demo module graph, workspace/showcase entry points and homepage imports of
+Studio assets use `library-20261107`. The original timing Inbox request, prepared
+edit/import/share flow, team setup and structure-camera controls are preserved.
+
+### Verification for this update
+
+- `node --test website/tests/*.test.mjs`: 25 passing tests. New checks cover exact
+  states and scopes, requirement/file relations, mandatory context with pagination,
+  all discussion anchors, rejected retargeting, invalid/reset states, escaping,
+  message history merging and import/cache consistency.
+- In-app browser runtime: saved mesh and code preview, exact line comment and
+  named mention, Inbox return, requirement revision discussion, Shared context,
+  file-to-requirement Related link, parent comparison, saved-state selection and
+  the original timing review (`0.15` → `0.25`, selected line 2) worked.
+- Library layouts were inspected at 320, 390, 768, 1024 and 1440 CSS pixels;
+  horizontal document width matched each tested viewport after fixing compact
+  toolbar overflow. Related/discussion stacks below the artifact on narrow views.
+- The feature overview rendered the new Files and Requirements excerpts; browser
+  console inspection reported no warning/error entries during these flows.
+
+These are local demo observations, separate from live model, connector, worker,
+physical-verification or deployment evidence. No paid model, external tool or real
+collaboration service was invoked.

@@ -58,7 +58,7 @@ class Service(CrewSetupJobsMixin, CrewSetupMixin, MembershipMixin, StudioMixin, 
     READS |= {'get_validation_plan', 'get_evidence_view', 'query_evidence', 'read_artifact_batch', 'list_artifact_files'}
     READS.add('workspace_members')
     READS |= {'get_crew_setup', 'list_crew_setups', 'get_crew_setup_control'}
-    READS |= {'studio_overview', 'studio_work', 'studio_inbox', 'studio_team', 'list_bot_handoffs', 'get_onboarding', 'list_onboardings'}
+    READS |= {'studio_library','studio_related','studio_context','studio_overview', 'studio_work', 'studio_inbox', 'studio_team', 'list_bot_handoffs', 'get_onboarding', 'list_onboardings'}
     READS |= {'get_development_state', 'list_development_states', 'get_design_assessment'}
     READS |= {'related_review_context','check_mentor_job'}
     READS |= {'get_review_team', 'review_automation_status'}

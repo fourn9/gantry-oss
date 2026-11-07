@@ -21,8 +21,8 @@ export function createBotUI({api,modal,toast,getContext,refresh}){
     const s=find(detail.work.session_id);
     if(!s?.project?.enabled||!s.bots.some(r=>r.bot.enabled&&r.binding.enabled))return showTeam();
     const intent=intentKey();
-    modal(mode==='ask'?'Ask a Bot':'Assign work',requestForm(s,detail,selection,mode,draft),async form=>{
-      await api('studio_request_bot',{work_id:detail.work.id,version:detail.work.version,state_id:selection.state_id,
+    modal(mode==='ask'?'Ask Crew agent':'Assign work',requestForm(s,detail,selection,mode,draft),async form=>{
+      await api('studio_request_bot',{...(detail.work.id?{work_id:detail.work.id}:{project_id:detail.work.project_id}),version:detail.work.version,state_id:selection.state_id,
         anchor:selection.anchor,mode,bot_id:form.bot.value,body:form.body.value,
         completion:mode==='ask'?['Answer the recorded question with evidence and limitations']:lines(form.completion.value),
         write_scope:mode==='ask'?[]:lines(form.scope.value)},intent);

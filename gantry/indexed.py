@@ -25,6 +25,21 @@ class Records(MutableMapping):
     def __deepcopy__(self, memo): return {k: copy.deepcopy(self[k], memo) for k in self}
 
 
+def entry_values(entries, entry_type):
+    """Read only matching entries, including transaction-local replacements."""
+    if not isinstance(entries, Records):
+        yield from (value for value in entries.values() if value.get('type') == entry_type)
+        return
+    keys = {row[0] for row in entries.con.execute(
+        "SELECT id FROM records WHERE collection=? AND "
+        "COALESCE(json_extract(body,'$.value.type'),json_extract(body,'$.type'))=?",
+        (entries.table, entry_type))}
+    for key in sorted(keys | entries.cache.keys()):
+        value = entries[key]
+        if value.get('type') == entry_type:
+            yield value
+
+
 def schema(con):
     manifests.schema(con)
     con.executescript('''
@@ -33,6 +48,8 @@ def schema(con):
         session_id TEXT, state_id TEXT, subject_id TEXT, profile TEXT, created_seq INTEGER,
         PRIMARY KEY(collection,id));
       CREATE INDEX IF NOT EXISTS records_by_session ON records(collection,session_id,id);
+      CREATE INDEX IF NOT EXISTS entries_by_type ON records(collection,
+        COALESCE(json_extract(body,'$.value.type'),json_extract(body,'$.type')),id);
       CREATE INDEX IF NOT EXISTS evidence_by_state ON records(collection,state_id,id);
       CREATE INDEX IF NOT EXISTS evidence_by_subject ON records(collection,state_id,subject_id,id);
       CREATE INDEX IF NOT EXISTS evidence_by_profile ON records(collection,state_id,profile,id);

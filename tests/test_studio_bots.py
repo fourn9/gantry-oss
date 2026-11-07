@@ -28,6 +28,30 @@ class StudioBotTests(unittest.TestCase):
             'completion':['Return an evidence-based answer'], 'write_scope':[] if mode=='ask' else ['mechanical.txt'],
             **extra}
 
+    def test_project_component_question_returns_without_creating_work(self):
+        project, work = self.work()
+        before = self.owner.call('studio_overview')['total']
+        anchor = {'kind':'component','component_id':self.base['hierarchy'][0]['id']}
+        target = {'project_id':project['id'],'state_id':self.base['id'],'anchor':anchor}
+        related = self.owner.call('studio_related',target)
+        person = next(p for p in related['participants'] if p['bot_ids'] and 'designer' in p['bot_ids'])
+        self.assertTrue(person['name'])
+        self.assertTrue(person['role'])
+        for i in range(51):
+            self.owner.call('studio_comment',{**target,'body':f'Earlier comment {i}','mentions':[]})
+        request = self.owner.call('studio_request_bot',{**target,'version':related['session_version'],
+            'mode':'ask','bot_id':'designer','body':'Inspect this saved component',
+            'completion':['Return evidence and limitations'],'write_scope':[]})
+        with self.worker('designer',lambda *args:{'output':self.answer(summary='Need measurement'),'provider':{'kind':'fixture'}}) as worker:
+            self.assertEqual(worker.tick()[0]['task']['status'],'completed')
+        view = self.owner.call('studio_related',target)
+        self.assertEqual(view['bot_requests'][0]['status'],'completed')
+        other=self.owner.call('studio_related',{**target,'anchor':{'kind':'project'}})
+        self.assertFalse(other['bot_requests'])
+        self.assertEqual(view['threads'][0]['messages'][-1]['body'].split('\n')[0],'Need measurement')
+        self.assertEqual(self.owner.call('studio_overview')['total'],before)
+        self.assertEqual(self.owner.call('studio_inbox')['items'][0]['project_id'],project['id'])
+
     def test_ask_pins_context_queues_offline_and_returns_to_same_selection(self):
         project, work = self.work()
         team = self.owner.call('studio_team', {'project_id':project['id']})
@@ -221,6 +245,11 @@ class StudioBotTests(unittest.TestCase):
         server=Server(('127.0.0.1',0),self.service);thread=threading.Thread(target=server.serve_forever,daemon=True);thread.start()
         try:
             url='http://127.0.0.1:'+str(server.server_port)
+            from urllib.request import urlopen
+            for asset in ('studio_library_ui.js','studio_library_views.js'):
+                with urlopen(url+'/'+asset) as response:
+                    self.assertEqual(response.status,200)
+                    self.assertIn('javascript',response.headers['Content-Type'])
             with BotWorker(Client(url,self.tokens['designer']),cfg,self.root/'http-worker') as worker:
                 result=worker.tick()[0]
             self.assertIn('task',result,result)

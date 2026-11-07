@@ -8,7 +8,7 @@ from .model import require
 READ_TOOLS = set('context reviews events project_details session_details product_overview identity get_development_state list_development_states development_state get_change_review list_change_reviews related_review_context get_review_team review_automation_status get_evidence_view query_evidence get_validation_plan state why impact open history outcomes design review_context list_artifact_files read_artifact_chunk read_artifact_batch restore_artifact'.split())
 READ_TOOLS.add('render_evidence_view')
 READ_TOOLS.add('get_design_assessment')
-READ_TOOLS.update({'studio_overview','studio_work','studio_inbox','studio_team','get_onboarding','list_onboardings'})
+READ_TOOLS.update({'studio_library','studio_related','studio_context','studio_overview','studio_work','studio_inbox','studio_team','get_onboarding','list_onboardings'})
 READ_TOOLS.update({'get_persistent_bot', 'list_persistent_memories', 'bot_inbox'})
 DEVELOP_TOOLS = set('record capture_artifact begin_change checkpoint_change share_change integrate_changes submit_change_review respond_to_change_review create_work claim_work submit_work discuss'.split())
 DEVELOP_TOOLS.update({'studio_comment','studio_acknowledge','studio_import_update','studio_share_update','studio_sync_update','record_state_restore'})
@@ -29,7 +29,7 @@ BOT_WRITES = set('capture_artifact assign_bot_task claim_bot_task checkpoint_bot
     'start_bot_runtime heartbeat_bot_runtime stop_bot_runtime record_state_restore'.split())
 BOT_READS.add('list_bot_handoffs')
 BOT_WRITES.update({'request_bot_handoff','acknowledge_bot_handoff','accept_bot_handoff'})
-PROFILES['bot'] = BOT_READS | BOT_WRITES | {'get_design_assessment','studio_overview','studio_work','studio_inbox','studio_team','studio_comment','studio_acknowledge'}
+PROFILES['bot'] = BOT_READS | BOT_WRITES | {'get_design_assessment','studio_library','studio_related','studio_context','studio_overview','studio_work','studio_inbox','studio_team','studio_comment','studio_acknowledge'}
 PROFILES['bot'].update({'get_bot_working_state', 'update_bot_working_state', 'record_bot_learning_use', 'poll_bot_continuations'})
 PROFILES['bot'].update({'get_bot_learning_plan', 'prepare_bot_learning', 'submit_bot_learning_plan', 'complete_empty_bot_learning', 'get_bot_reflection', 'list_bot_reflections', 'complete_bot_reflection'})
 PROFILES['bot'].update({'refresh_bot_task', 'ask_bot', 'record_bot_decision', 'record_bot_action', 'record_bot_experience'})

@@ -11065,6 +11065,10 @@
         "anchor": {
           "additionalProperties": false,
           "properties": {
+            "component_id": {
+              "minLength": 1,
+              "type": "string"
+            },
             "hash": {
               "minLength": 1,
               "type": "string"
@@ -11072,8 +11076,12 @@
             "kind": {
               "enum": [
                 "work",
+                "project",
+                "component",
+                "file",
                 "cad",
-                "code"
+                "code",
+                "requirement"
               ]
             },
             "line": {
@@ -11085,6 +11093,14 @@
               "type": "string"
             },
             "path": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "requirement_id": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "revision_id": {
               "minLength": 1,
               "type": "string"
             }
@@ -11113,6 +11129,10 @@
           "maxItems": 20,
           "type": "array"
         },
+        "project_id": {
+          "minLength": 1,
+          "type": "string"
+        },
         "state_id": {
           "minLength": 1,
           "type": "string"
@@ -11127,11 +11147,103 @@
         }
       },
       "required": [
-        "work_id",
         "state_id",
         "anchor",
         "body",
         "mentions"
+      ],
+      "type": "object"
+    }
+  },
+  "studio_context": {
+    "description": "studio context",
+    "schema": {
+      "additionalProperties": false,
+      "properties": {
+        "after": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "anchor": {
+          "additionalProperties": false,
+          "properties": {
+            "component_id": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "hash": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "kind": {
+              "enum": [
+                "work",
+                "project",
+                "component",
+                "file",
+                "cad",
+                "code",
+                "requirement"
+              ]
+            },
+            "line": {
+              "minimum": 1,
+              "type": "integer"
+            },
+            "part": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "path": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "requirement_id": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "revision_id": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind"
+          ],
+          "type": "object"
+        },
+        "basis": {
+          "type": "object"
+        },
+        "delta_after": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "intent": {
+          "type": "object"
+        },
+        "limit": {
+          "maximum": 100,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "project_id": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "since_state": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "state_id": {
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "required": [
+        "project_id",
+        "state_id",
+        "anchor"
       ],
       "type": "object"
     }
@@ -11445,6 +11557,61 @@
       "type": "object"
     }
   },
+  "studio_library": {
+    "description": "studio library",
+    "schema": {
+      "additionalProperties": false,
+      "properties": {
+        "after": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "basis": {
+          "type": "object"
+        },
+        "component_id": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "intent": {
+          "type": "object"
+        },
+        "limit": {
+          "maximum": 100,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "path": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "project_id": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "query": {
+          "maxLength": 240,
+          "type": "string"
+        },
+        "section": {
+          "enum": [
+            "files",
+            "requirements",
+            "versions"
+          ]
+        },
+        "state_id": {
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "required": [
+        "project_id",
+        "section"
+      ],
+      "type": "object"
+    }
+  },
   "studio_overview": {
     "description": "studio overview",
     "schema": {
@@ -11470,14 +11637,22 @@
       "type": "object"
     }
   },
-  "studio_request_bot": {
-    "description": "studio request bot",
+  "studio_related": {
+    "description": "studio related",
     "schema": {
       "additionalProperties": false,
       "properties": {
+        "after": {
+          "minLength": 1,
+          "type": "string"
+        },
         "anchor": {
           "additionalProperties": false,
           "properties": {
+            "component_id": {
+              "minLength": 1,
+              "type": "string"
+            },
             "hash": {
               "minLength": 1,
               "type": "string"
@@ -11485,8 +11660,12 @@
             "kind": {
               "enum": [
                 "work",
+                "project",
+                "component",
+                "file",
                 "cad",
-                "code"
+                "code",
+                "requirement"
               ]
             },
             "line": {
@@ -11498,6 +11677,99 @@
               "type": "string"
             },
             "path": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "requirement_id": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "revision_id": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind"
+          ],
+          "type": "object"
+        },
+        "basis": {
+          "type": "object"
+        },
+        "intent": {
+          "type": "object"
+        },
+        "limit": {
+          "maximum": 100,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "message_after": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "project_id": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "state_id": {
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "required": [
+        "project_id",
+        "state_id",
+        "anchor"
+      ],
+      "type": "object"
+    }
+  },
+  "studio_request_bot": {
+    "description": "studio request bot",
+    "schema": {
+      "additionalProperties": false,
+      "properties": {
+        "anchor": {
+          "additionalProperties": false,
+          "properties": {
+            "component_id": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "hash": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "kind": {
+              "enum": [
+                "work",
+                "project",
+                "component",
+                "file",
+                "cad",
+                "code",
+                "requirement"
+              ]
+            },
+            "line": {
+              "minimum": 1,
+              "type": "integer"
+            },
+            "part": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "path": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "requirement_id": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "revision_id": {
               "minLength": 1,
               "type": "string"
             }
@@ -11535,6 +11807,10 @@
             "assign"
           ]
         },
+        "project_id": {
+          "minLength": 1,
+          "type": "string"
+        },
         "state_id": {
           "minLength": 1,
           "type": "string"
@@ -11556,7 +11832,6 @@
         }
       },
       "required": [
-        "work_id",
         "version",
         "state_id",
         "anchor",
