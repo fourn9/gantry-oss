@@ -29,7 +29,7 @@ numba==0.68.1
 numpy==2.5.4
 packaging==26.3
 pillow==13.0.0
-pip==26.2.2
+pip==26.3
 propcache==0.5.4
 pycparser==3.12
 pyparsing==3.3.3
