@@ -37,3 +37,7 @@ export function primaryComponents(components){
 export function commentCount(detail,stateId,path,line){
   return (detail.discussion_index||[]).filter(t=>t.state_id===stateId&&t.anchor.path===path&&(line===undefined||t.anchor.line===line)).reduce((n,t)=>n+t.message_count,0);
 }
+
+export const libraryURL=(project,node,section,state,anchor,thread,notification)=>'studio/'+encodeURIComponent(project)+'/'+encodeURIComponent(node||'~')+'/'+section+(state?'/'+encodeURIComponent(state):'')+(anchor?'/'+encodeURIComponent(JSON.stringify(anchor)):'')+(thread?'/'+encodeURIComponent(thread):'')+(notification?'/'+encodeURIComponent(notification):'');
+export const participantName=(participants,id)=>participants?.find(p=>p.id===id||p.bot_ids?.includes(id))?.name||id;
+export const anchorLabel=a=>a.kind==='work'?'Work conversation':a.kind==='project'?'Project conversation':a.kind==='component'?a.component_id:a.kind==='requirement'?a.requirement_id:a.kind==='code'?`${a.path}:${a.line}`:a.path||a.part;

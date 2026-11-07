@@ -1,8 +1,9 @@
 // Public, invented sample data. This adapter never opens a network connection.
-import {fileChanges} from './studio_model.js?v=structure-20261106';
-import {componentScope} from './studio_context.js?v=structure-20261106';
+import {createLibraryFixture} from './demo-library.js?v=library-20261107';
+import {fileChanges} from './studio_model.js?v=library-20261107';
+import {componentScope} from './studio_context.js?v=library-20261107';
 const clone=value=>structuredClone(value);
-const members=[{id:'designer',kind:'human'},{id:'controls-agent',kind:'agent'},{id:'design-agent',kind:'agent'},{id:'mechanical-reviewer',kind:'human'}];
+const members=[{id:'designer',name:'Alex Morgan',role:'Project owner',kind:'human'},{id:'controls-agent',name:'Kai',role:'Controls Crew agent',kind:'agent'},{id:'design-agent',name:'Ari',role:'Mechanical Crew agent',kind:'agent'},{id:'mechanical-reviewer',name:'Sam Rivera',role:'Mechanical reviewer',kind:'human'}];
 const hierarchy=[
  {id:'robot',title:'Bench robot',kind:'robot',paths:['cad/','control/']},
  {id:'wrist',parent:'robot',title:'Wrist assembly',kind:'assembly',paths:['cad/','control/']},
@@ -26,12 +27,13 @@ export async function createDemoAPI(){
  const text=(value,max)=>must(typeof value==='string'&&value.length<=max,'Text exceeds the demo limit.');
  const state=id=>must(states[id],'This sample version is unavailable.');
  const work=id=>must(works[id],'This sample work is unavailable.');
+ const library=createLibraryFixture({state,getStates:()=>states,getWorks:()=>works,getThreads:()=>threads,members,hierarchy,getSeq:()=>seq});
  async function saveState(id,files,summary,sharing='local',previous=null){
   const manifest={};for(const [path,content] of Object.entries(files)){
    const bytes=new TextEncoder().encode(content),hash=await digest(bytes);
    blobs[hash]={content:btoa(String.fromCharCode(...bytes)),hash};manifest[path]={hash,size:bytes.length};
   }
-  const value={state:{id,snapshot:id,summary,session_id:'sample-session',hierarchy:clone(hierarchy)},manifest,
+  const value={state:{id,snapshot:id,summary,session_id:'sample-session',hierarchy:clone(hierarchy),parents:previous?[previous.state.id]:[],created_at:Date.UTC(2026,10,1,8)+counter*1000,capture:{missing:['Native CAD source','Real test execution','Live agents and external tools']},unfinished:['Verify full-motion clearance','Resolve and measure controller settling time']},manifest,
    status:{work:'working',sharing,verification:id==='state_base'?'pass':'unverified',adoption:'unadopted'},
    diffs:previous?fileChanges(previous.manifest,manifest):[],engineering:{checks:[{id:'Full-motion clearance',scope:'Sample assembly · physical verification required',effective_status:'unverified'}]},
    evaluations:[{state_id:'state_base',scope:'Sample result · controller syntax (illustrative, not executed)',verdict:'pass',applicable:id==='state_base'}],files};
@@ -45,7 +47,7 @@ export async function createDemoAPI(){
    discussion_index:threads.filter(t=>t.work_id===wid).map(t=>({...clone(t),message_count:t.messages.length})),
    participants:clone(members),can_update:true,can_comment:true,source:{repository:'sample/bench-robot',commit:''},
    capture:{missing:['Native CAD source','Real test execution','Live agents and external tools']},activity:[],activity_token:String(seq),
-   demo_request:wid==='bracket'&&id==='state_bracket_v1'?{agent:'design-agent',thread_id:'thread_sample',state_id:id,anchor:clone(threads.find(t=>t.id==='thread_sample').anchor),
+   demo_request:wid==='bracket'&&id==='state_bracket_v1'?{agent:'design-agent',agent_name:'Ari',thread_id:'thread_sample',state_id:id,anchor:clone(threads.find(t=>t.id==='thread_sample').anchor),
     reason:'The proposed controller wait exceeds the current 0.15-second requirement. Changing that requirement needs the project owner’s direction.',
     changed:'Bracket moved inward by 2 mesh units. Controller wait: 0.15 → 0.25 seconds (+0.10 seconds per move).',
     remaining:'After your direction, the team can evaluate motion clearance and timing. Neither has been verified for this update. This demo records replies only; it does not run checks.',
@@ -70,13 +72,20 @@ export async function createDemoAPI(){
   const anchor={kind:'code',path:'control/motion.py',line:2,hash:state('state_bracket_v1').manifest['control/motion.py'].hash};
   const related_anchor={kind:'cad',path:'cad/sensor-bracket.stl',part:'cad/sensor-bracket.stl',hash:state('state_bracket_v1').manifest['cad/sensor-bracket.stl'].hash};
   threads.push({id:'thread_sample',work_id:'bracket',state_id:'state_bracket_v1',anchor,compare_state_id:'state_base',related_anchor,messages:[
-   {author:'design-agent',at:Date.UTC(2026,10,1,8,50),body:'@controls-agent I am moving the bracket inward. Check the controller timing alongside this change.',mentions:['controls-agent']},
-   {author:'controls-agent',at:Date.UTC(2026,10,1,8,55),body:'@design-agent I propose 0.25 seconds to settle. That is 0.10 seconds above the current requirement; the owner needs to confirm the timing tradeoff before we evaluate this candidate.',mentions:['design-agent']},
-   {author:'design-agent',at:Date.UTC(2026,10,1,9),body:'@designer Can settling time increase from 0.15 to 0.25 seconds? This adds 0.10 seconds per move. Confirm the timing tradeoff, or ask us to revise within the current limit. Motion and timing checks are still pending.',mentions:['designer']}]});
-  inbox.push({id:'request_sample',work_id:'bracket',state_id:'state_bracket_v1',thread_id:'thread_sample',anchor,title:'Confirm the settling-time requirement',author:'design-agent',body:threads[0].messages.at(-1).body,read:false,kind:'Change review',project_id:'bench',project_name:'Bench robot',scope:'Sensor bracket + Motion control',contributors:['design-agent','controls-agent']});
+   {author:'design-agent',at:Date.UTC(2026,10,1,8,50),body:'@Kai I am moving the bracket inward. Check the controller timing alongside this change.',mentions:['controls-agent']},
+   {author:'controls-agent',at:Date.UTC(2026,10,1,8,55),body:'@Ari I propose 0.25 seconds to settle. That is 0.10 seconds above the current requirement; the owner needs to confirm the timing tradeoff before we evaluate this candidate.',mentions:['design-agent']},
+   {author:'design-agent',at:Date.UTC(2026,10,1,9),body:'@Alex Morgan Can settling time increase from 0.15 to 0.25 seconds? This adds 0.10 seconds per move. Confirm the timing tradeoff, or ask us to revise within the current limit. Motion and timing checks are still pending.',mentions:['designer']}]});
+  inbox.push({id:'request_sample',work_id:'bracket',state_id:'state_bracket_v1',thread_id:'thread_sample',anchor,title:'Confirm the settling-time requirement',author:'design-agent',body:threads[0].messages.at(-1).body,read:false,kind:'Change review',project_id:'bench',project_name:'Bench robot',scope:'Sensor bracket + Motion control',contributors:['design-agent','controls-agent'],contributor_names:['Ari','Kai']});
+  const requirementAnchor={kind:'requirement',requirement_id:'settling-time',revision_id:'timing-r1'};
+  threads.push({id:'thread_requirement_sample',project_id:'bench',state_id:'state_base',anchor:requirementAnchor,messages:[{id:'message_requirement_sample',author:'controls-agent',at:Date.UTC(2026,10,1,8,30),body:'@Alex Morgan The saved requirement is 0.15 seconds. A measured timing report is still missing. Confirm which evidence the team should acquire before any requirement change.',mentions:['designer']}]});
+  inbox.push({id:'request_requirement_sample',project_id:'bench',state_id:'state_base',thread_id:'thread_requirement_sample',anchor:requirementAnchor,title:'Review the timing requirement',author:'controls-agent',body:threads.at(-1).messages[0].body,read:false,kind:'Requirement discussion'});
+
  }
  async function api(command,args={}){
   switch(command){
+   case 'studio_library':return clone(library.library(args));
+   case 'studio_related':return library.related(args);
+   case 'studio_context':return clone(library.context(args));
    case 'studio_overview':return clone({projects:[{id:'bench',name:'Bench robot',hierarchy,structure_state:'state_base'}],works:Object.values(works),next:null,collaboration:{work_id:'bracket',state_id:'state_bracket_v1',thread_id:'thread_sample',messages:clone(threads.find(t=>t.id==='thread_sample').messages),replied:threads.find(t=>t.id==='thread_sample').messages.some(m=>m.author==='designer')},activity_token:String(seq)});
    case 'studio_work':return detail(args.work_id,args.state_id);
    case 'get_development_state':{const value=clone(state(args.state_id));delete value.files;return value;}
@@ -95,24 +104,21 @@ export async function createDemoAPI(){
     v.status.sharing='shared';v.notes=[args.note||''];w.sharing='shared';w.version++;seq++;return {state_id:w.head};
    }
    case 'studio_comment':{
-    const w=work(args.work_id);must(w.versions.includes(args.state_id),'Version does not belong to this work.');
+    const w=args.work_id?work(args.work_id):null;if(w)must(w.versions.includes(args.state_id),'Version does not belong to this work.');
+    library.validate({...args,project_id:args.project_id||w?.project_id});
     text(args.body,4000);must(args.body.trim(),'Write a comment first.');must(threads.reduce((n,t)=>n+t.messages.length,0)<100,'Reset the demo to add more comments.');
-    const anchor=args.anchor;must(anchor&&['work','cad','code'].includes(anchor.kind),'Unsupported comment target.');
-    if(anchor.kind!=='work'){
-     const v=state(args.state_id),f=v.manifest[anchor.path];must(f&&f.hash===anchor.hash,'The selected file version changed.');
-     if(anchor.kind==='cad')must(anchor.part===anchor.path,'Select a sample part.');
-     if(anchor.kind==='code')must(Number.isInteger(anchor.line)&&anchor.line>0&&anchor.line<=v.files[anchor.path].split('\n').length,'Select an existing line.');
-    }
+    const anchor=args.anchor;
     const mentions=args.mentions||[];must(Array.isArray(mentions)&&mentions.every(id=>members.some(m=>m.id===id)),'Unknown sample participant.');
-    let t=threads.find(t=>t.work_id===w.id&&t.state_id===args.state_id&&canonical(t.anchor)===canonical(anchor));
-    if(!t){t={id:'thread_'+(++counter),work_id:w.id,state_id:args.state_id,anchor:clone(anchor),messages:[]};threads.push(t);}
-    t.messages.push({author:'designer',at:Date.now(),body:args.body,mentions:clone(mentions)});
-    for(const recipient of mentions)inbox.unshift({id:'request_'+(++counter),recipient,work_id:w.id,state_id:args.state_id,thread_id:t.id,anchor:clone(anchor),title:w.title,author:'designer',body:args.body,read:false});
+    let t=threads.find(t=>(w?t.work_id===w.id:!t.work_id&&t.project_id===args.project_id)&&t.state_id===args.state_id&&canonical(t.anchor)===canonical(anchor));
+    if(args.thread_id)must(t?.id===args.thread_id,'Replies must keep their original saved target.');
+    if(!t){t={id:'thread_'+(++counter),...(w?{work_id:w.id}:{project_id:args.project_id}),state_id:args.state_id,anchor:clone(anchor),messages:[]};threads.push(t);}
+    t.messages.push({id:'message_'+(++counter),author:'designer',at:Date.now(),body:args.body,mentions:clone(mentions)});
+    for(const recipient of mentions)inbox.unshift({id:'request_'+(++counter),recipient,...(w?{work_id:w.id}:{project_id:args.project_id}),state_id:args.state_id,thread_id:t.id,anchor:clone(anchor),title:w?.title||({project:'Project conversation',component:'Component conversation',requirement:'Requirement conversation'}[anchor.kind]||anchor.path),author:'designer',body:args.body,read:false});
     seq++;return {thread_id:t.id};
    }
-   case 'studio_inbox':return clone({items:inbox.filter(i=>!i.recipient||i.recipient==='designer').map(i=>({...i,reply_sent:threads.find(t=>t.id===i.thread_id)?.messages.some(m=>m.author==='designer')||false})),next:null,activity_token:String(seq)});
+   case 'studio_inbox':return clone({items:inbox.filter(i=>!i.recipient||i.recipient==='designer').map(i=>({...i,author_name:members.find(p=>p.id===i.author)?.name||i.author,reply_sent:threads.find(t=>t.id===i.thread_id)?.messages.some(m=>m.author==='designer')||false})),next:null,activity_token:String(seq)});
    case 'studio_acknowledge':{const item=inbox.find(i=>i.id===args.notification_id);must(item,'Request not found.');item.read=true;seq++;return {};}
-   case 'session_details':return {session:{owner:'designer',actors:members.map(m=>m.id)}};
+   case 'session_details':return {session:{owner:'designer',actors:members.map(m=>m.id)},participants:clone(members)};
    case 'begin_change':{
     text(args.title,240);text(args.purpose,1000);must(args.title.trim()&&args.purpose.trim(),'Add a title and purpose.');state(args.state_id);
     const owner=must(members.find(m=>m.id===args.assignee),'Choose a sample participant.');must(Object.keys(works).length<15,'Reset the demo to add more work.');

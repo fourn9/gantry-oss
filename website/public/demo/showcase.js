@@ -1,15 +1,16 @@
-import {mountStructureCamera} from './studio_camera.js';
+import {mountStructureCamera} from './studio_camera.js?v=library-20261107';
 if(location.hash.startsWith('#studio')) location.replace('./workspace.html'+location.hash);
-import {createDemoAPI} from './demo-data.js?v=structure-20261106';
-import * as view from './studio_views.js?v=structure-20261106';
-import {lineDiff} from './studio_model.js?v=structure-20261106';
-import {parseMesh,mountMesh} from './studio_mesh.js';
-import {esc} from './ui.js';
+import {createDemoAPI} from './demo-data.js?v=library-20261107';
+import * as view from './studio_views.js?v=library-20261107';
+import {lineDiff} from './studio_model.js?v=library-20261107';
+import {parseMesh,mountMesh} from './studio_mesh.js?v=library-20261107';
+import {esc} from './ui.js?v=library-20261107';
+import * as library from './studio_library_views.js?v=library-20261107';
 // Reuse the actual Studio renderers and invented demo data. Each excerpt has
 // isolated styles and inert controls; the adjacent link opens the working demo.
 function excerpt(id,html){
  const host=document.getElementById(id),root=host.attachShadow({mode:'open'});
- root.innerHTML=`<link rel="stylesheet" href="./style.css"><link rel="stylesheet" href="./studio.css?v=structure-20261106"><style>
+ root.innerHTML=`<link rel="stylesheet" href="./style.css?v=library-20261107"><link rel="stylesheet" href="./studio.css?v=library-20261107"><style>
  :host{display:block;color:#252724;font:14px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;--bg:#fff;--sidebar:#f7f7f6;--soft:#f6f6f5;--hover:#efefed;--line:#e6e6e3;--text:#252724;--muted:#70746c;--accent:#2b6ddd;--green:#34835d;--red:#ad4c47;--amber:#927236;--radius:7px;--mono:ui-monospace,monospace}
  .studio-request{display:none}.studio-workrow p{font-size:12px;line-height:1.7}.screen{background:white;min-height:340px;overflow:hidden}.studio-body{min-height:0;display:block}.studio-conversation{border:0;padding:24px;min-height:360px}.studio-threadhead{position:static}.studio-part-list{display:none!important}.studio-structure>.studio-map{display:block!important;overflow:hidden}.studio-map svg{width:100%;min-width:0;height:auto;max-height:330px}.studio-workhead{padding:20px 24px}.studio-workhead h1{font-size:18px}.studio-artifactbar{padding:10px 16px;flex-wrap:nowrap}.studio-artifactbar .studio-actions{width:auto}.studio-viewer{padding:18px}.studio-cad canvas{display:block;width:100%;height:320px}.studio-code-line{font-size:12px!important}.studio-checks{font-size:12px}.studio-small{font-size:11px}.studio-back{display:none}.studio-workfoot{padding:12px 18px}.studio-messages{max-height:none}button{cursor:default}.studio-content{min-width:0}
  </style><div class="screen studio-mode" inert>${html}</div>`;
@@ -30,6 +31,10 @@ try{
  graph.querySelectorAll('.structure-card').forEach(card=>{card.style.left=card.dataset.x+'px';card.style.top=card.dataset.y+'px';});
  const canvas=diagram.querySelector('.structure-workspace');canvas.style.height='360px';canvas.style.minHeight='360px';
  mountStructureCamera(diagram.querySelector('#structure-viewport'),graph,diagram.querySelector('.structure-toolbar'),null,()=>{});
+ const savedFiles=await api('studio_library',{project_id:'bench',section:'files'});
+ excerpt('screen-files',view.projectHeader(overview.projects[0],null,'files')+`<div class="library-body" style="min-height:340px;grid-template-columns:180px minmax(0,1fr)"><aside class="library-browser">${library.fileList(savedFiles,'control/motion.py')}</aside><section class="library-content"><div class="library-selectionbar">control/motion.py · Saved baseline</div><div class="library-requirement"><h2>Same saved file. Connected context.</h2><p>0.15-second settling requirement</p><p>Timing check · Evidence still missing</p><p>Related work and version-bound discussion</p><p class="studio-small">No model calls or real checks run in this demo.</p></div></section></div>`);
+ const requirements=await api('studio_library',{project_id:'bench',state_id:'state_bracket_v1',section:'requirements'});
+ excerpt('screen-requirements',view.projectHeader(overview.projects[0],null,'requirements')+library.requirementDetail(requirements.items.find(r=>r.requirement_id==='settling-time')));
  const baseline=await api('get_development_state',{state_id:detail.versions[0].id});
  const path='control/motion.py';const before=new TextDecoder().decode(await bytes(baseline,path)),after=new TextDecoder().decode(await bytes(detail.selected,path));
  const rows=lineDiff(before,after);
