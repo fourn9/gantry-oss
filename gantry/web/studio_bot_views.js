@@ -6,7 +6,7 @@ export function requestStatus(r){
   return ({waiting:'Waiting for reports',held:'Paused · recovery required',handoff_requested:'Handoff pending',completed:'Completed',blocked:'Needs attention',failed:'Failed',cancelled:'Stopped'})[r.status]||r.status;
 }
 export function requestActions(detail){
-  return `<div class="studio-bot-actions">${detail.can_ask_bot?button('ask-bot','Ask a Bot'):''}${detail.can_assign_bot?button('assign-bot','Assign work'):''}</div>`;
+  return `<div class="studio-bot-actions">${detail.can_ask_bot?button('ask-bot','Ask Crew agent'):''}${detail.can_assign_bot?button('assign-bot','Assign work'):''}</div>`;
 }
 export function requestList(detail,selection){
   const same=r=>r.state_id===selection.state_id&&JSON.stringify(Object.entries(r.anchor).sort())===JSON.stringify(Object.entries(selection.anchor).sort());

@@ -6,10 +6,10 @@ from .development import in_scope
 from .studio_discussion import ANCHOR
 
 register('studio_team', {'project_id': S}, ['project_id'])
-register('studio_request_bot', {'work_id':S, 'version':I, 'state_id':S, 'anchor':ANCHOR,
+register('studio_request_bot', {'work_id':S, 'project_id':S, 'version':I, 'state_id':S, 'anchor':ANCHOR,
     'mode':{'enum':['ask','assign']}, 'bot_id':S, 'body':{'type':'string','minLength':1,'maxLength':4000},
     'completion':A, 'write_scope':A},
-    ['work_id','version','state_id','anchor','mode','bot_id','body','completion','write_scope'])
+    ['version','state_id','anchor','mode','bot_id','body','completion','write_scope'])
 
 
 class StudioBotsMixin:
@@ -78,42 +78,48 @@ class StudioBotsMixin:
             if d['project_id']==project['id']], 'mentor_required':False}
 
     def cmd_studio_request_bot(self, s, actor, a, fx, n, con):
-        change, d = self._studio_work(s,actor,a['work_id'])
-        self._studio_task_authority(s,actor,change,a['mode'])
+        change,d,state,pid=self._studio_target(s,actor,a)
+        # Project conversations have a real saved state, without inventing a change.
+        scope=change or {'session_id':d['id'],'assignee':d['owner'],'author':d['owner'],
+            'write_scope':d['write_scope'],'dependencies':[],'requirement_refs':state['context'].get('requirement_refs',[])}
+        self._studio_task_authority(s,actor,scope,a['mode'])
         target=self._bd_binding(s,d['id'],a['bot_id'])
         require(s['principals'][target['principal_id']]['kind']=='agent','unauthorized','Studio Bots require a dedicated agent identity')
-        state = self._studio_state(s,actor,change,a['state_id'])
-        require(a['version']==change['version'],'stale_basis','Work changed; refresh before sending')
-        require(a['mode']=='ask' or state['id']==change['head'],'stale_basis','Assign from the latest work checkpoint')
+        self._continuity_state(s,s['principals'][target['principal_id']],state['id'])
+        require(a['version']==(change['version'] if change else d['version']),'stale_basis','Context changed; refresh before sending')
+        require(a['mode']=='ask' or state['id']==(change['head'] if change else d.get('active_state')),
+                'stale_basis','Assign from the current development state')
         require(a['body'].strip() and a['completion'],'invalid_input','Question/purpose and completion conditions required')
         require(a['mode']!='ask' or not a['write_scope'],'invalid_input','Ask is read-only; use Assign work for editing')
         require(a['mode']!='assign' or a['write_scope'],'invalid_input','Assign an explicit editable scope')
-        require(all(in_scope(path,change['write_scope']) for path in a['write_scope']),
+        require(all(in_scope(path,scope['write_scope']) for path in a['write_scope']),
                 'scope_denied','Assignment exceeds the originating work scope')
         # Reuse selection validation, recipient access and exact-version thread handling.
-        message=self.cmd_studio_comment(s,actor,{k:a[k] for k in ('work_id','state_id','anchor')} |
+        message=self.cmd_studio_comment(s,actor,{k:a[k] for k in ('work_id','project_id','state_id','anchor') if k in a} |
             {'body':a['body'],'mentions':[]},fx,n,con)
         request_id=uid('brequest')
         manifest=self._manifest(s,state['snapshot'])
-        dependencies=sorted(set(change['dependencies']+[a['anchor']['path']] if a['anchor'].get('path') else change['dependencies']))
+        dependencies=sorted(set(scope['dependencies']+[a['anchor']['path']] if a['anchor'].get('path') else scope['dependencies']))
         task=self._bd_assign(s,actor,{'session_id':d['id'],'bot_id':a['bot_id'],'state_id':state['id'],
             'kind':'report' if a['mode']=='ask' else 'develop','title':a['body'][:200],
             'completion':a['completion'],'write_scope':a['write_scope'],
             'dependencies':[p for p in dependencies if p in manifest],'after_tasks':[],
-            'requirement_refs':change.get('requirement_refs',[])},fx,n,con,studio={'change':change,'mode':a['mode']})
+            'requirement_refs':scope.get('requirement_refs',[])},fx,n,con,studio={'change':scope,'mode':a['mode']})
         saved=s['bot_tasks'][task['id']]
         saved.update(studio_request_id=request_id,studio_mode=a['mode'])
         self._dev_save(s,fx,'bot_tasks',saved)
-        record=dict(a,id=request_id,subject_id=change['id'],session_id=d['id'],task_id=task['id'],
+        record=dict({k:v for k,v in a.items() if k not in {'work_id','project_id'}},id=request_id,work_id=change['id'] if change else None,project_id=pid,subject_id=change['id'] if change else pid,session_id=d['id'],task_id=task['id'],
             task_ids=[task['id']],thread_id=message['thread_id'],requester=actor['id'],created_seq=s['seq']+1)
         self._dev_save(s,fx,'studio_bot_requests',record)
         return {'request_id':request_id,'task_id':task['id'],'thread_id':message['thread_id'],
             'status':'pending','runtime':self._studio_presence(s,a['bot_id'])}
 
-    def _studio_bot_requests(self,s,work_id,state_id=None,actor=None):
+    def _studio_bot_requests(self,s,work_id,state_id=None,actor=None,project_id=None,anchor=None):
         rows=[]
         for r in s.get('studio_bot_requests',{}).values():
             if r['work_id']!=work_id or (state_id and r['state_id']!=state_id): continue
+            if not work_id and r.get('project_id')!=project_id: continue
+            if anchor is not None and r['anchor']!=anchor: continue
             task=s['bot_tasks'][r['task_id']]
             owner=s['bot_projects'][task['session_id']]['owner']
             handoff=s.get('bot_handoffs',{}).get(task.get('handoff_id'))
@@ -132,7 +138,7 @@ class StudioBotsMixin:
         if not task.get('studio_request_id'): return {}
         record=s['studio_bot_requests'][task['studio_request_id']]
         return {'studio_request':{k:copy.deepcopy(record[k]) for k in
-            ('id','work_id','state_id','anchor','body','mode','requester','thread_id')}}
+            ('id','work_id','state_id','anchor','body','mode','requester','thread_id','project_id') if k in record}}
 
     def _studio_return_bot_report(self,s,actor,task,fx,n,con):
         if not task.get('studio_request_id') or task['status'] not in {'completed','failed','blocked','cancelled'}: return
@@ -152,10 +158,10 @@ class StudioBotsMixin:
         report=task['reports'][-1]['report'] if task['reports'] else {'summary':task.get('cancellation','Task stopped'),'rationale':'','unverified':[]}
         body=report['summary']+'\n\n'+report['rationale']
         if report['unverified']: body+='\n\nUnverified: '+'; '.join(report['unverified'])
-        message=self.cmd_studio_comment(s,actor,{'work_id':r['work_id'],'state_id':r['state_id'],
+        message=self.cmd_studio_comment(s,actor,{**({'work_id':r['work_id']} if r['work_id'] else {'project_id':r['project_id']}),'state_id':r['state_id'],
             'anchor':r['anchor'],'thread_id':r['thread_id'],'body':body[:4000] or 'Task ended','mentions':[]},fx,n,con)
         message.update(bot_id=task['bot_id'],task_id=task['id'],result_work_id=task.get('change_id'),result_state_id=task.get('output_state'))
         self._dev_save(s,fx,'studio_messages',message)
         self._dev_save(s,fx,'studio_notifications',dict(id=uid('mention'),session_id=task['session_id'],
-            subject_id=r['requester'],work_id=r['work_id'],state_id=r['state_id'],thread_id=r['thread_id'],
+            subject_id=r['requester'],work_id=r['work_id'],project_id=r.get('project_id'),state_id=r['state_id'],thread_id=r['thread_id'],
             message_id=message['id'],at=self.clock(),read=False))

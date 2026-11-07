@@ -20,7 +20,8 @@ class BotHandoffMixin:
         if self._bd_owner(actor,p): return
         if task.get('studio_request_id'):
             request=s['studio_bot_requests'][task['studio_request_id']]
-            change=self._dev_get(s,'dev_changes',request['work_id'])
+            change=self._dev_get(s,'dev_changes',request['work_id']) if request['work_id'] else {
+                'session_id':d['id'],'assignee':d['owner'],'author':d['owner']}
             if actor['kind']=='human' and actor['id']==request['requester']:
                 self._studio_task_authority(s,actor,change,request['mode']); return
         binding,_,_,_=self._bd_actor(s,actor,d['id'],requested_by)
