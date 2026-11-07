@@ -126,6 +126,8 @@ class OnboardingMixin:
         d=self._onboarding(s,actor,a,write=True)
         require(a['snapshot']==d['snapshot'],'stale_basis','Proposal must use the current source snapshot')
         p=a['proposal']
+        from .requirement_mapping import validate_links
+        validate_links(self,s,actor,p.get('requirement_links') or [],d['manifest'])
         for item in p['questions']+p['findings']:
             for ref in item['evidence']:
                 require(ref['path'] in d['manifest'] and ref['hash']==d['manifest'][ref['path']]['hash'],
@@ -183,6 +185,12 @@ class OnboardingMixin:
                     'capture':'Saved files only; environment not executed',
                     'agent_findings':d['proposal']['content']['findings'] if d.get('proposal') and d['proposal']['snapshot']==d['snapshot'] else [],
                     'human_corrections':d['corrections'], 'answers':d['answers']}}
+        proposal=d.get('proposal')
+        links=(proposal['content'].get('requirement_links') or []) if proposal and proposal['snapshot']==d['snapshot'] else []
+        if links:
+            from .requirement_mapping import validate_links, mapped_context
+            refs=validate_links(self,s,actor,links,d['manifest'])
+            context=mapped_context(context,links,refs,{'onboarding_id':d['id'],'author':proposal['author']})
         result=self.cmd_studio_import_project(s,actor,{'name':d['name'],'description':d['goal'] or 'Existing development',
             'files':files,'hierarchy':view['hierarchy'],'context':context,'title':a['title'].strip(),'purpose':a['purpose'].strip(),
             'write_scope':list(d['manifest']),'dependencies':[],'actors':d['actors'],'missing':limitations,'zone':d['zone']},fx,n,con)

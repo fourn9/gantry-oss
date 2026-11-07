@@ -8,6 +8,7 @@ Use [documentation](../docs/README.md) for current operation and [verification r
 
 ## Feature records
 
+- [Crew development continuation](crew-development-continuation.md)
 - [Bot experiential learning](bot-experiential-learning.md)
 - [Bot inference recovery](bot-inference-recovery.md)
 - [Paired Bot experience evaluation](bot-learning-evaluation.md)

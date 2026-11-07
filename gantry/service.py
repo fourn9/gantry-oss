@@ -67,7 +67,7 @@ class Service(CrewSetupJobsMixin, CrewSetupMixin, MembershipMixin, StudioMixin, 
     READS.add('get_bot_working_state')
     READS.add('render_evidence_view')
     READS |= {'get_bot_project', 'get_bot_task', 'list_bot_tasks', 'check_bot_task'}
-    READS |= {'get_bot_team_proposal', 'get_bot_records'}
+    READS |= {'get_bot_team_proposal', 'get_bot_records', 'get_bot_requirements'}
     READS |= {'get_change_review', 'list_change_reviews'}
     READS |= {'automation_status', 'get_analysis'}
     READS |= {'product_overview', 'project_details', 'session_details', 'get_signal'}

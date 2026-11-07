@@ -1,6 +1,7 @@
 """Agent and UI share the same bounded, evidence-bound onboarding contract."""
 from .contracts import register,S,I,A
 from .continuity_contracts import NODE
+from .requirement_mapping import LINKS
 TEXT={'type':'string','minLength':1,'maxLength':2000}
 SHORT={'type':'string','minLength':1,'maxLength':240}
 FILES={'type':'object','maxProperties':1000,'additionalProperties':{'type':'string'}}
@@ -12,6 +13,7 @@ QUESTION={'type':'object','properties':{'id':SHORT,'text':TEXT,'why':TEXT,'optio
           'required':['id','text','why','options','evidence'],'additionalProperties':False}
 NEXT={'type':'object','properties':{'title':SHORT,'purpose':TEXT},'required':['title','purpose'],'additionalProperties':False}
 PROPOSAL={'type':'object','properties':{
+    'requirement_links': LINKS,
     'nodes':{'type':'array','maxItems':100,'items':NODE},
     'findings':{'type':'array','maxItems':50,'items':FINDING},
     'questions':{'type':'array','maxItems':10,'items':QUESTION},

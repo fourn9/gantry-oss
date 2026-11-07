@@ -86,6 +86,9 @@ def _input(context, workspace):
             'Return waiting with assignments when delegating. On the next attempt read the returned child reports. '
             'Return concrete edits only within write_scope; a customer tool bridge may also edit that workspace. '
             'Report missing capabilities, failed checks and unresolved compatibility in unverified. '
+            'For actionable remaining issues, use followups to choose fix, verify, consult or defer with reasons and evidence. '
+            'Fix/verify must reference a real assignments index, consult a saved consultation message_id; defer explains why. '
+            'A completed child task still needs managerial review of its results; product completion is not inferred. '
             'Read design_assessment before choosing the next edit, test or handoff: it compares the assignment baseline with the current checkpoint. '
             'Use its open_checks, requirement transitions and impact gaps; choose corrections, retests or consultations with recorded reasons. '
             'A requirement is met only relative to its linked evidence; do not erase unknown dependencies or change acceptance to obtain a pass. '
@@ -139,6 +142,9 @@ def process_bot_task(client, queued, root, infer_fn, runtime_fence, recovered=No
             else:
                 receipt = infer_fn(journal['input'], BOT_ANSWER, directory/'model')
             validate(receipt['output'], BOT_ANSWER)
+            if 'final_result' in receipt:
+                journal.update(phase='done', receipt=receipt, result=receipt['final_result']); persist(marker, journal)
+                return receipt['final_result']
             journal.update(phase='output_saved', receipt=receipt); persist(marker, journal)
         if journal['phase'] == 'output_saved':
             client.call('check_bot_task', ref)
@@ -194,6 +200,12 @@ def recover_bot_task(client, task_id, root, runtime_fence, infer_fn, reason, loo
     require(marker.is_file(), 'journal_missing', 'Keep the original per-Bot task journal')
     journal = json.loads(marker.read_text())
     if journal['phase'] == 'done': return journal['result']
+    if loop_config and loop_config.get('agent_loop'):
+        from .crew_runtime import reconcile_finish
+        result = reconcile_finish(client, directory/'actions')
+        if result is not None:
+            journal.update(phase='done', result=result); persist(marker, journal)
+            return result
     # A locally known running tool/model must not be launched twice. Unknown
     # remote effects still require the caller's explicit stopped assertion.
     from .monthly_recovery import ensure_stopped, prepare_retry

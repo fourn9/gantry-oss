@@ -24,10 +24,11 @@ PROFILES = {'read-only': READ_TOOLS, 'developer': READ_TOOLS | DEVELOP_TOOLS,
 BOT_READS = set('identity events get_development_state list_development_states get_persistent_bot '
     'list_persistent_memories bot_inbox get_bot_project get_bot_task list_bot_tasks check_bot_task '
     'list_artifact_files read_artifact_chunk read_artifact_batch restore_artifact get_evidence_view query_evidence'.split())
-BOT_WRITES = set('capture_artifact assign_bot_task claim_bot_task checkpoint_bot_task finish_bot_task '
+BOT_WRITES = set('propose_bot_requirements integrate_bot_task capture_artifact assign_bot_task claim_bot_task checkpoint_bot_task finish_bot_task '
     'hold_bot_task recover_bot_task cancel_bot_task send_bot_message resolve_bot_message '
     'start_bot_runtime heartbeat_bot_runtime stop_bot_runtime record_state_restore'.split())
 BOT_READS.add('list_bot_handoffs')
+BOT_READS.add('get_bot_requirements')
 BOT_WRITES.update({'request_bot_handoff','acknowledge_bot_handoff','accept_bot_handoff'})
 PROFILES['bot'] = BOT_READS | BOT_WRITES | {'get_design_assessment','studio_library','studio_related','studio_context','studio_overview','studio_work','studio_inbox','studio_team','studio_comment','studio_acknowledge'}
 PROFILES['bot'].update({'get_bot_working_state', 'update_bot_working_state', 'record_bot_learning_use', 'poll_bot_continuations'})

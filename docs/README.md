@@ -24,6 +24,7 @@ Start with **Bot development**, then choose the extra behavior you need. These g
 | Ask, assign and hand off from Studio | [Studio Bot workflow](STUDIO_BOT_WORKFLOW.md) |
 | Independent Crew setup and task execution | [Bot development](BOT_DEVELOPMENT.md) |
 | Managers, specialists and peer consultation | [Crew organization](CREW_ORGANIZATION.md) |
+| Integrate, verify, recover and carry residual work forward | [Development continuation](CREW_DEVELOPMENT_CONTINUATION.md) |
 | Persistent identity, runtime and workspaces | [Persistent Bots](PERSISTENT_BOTS.md) |
 | Working memory and selective continuation | [Bot continuity](BOT_CONTINUITY.md) |
 | Conditional lessons and outcome reflection | [Bot learning](BOT_LEARNING.md) |

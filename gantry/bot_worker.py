@@ -26,6 +26,7 @@ def environment_manifest(config):
     if 'learning_mode' in config: fields += ('learning_mode',)
     if config.get('personal_continuity'): fields += ('personal_continuity',)
     if config.get('agent_loop'): fields += ('agent_loop', 'local_tools', 'tool_runtime', 'sandbox')
+    if 'tool_evidence' in config: fields += ('tool_evidence',)
     return {'name': config['name'], 'backend': config['backend'], 'tools': config.get('tools', []),
             'definition': digest({k: config.get(k) for k in fields})}
 

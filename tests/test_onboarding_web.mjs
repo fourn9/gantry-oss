@@ -22,3 +22,9 @@ test('source-derived strings and agent prompt are escaped and never represented 
  const html=views.review(draft);assert.ok(html.includes('&lt;script&gt;'));assert.ok(!html.includes('<script>'));assert.ok(html.includes('does not approve'));
  assert.match(agentPrompt(draft),/Do not execute/);assert.match(html,/Prepare with your agent/);
 });
+test('proposed requirement links are visible before confirming and escape evidence',()=>{
+ const draft={id:'d',actors:[],version:1,snapshot:'rev_a',name:'Fixture',goal:'goal',manifest:{},status:'draft',can_confirm:true,
+  discovery:{facts:[],limitations:[]},missing:[],hierarchy:[],corrections:{},stale_corrections:[],questions:[],answers:{},next_work:{title:'Inspect',purpose:'Continue'},
+  proposal:{snapshot:'rev_a',author:'agent',content:{findings:[],requirement_links:[{requirement_id:'travel',revision_id:'rev_req',rationale:'<script>claim</script>',evidence:[{path:'<img>',hash:'abc'}]}]}}};
+ const html=views.review(draft);assert.match(html,/Proposed requirement links/);assert.match(html,/travel/);assert.ok(!html.includes('<script>'));assert.match(html,/still unverified/);
+});

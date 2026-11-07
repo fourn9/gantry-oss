@@ -19,11 +19,15 @@ from .runner import persist
 from . import project_sandbox
 
 SCHEMA = {'type': 'object', 'properties': {
-    'action': {'enum': ['read', 'edit', 'context', 'records', 'inspect', 'tool', 'publish_physical', 'ask', 'resolve', 'decision', 'remember', 'working_state', 'experience_use', 'team', 'stop', 'finish']},
+    'action': {'enum': ['requirements', 'propose_requirements', 'integrate', 'read', 'edit', 'context', 'records', 'inspect', 'tool', 'publish_physical', 'ask', 'resolve', 'decision', 'remember', 'working_state', 'experience_use', 'team', 'stop', 'finish']},
     'arguments_json': S, 'rationale': S}, 'required': ['action', 'arguments_json', 'rationale'], 'additionalProperties': False}
 API_ACTIONS = {'ask': 'ask_bot', 'decision': 'record_bot_decision', 'remember': 'record_bot_experience',
-               'working_state': 'update_bot_working_state', 'experience_use': 'record_bot_learning_use'}
+               'working_state': 'update_bot_working_state', 'experience_use': 'record_bot_learning_use',
+               'propose_requirements': 'propose_bot_requirements'}
 GUIDE = {
+    'requirements': 'Optional after/limit. Page existing adopted requirement definitions in this project zone. Discovery is not assignment or fulfillment. Use exact reference IDs and saved source hashes to propose links; do not invent requirements from prose.',
+    'propose_requirements': 'links [{requirement_id,revision_id,rationale,evidence:[{path,hash}]}], summary. Propose links to existing adopted requirements in a separate shared metadata change. Never invent IDs. The active task remains unchanged; inspect the candidate, then a delegated manager selects it for subsequent work. Missing formal requirements remain unlinked until defined through the existing requirement approval process.',
+    'integrate': 'state_id (current pinned input), changes [{id,version}], summary. Integrates shared candidates as an intermediate action, restores their exact combined files, and keeps this task running. Then inspect/edit/test yourself or finish waiting with a child assignment using the returned state_id. Does not verify or adopt. Requires integration delegation and no prior saved edits in this task; conflicts remain unresolved.',
     'read': 'path; optional offset and length (bytes). Returns exact hash and bounded text/base64.',
     'edit': 'path, content, expected_hash (sha256 from read, or absent). Within task scope only.',
     'context': 'pointer (JSON pointer into full authorized context), optional offset, limit for arrays/maps.',
@@ -51,8 +55,8 @@ def action_schemas():
     schemas = {'finish': BOT_ANSWER,
         'edit': _schema({'path': S, 'content': {'type': 'string'}, 'expected_hash': S}),
         'tool': _schema({'name': S}), 'publish_physical': _schema({'plan_path': S})}
-    for name, op in {**API_ACTIONS, 'resolve': 'resolve_bot_question', 'team': 'propose_bot_team',
-                     'records': 'get_bot_records'}.items():
+    for name, op in {**API_ACTIONS, 'integrate': 'integrate_bot_task', 'resolve': 'resolve_bot_question', 'team': 'propose_bot_team',
+                     'records': 'get_bot_records', 'requirements': 'get_bot_requirements'}.items():
         schema = json.loads(json.dumps(CONTRACTS[op]['schema']))
         for key in ('task_id', 'fence', 'basis', 'intent'):
             schema['properties'].pop(key, None)
@@ -118,6 +122,7 @@ def _tool(client, ref, config, args, workspace, step, scope, zone):
     from .bot_execution import safe_fingerprint
     safe_fingerprint(workspace)
     shutil.copytree(workspace, scratch)
+    original_times = {p.relative_to(scratch).as_posix(): p.stat().st_mtime_ns for p in scratch.rglob('*') if p.is_file()}
     result = project_sandbox.execute(command, scratch, config.get('tool_runtime'), config.get('sandbox'),
                                     lambda: client.call('check_bot_task', ref))
     # Preserve the full bounded output in artifact storage; prompts see a bounded preview.
@@ -127,12 +132,13 @@ def _tool(client, ref, config, args, workspace, step, scope, zone):
                            'crew-tool-output:' + digest([ref['task_id'], str(step), output.hex()]))
     result.update(output=result['output'][:32000], output_artifact=artifact['revision_id'],
                   output_truncated=len(result['output']) > 32000)
-    changes = []
+    changes = []; refreshed = []
     for file in sorted(scratch.rglob('*')):
         rel = file.relative_to(scratch).as_posix()
         if rel in {'.test-output', 'home', 'tmp'} or rel.startswith(('home/', 'tmp/')): continue
         require(not file.is_symlink(), 'scope_denied', 'Tool created a symlink')
         if not file.is_file(): continue
+        if original_times.get(rel) != file.stat().st_mtime_ns: refreshed.append(rel)
         raw = read_file(scratch, rel)
         original = workspace/rel
         before = read_file(workspace, rel) if original.exists() else None
@@ -146,6 +152,7 @@ def _tool(client, ref, config, args, workspace, step, scope, zone):
     for rel, raw, expected in changes:
         _path(workspace, rel, scope, create=True); write_file(workspace, rel, raw, expected)
     result['workspace_changes_applied'] = [rel for rel, _, _ in changes]
+    result['refreshed_paths'] = refreshed
     return result
 
 
@@ -156,8 +163,14 @@ def _api_effect(client, operation, args, step, key):
 
 def _execute(client, context, ref, config, action, args, workspace, step, key):
     scope = context['task']['write_scope']
-    require(context['task'].get('studio_mode') != 'ask' or action not in {'edit','tool','publish_physical','team','stop'},
+    require(context['task'].get('studio_mode') != 'ask' or action not in {'propose_requirements','integrate','edit','tool','publish_physical','team','stop'},
             'scope_denied', 'Ask cannot edit, execute tools or change team work')
+    if action == 'integrate':
+        from .bot_execution import safe_fingerprint
+        expected = digest({name: info['hash'] for name, info in context['development']['manifest'].items()})
+        require(safe_fingerprint(workspace) == expected, 'stale_basis', 'Unsaved workspace changes; preserve them before integration')
+        require(not set(args) & set(ref), 'invalid_input', 'Runtime supplies task identity')
+        return _api_effect(client, 'integrate_bot_task', {**args, **ref}, step, key)
     if action == 'publish_physical':
         validate(args, _schema({'plan_path': S}))
         from .hardware import publish_bot
@@ -169,9 +182,9 @@ def _execute(client, context, ref, config, action, args, workspace, step, key):
         other = client.call('get_bot_task', {'task_id': args['task_id']})
         require(other['task']['session_id'] == context['task']['session_id'], 'scope_denied', 'Inspect this project only')
         return _context_value(other, {k: v for k, v in args.items() if k != 'task_id'} | {'pointer': args.get('pointer', '')})
-    if action == 'records':
+    if action in {'records', 'requirements'}:
         require('task_id' not in args, 'invalid_input', 'Runtime supplies task identity')
-        return client.call('get_bot_records', {**args, 'task_id': ref['task_id']})
+        return client.call('get_bot_records' if action == 'records' else 'get_bot_requirements', {**args, 'task_id': ref['task_id']})
     if action == 'read':
         validate(args, _schema({'path': S, 'offset': {'type': 'integer', 'minimum': 0},
             'length': {'type': 'integer', 'minimum': 1, 'maximum': 65536}}, ['path']))
@@ -222,11 +235,85 @@ def _return_effect(client, saved, marker, field, operation, key, ref):
         return client.call(operation, saved[field], saved[request_key])
 
 
+def _materialize_integration(client, workspace, step, saved, key):
+    """Keep predecessor files and reconcile the exact state before the next action."""
+    from .continuity_adapter import restore_development_state
+    from .bot_execution import safe_fingerprint
+    result = saved['result']; state_id = result['state']['id']
+    detail = client.call('get_development_state', {'state_id': state_id})
+    expected = digest({name: info['hash'] for name, info in detail['manifest'].items()})
+    if saved.get('materialized'):
+        require(safe_fingerprint(workspace) == expected, 'stale_basis', 'Integrated workspace changed before receipt reconciliation')
+        return
+    backup = step/'pre-integration-workspace'
+    # Retain the predecessor even across interruption between the two renames.
+    if workspace.exists() and safe_fingerprint(workspace) == expected:
+        saved['materialized'] = state_id
+        return
+    if workspace.exists():
+        require(safe_fingerprint(workspace) == saved['before'] and not backup.exists(),
+                'stale_basis', 'Local files changed while integration was being materialized')
+    else:
+        require(backup.exists() and safe_fingerprint(backup) == saved['before'],
+                'outcome_unknown', 'Missing predecessor workspace')
+    restored = restore_development_state(client, state_id, step/'integrated-restore', key+':restore')
+    source = Path(restored['workspace'])
+    require(safe_fingerprint(source) == expected, 'integrity_error', 'Restored integration differs from pinned manifest')
+    if workspace.exists():
+        require(safe_fingerprint(workspace) == saved['before'] and not backup.exists(),
+                'stale_basis', 'Workspace changed during integration restore; no switch performed')
+        workspace.rename(backup)
+    require(safe_fingerprint(backup) == saved['before'], 'stale_basis', 'Predecessor changed during switch; files retained for recovery')
+    source.rename(workspace)
+    saved['materialized'] = state_id
+
+
+def _publish_tool_evidence(client, ref, config, workspace, saved, marker, key):
+    """Publish an installed tool's reports without re-running the tool on retry."""
+    name = json.loads(saved['receipt']['output']['arguments_json'])['name']
+    mapping = config.get('tool_evidence', {}).get(name)
+    if mapping is None or saved.get('evidence_done'): return
+    if 'tool_result' not in saved:
+        saved['tool_result'] = saved['result']; persist(marker, saved)
+    try:
+        validate(mapping, _schema({'plan_path': S}))
+        if 'evidence_args' not in saved:
+            from .hardware import _physical_checkpoint
+            full = client.call('get_bot_task', {'task_id': ref['task_id']})
+            baseline = client.call('get_development_state', {'state_id': full['task']['state_id']})
+            args = _physical_checkpoint(client, full['development'], workspace, full['zone'],
+                mapping['plan_path'], key+':evidence:capture', baseline, execution={
+                    'input_state': saved.get('input_state'),
+                    'action_key': key, 'exit_code': saved['tool_result']['exit_code'],
+                    'output_artifact': saved['tool_result']['output_artifact'],
+                    'refreshed_paths': saved['tool_result'].get('refreshed_paths', [])})
+            args.pop('work_status')
+            saved['evidence_args'] = {**ref, **args}; persist(marker, saved)
+        result = _return_effect(client, saved, marker, 'evidence_args', 'checkpoint_bot_task', key+':evidence', ref)
+        saved['result'] = {**saved['tool_result'], 'evidence_publication': {
+            'state_id': result['state']['id'], 'checks': result['state']['context']['environment']['engineering']['checks'],
+            'formal_adoption': False}}
+    except (Fault, ValueError) as exc:
+        if isinstance(exc, Fault) and exc.code not in {'invalid_input', 'conflict', 'capture_incomplete', 'not_found', 'stale_basis', 'scope_denied'}:
+            raise
+        # Stale acceptance files can be corrected by a new assignment. Changed
+        # task authority itself must still hold the worker, not become feedback.
+        client.call('check_bot_task', ref)
+        saved['result'] = {'error': 'evidence_publication', 'message': str(exc)[:500],
+            'cause': exc.code if isinstance(exc, Fault) else 'invalid_input',
+            'tool_result': saved['tool_result']}
+    saved['evidence_done'] = True
+    saved['evidence_record_args'] = {**ref, 'kind': 'tool_evidence', 'details': {
+        'result': saved['result'], 'tool': name, 'plan_path': mapping.get('plan_path') if isinstance(mapping, dict) else None}}
+    persist(marker, saved)
+
+
 def run_actions(client, initial, ref, infer, config, root):
     from .bot_execution import _input, safe_fingerprint
     root = Path(root); root.mkdir(parents=True, exist_ok=True)
     state_path = root/'loop.json'
     state = json.loads(state_path.read_text()) if state_path.exists() else {'next': 0, 'last_result': None}
+    if not state_path.exists(): persist(state_path, state)
     workspace = Path(initial['workspace'])
     while True:
         number = state['next']; step = root/str(number); step.mkdir(exist_ok=True)
@@ -236,6 +323,7 @@ def run_actions(client, initial, ref, infer, config, root):
             input_path = step/'input.json'
             context = json.loads(input_path.read_text()) if input_path.exists() else _input(full, workspace)
             if not input_path.exists(): context.update(action_guide=GUIDE, action_schemas=action_schemas(), available_tools=config.get('local_tools', {}),
+                tool_evidence=config.get('tool_evidence', {}),
                 last_result=result_preview(state['last_result']), round=number,
                 instruction=context['instruction'] + ' Choose ONE action each turn; put its JSON object in arguments_json. '
                 'Use context to fetch omitted records, inspect to retrieve peer tasks, read for files, tool for real tests, and edit for changes. '
@@ -244,6 +332,7 @@ def run_actions(client, initial, ref, infer, config, root):
             persist(input_path, context)
             receipt = infer(context, SCHEMA, step/'model'); validate(receipt['output'], SCHEMA)
             saved = {'phase': 'prepared', 'receipt': receipt, 'before': safe_fingerprint(workspace),
+                     'input_state': full['development']['state']['id'],
                      'discussion_version': context['task']['discussion_version']}
             persist(marker, saved)
         output = saved['receipt']['output']; action = output['action']
@@ -293,6 +382,9 @@ def run_actions(client, initial, ref, infer, config, root):
                     'sandbox_unavailable', 'reauthorization_required'}: raise
                 saved.update(phase='completed', result={'error': exc.code if isinstance(exc, Fault) else 'invalid_input',
                                                       'message': str(exc)[:500], 'details': exc.details if isinstance(exc, Fault) else {}}); persist(marker, saved)
+        if action == 'integrate' and saved['result'].get('integrated'):
+            _materialize_integration(client, workspace, step, saved, key)
+            persist(marker, saved)
         # Locally durable effect receipts are reconciled before advancing the model.
         if 'record_args' not in saved:
             try: client.call('check_bot_task', ref)
@@ -307,7 +399,7 @@ def run_actions(client, initial, ref, infer, config, root):
                 'provider': saved['receipt'].get('provider', {'kind': 'injected_test_inference'}), 'round': number}}
             persist(marker, saved)
         _return_effect(client, saved, marker, 'record_args', 'record_bot_action', key + ':record', ref)
-        if safe_fingerprint(workspace) != saved['before']:
+        if action != 'integrate' and safe_fingerprint(workspace) != saved['before']:
             if 'checkpoint_args' not in saved:
                 snapshot, missing = capture_workspace(client, workspace, key+':capture', full['zone'])
                 saved['checkpoint_args'] = {**ref, 'snapshot': snapshot['revision_id'], 'summary': output['rationale'],
@@ -315,7 +407,52 @@ def run_actions(client, initial, ref, infer, config, root):
                     'capture': {'scope': 'Brokered action and saved workspace', 'missing': missing}}
                 persist(marker, saved)
             _return_effect(client, saved, marker, 'checkpoint_args', 'checkpoint_bot_task', key + ':checkpoint', ref)
+        if action == 'tool' and 'error' not in saved.get('tool_result', saved['result']):
+            _publish_tool_evidence(client, ref, config, workspace, saved, marker, key)
+        if saved.get('evidence_record_args'):
+            _return_effect(client, saved, marker, 'evidence_record_args', 'record_bot_action', key+':evidence-record', ref)
         if action == 'finish' and 'report' in saved['result']:
-            return {'output': saved['result']['report'], 'provider': {'kind': 'bot_action_loop', 'rounds': number+1},
-                    'checkpoint_fingerprint': safe_fingerprint(workspace)}
+            report = saved['result']['report']
+            if 'final_args' not in saved:
+                saved.update(final_args={**ref, 'report': {k: v for k, v in report.items() if k != 'edits'}},
+                             phase='finalizing')
+                persist(marker, saved)
+            try:
+                result = _return_effect(client, saved, marker, 'final_args', 'finish_bot_task', key+':finish', ref)
+            except Fault as exc:
+                # Only definite contract rejections are correction requests. Transport
+                # uncertainty and changed authority/basis must not launch a new turn.
+                if exc.code not in {'invalid_input', 'invalid_state', 'dependency_pending', 'conflict', 'not_found', 'scope_denied'}:
+                    raise
+                client.call('check_bot_task', ref)
+                saved.update(phase='rejected', result={'error': exc.code, 'message': str(exc)[:500], 'details': exc.details})
+                saved['feedback_args'] = {**ref, 'kind': 'finish', 'details': {
+                    'rationale': output['rationale'], 'arguments': output['arguments_json'],
+                    'result': saved['result'], 'round': number, 'stage': 'core_validation'}}
+                persist(marker, saved)
+            else:
+                saved.update(phase='finished', final_result=result); persist(marker, saved)
+                return {'output': report, 'provider': {'kind': 'bot_action_loop', 'rounds': number+1},
+                        'checkpoint_fingerprint': safe_fingerprint(workspace), 'final_result': result}
+        if saved.get('feedback_args'):
+            _return_effect(client, saved, marker, 'feedback_args', 'record_bot_action', key+':feedback', ref)
         state.update(next=number+1, last_result=saved['result']); persist(state_path, state)
+
+
+def reconcile_finish(client, root):
+    """Recover a committed finish before requiring an active task/lease again."""
+    root = Path(root); state_path = root/'loop.json'
+    if not state_path.exists(): return None
+    state = json.loads(state_path.read_text()); marker = root/str(state['next'])/'action.json'
+    if not marker.exists(): return None
+    saved = json.loads(marker.read_text())
+    if saved['phase'] == 'finished': return saved['final_result']
+    if saved['phase'] != 'finalizing' or 'final_args_key' not in saved: return None
+    try: result = client.call('finish_bot_task', saved['final_args'], saved['final_args_key'])
+    except Fault as exc:
+        # A stopped worker may have been held before the uncertain request reached
+        # Core. The normal recovery path must revalidate and renew that lease.
+        if exc.code in {'stale_basis', 'mode_disabled'}: return None
+        raise
+    saved.update(phase='finished', final_result=result); persist(marker, saved)
+    return result

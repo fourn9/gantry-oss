@@ -11,19 +11,23 @@ class MonthlyTests(unittest.TestCase):
             with self.assertRaises(Fault) as error:infer_monthly({}, {}, root)
             self.assertEqual(error.exception.code,'subscription_login_required')
     def test_official_cli_tools_disabled_and_receipt_reused(self):
-        commands=[]
+        commands=[]; prompts=[]
         class Process:
             returncode=0
             pid=99999999
             def __init__(self,argv,**kw):
                 commands.append((argv,kw));self.output=Path(argv[argv.index('-o')+1])
-            def communicate(self,prompt,timeout):self.output.write_text('{"status":"ready"}')
+            def communicate(self,prompt,timeout):
+                prompts.append(prompt); self.output.write_text('{"status":"ready"}')
         schema={'type':'object','properties':{'status':{'type':'string'}},'required':['status'],'additionalProperties':False}
         with tempfile.TemporaryDirectory() as root, patch('gantry.monthly_codex.subprocess.run',return_value=SimpleNamespace(returncode=0,stdout='',stderr='Logged in using ChatGPT')),patch('gantry.monthly_codex.subprocess.Popen',Process),patch.dict('os.environ',{'OPENAI_API_KEY':'must-not-use','CODEX_API_KEY':'must-not-use'}):
             out=infer_monthly({'task':'ready'},schema,root)
             self.assertEqual(out['output'],{'status':'ready'})
             self.assertEqual(infer_monthly({'task':'ready'},schema,root),out)
             self.assertEqual(len(commands),1)
+            self.assertIn('schema-defined Gantry actions', prompts[0])
+            self.assertIn('Native Codex tools remain disabled', prompts[0])
+            self.assertNotIn('do not invoke tools or access other files/network', prompts[0])
             argv,kw=commands[0]
             self.assertIn('shell_tool',argv);self.assertIn('view_image',argv);self.assertIn('apps',argv)
             self.assertNotIn('OPENAI_API_KEY',kw['env']);self.assertNotIn('CODEX_API_KEY',kw['env'])

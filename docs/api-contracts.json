@@ -4714,6 +4714,87 @@
                 "null"
               ]
             },
+            "followups": {
+              "items": {
+                "additionalProperties": false,
+                "properties": {
+                  "assignment_index": {
+                    "minimum": 0,
+                    "type": [
+                      "integer",
+                      "null"
+                    ]
+                  },
+                  "disposition": {
+                    "enum": [
+                      "fix",
+                      "verify",
+                      "consult",
+                      "defer"
+                    ]
+                  },
+                  "evidence": {
+                    "items": {
+                      "minLength": 1,
+                      "type": "string"
+                    },
+                    "type": "array"
+                  },
+                  "id": {
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "message_id": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "reason": {
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "requirement_refs": {
+                    "items": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "requirement_id": {
+                          "type": "string"
+                        },
+                        "revision_id": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "requirement_id",
+                        "revision_id"
+                      ],
+                      "type": "object"
+                    },
+                    "maxItems": 200,
+                    "type": "array"
+                  },
+                  "summary": {
+                    "minLength": 1,
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "id",
+                  "summary",
+                  "disposition",
+                  "reason",
+                  "evidence",
+                  "requirement_refs"
+                ],
+                "type": "object"
+              },
+              "maxItems": 40,
+              "type": [
+                "array",
+                "null"
+              ]
+            },
             "integrate_changes": {
               "items": {
                 "additionalProperties": false,
@@ -5185,6 +5266,37 @@
       },
       "required": [
         "reflection_id"
+      ],
+      "type": "object"
+    }
+  },
+  "get_bot_requirements": {
+    "description": "get bot requirements",
+    "schema": {
+      "additionalProperties": false,
+      "properties": {
+        "after": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "basis": {
+          "type": "object"
+        },
+        "intent": {
+          "type": "object"
+        },
+        "limit": {
+          "maximum": 100,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "task_id": {
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "required": [
+        "task_id"
       ],
       "type": "object"
     }
@@ -6044,6 +6156,67 @@
       },
       "required": [
         "connection_id"
+      ],
+      "type": "object"
+    }
+  },
+  "integrate_bot_task": {
+    "description": "integrate bot task",
+    "schema": {
+      "additionalProperties": false,
+      "properties": {
+        "basis": {
+          "type": "object"
+        },
+        "changes": {
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "id": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "version": {
+                "minimum": 1,
+                "type": "integer"
+              }
+            },
+            "required": [
+              "id",
+              "version"
+            ],
+            "type": "object"
+          },
+          "maxItems": 32,
+          "minItems": 1,
+          "type": "array"
+        },
+        "fence": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "intent": {
+          "type": "object"
+        },
+        "state_id": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "summary": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "task_id": {
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "required": [
+        "task_id",
+        "fence",
+        "state_id",
+        "changes",
+        "summary"
       ],
       "type": "object"
     }
@@ -7134,6 +7307,93 @@
       "type": "object"
     }
   },
+  "propose_bot_requirements": {
+    "description": "propose bot requirements",
+    "schema": {
+      "additionalProperties": false,
+      "properties": {
+        "basis": {
+          "type": "object"
+        },
+        "fence": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "intent": {
+          "type": "object"
+        },
+        "links": {
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "evidence": {
+                "items": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "hash": {
+                      "minLength": 1,
+                      "type": "string"
+                    },
+                    "path": {
+                      "minLength": 1,
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "path",
+                    "hash"
+                  ],
+                  "type": "object"
+                },
+                "maxItems": 100,
+                "minItems": 1,
+                "type": "array"
+              },
+              "rationale": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "requirement_id": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "revision_id": {
+                "minLength": 1,
+                "type": "string"
+              }
+            },
+            "required": [
+              "requirement_id",
+              "revision_id",
+              "rationale",
+              "evidence"
+            ],
+            "type": "object"
+          },
+          "maxItems": 100,
+          "type": [
+            "array",
+            "null"
+          ]
+        },
+        "summary": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "task_id": {
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "required": [
+        "task_id",
+        "fence",
+        "links",
+        "summary"
+      ],
+      "type": "object"
+    }
+  },
   "propose_bot_team": {
     "description": "propose bot team",
     "schema": {
@@ -7835,6 +8095,60 @@
               },
               "maxItems": 10,
               "type": "array"
+            },
+            "requirement_links": {
+              "items": {
+                "additionalProperties": false,
+                "properties": {
+                  "evidence": {
+                    "items": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "hash": {
+                          "minLength": 1,
+                          "type": "string"
+                        },
+                        "path": {
+                          "minLength": 1,
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "path",
+                        "hash"
+                      ],
+                      "type": "object"
+                    },
+                    "maxItems": 100,
+                    "minItems": 1,
+                    "type": "array"
+                  },
+                  "rationale": {
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "requirement_id": {
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "revision_id": {
+                    "minLength": 1,
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "requirement_id",
+                  "revision_id",
+                  "rationale",
+                  "evidence"
+                ],
+                "type": "object"
+              },
+              "maxItems": 100,
+              "type": [
+                "array",
+                "null"
+              ]
             }
           },
           "required": [
