@@ -38,3 +38,9 @@ No credentials or private backups belong in this repository.
 
 No remote model, agent execution or real user notifications occur in the public
 fixture. Its invented states cannot be restored by a real server.
+
+- Full Python discovery completed: 1,732 tests, 14 optional-environment skips.
+  After the review fix, all 11 library/typed-index tests passed (including the
+  newly added descendant-scope and transaction-cache regressions).
+- No GitHub Actions workflow is configured in this repository; these are local
+  verification results, not a claim of hosted CI.
