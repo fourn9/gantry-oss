@@ -8,6 +8,10 @@ ANCHOR = {'type':'object','properties':{'kind':{'enum':['work','project','compon
 
 
 class StudioTargetsMixin:
+    def _studio_cad_part_supported(self,path,info):
+        """Adapters may extend preview support while retaining exact source hashes."""
+        return path.lower().endswith(('.stl','.obj'))
+
     def _studio_project_state(self,s,actor,pid,sid=None):
         project=self._project(s,actor,pid)
         sid=sid or project.get('baseline_state')
@@ -49,7 +53,7 @@ class StudioTargetsMixin:
                 except UnicodeDecodeError: raise Fault('invalid_input','Code line requires UTF-8 text')
                 require('\x00' not in text and 1<=anchor['line']<=len(text.splitlines()),'invalid_input','Line does not exist')
             if kind=='cad':
-                require(anchor['part']==path and path.lower().endswith(('.stl','.obj')),'invalid_input','Select a saved mesh file')
+                require(anchor['part']==path and self._studio_cad_part_supported(path,info),'invalid_input','Select a supported saved part')
         return change,session,state,pid
 
     def _studio_participants(self,s,actor,session,state):

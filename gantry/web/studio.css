@@ -95,7 +95,7 @@
 
 /* Saved state library: native content first; related context is opt-in. */
 .library-toolbar,.library-selectionbar,.library-panel-tabs{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 18px;border-bottom:1px solid var(--border,#e4e4e1)}
-.library-toolbar>div:first-child{min-width:0}.library-toolbar strong{font-size:13px;font-weight:500;display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.library-toolbar small{display:block;color:var(--muted,#777);margin-top:3px}
+.library-toolbar>div:first-child{min-width:0;max-width:100%}.library-toolbar strong{font-size:13px;font-weight:500;display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.library-toolbar small{display:block;color:var(--muted,#777);margin-top:3px}
 .library-body{display:grid;grid-template-columns:230px minmax(0,1fr);min-height:calc(100vh - 150px)}
 .library-body.library-panel-open{grid-template-columns:210px minmax(260px,1fr) minmax(280px,340px)}
 .library-browser{border-right:1px solid var(--border,#e4e4e1);overflow:auto;max-height:calc(100vh - 150px);padding:8px 0}.library-content{min-width:0;overflow:hidden}.library-file-list{font-size:12px}

@@ -1,5 +1,7 @@
 import copy
 import unittest
+from unittest.mock import patch
+from gantry import manifest_store
 import test_studio as fixtures
 import test_requirement_traceability as requirements
 
@@ -65,6 +67,24 @@ class LibraryTests(unittest.TestCase):
         page = self.call('studio_library', {'project_id':p['id'],'state_id':st['id'],'section':'requirements'})
         self.assertEqual(page['items'][0]['status'], 'needs_review')
 
+    def test_parent_related_records_include_child_component_files(self):
+        self.initialize = lambda:self.call('initialize_continuity', {
+            'session_id':self.session['id'],'version':self.detail()['session']['version'],
+            'summary':'Nested saved assembly','hierarchy':[
+                {'id':'robot','title':'Robot','kind':'robot','paths':[],'editable':True},
+                {'id':'arm','parent':'robot','title':'Arm','kind':'part','paths':['input.txt'],'editable':True}],
+            'context':{'requirements':[],'constraints':[],'decisions':[],
+                       'open_questions':[],'environment':{}}})
+        p,st,work,ref=self.linked()
+        args={'project_id':p['id'],'state_id':st['id']}
+        files=self.call('studio_library',{**args,'section':'files','component_id':'robot'})
+        related=self.call('studio_related',{**args,'anchor':{'kind':'component','component_id':'robot'}})
+        self.assertEqual([f['path'] for f in files['items']],['input.txt'])
+        self.assertEqual([f['path'] for f in related['files']],['input.txt'])
+        self.assertEqual(related['requirements'][0]['requirement_id'],ref['requirement_id'])
+        self.assertEqual(related['checks'][0]['id'],'travel')
+        self.assertEqual(related['works'][0]['id'],work['id'])
+
     def test_cross_project_state_and_unknown_targets_rejected(self):
         p, st, work = self.setup_work()
         other = self.call('save_project', {'name':'Other','description':'Separate'})
@@ -75,6 +95,19 @@ class LibraryTests(unittest.TestCase):
         page = self.call('studio_library', {'project_id':p['id'],'state_id':st['id'],'section':'requirements'})
         self.assertFalse(page['items'])
         self.assertEqual(page['unlinked_requirements'], ['motion'])
+
+    def test_library_adoption_lookup_does_not_expand_unrelated_artifacts(self):
+        p, st, _ = self.setup_work()
+        unrelated = self.artifact({'elsewhere.step':'unrelated saved source'})
+        with self.service.store.connect() as con:
+            root = con.execute('SELECT root FROM artifact_roots WHERE revision_id=?',(unrelated,)).fetchone()[0]
+        original = manifest_store.Tree.items
+        def selected_only(tree,current,after=''):
+            if current == root: raise AssertionError('Unrelated snapshot expanded')
+            return original(tree,current,after)
+        with patch.object(manifest_store.Tree,'items',selected_only):
+            page=self.call('studio_library',{'project_id':p['id'],'state_id':st['id'],'section':'files'})
+            self.assertEqual(page['state']['adoption'],'unadopted')
 
     def test_project_discussion_without_work_and_exact_requirement_revision(self):
         p, st, work, ref = self.linked()

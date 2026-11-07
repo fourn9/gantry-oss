@@ -5,6 +5,7 @@ from .engineering_context import assess as engineering_assess
 from .requirement_traceability import assess as requirement_assess
 from .development import in_scope
 from .model import require, Fault
+from .indexed import entry_values
 
 PAGE={'after':S,'limit':{'type':'integer','minimum':1,'maximum':100}}
 TARGET={'project_id':S,'state_id':S,'anchor':ANCHOR}
@@ -19,11 +20,21 @@ def page(items,a,key):
     return {'items':rows[:limit],'next':rows[limit-1][key] if len(rows)>limit else None}
 
 
+def component_scope(nodes, component_id):
+    require(any(h['id']==component_id for h in nodes),'invalid_input','Unknown component')
+    ids={component_id}
+    for _ in nodes:
+        expanded=ids|{h['id'] for h in nodes if h.get('parent') in ids}
+        if expanded==ids: break
+        ids=expanded
+    return [p for h in nodes if h['id'] in ids for p in h['paths']]
+
+
 class StudioLibraryMixin(StudioTargetsMixin):
     def _studio_state_label(self,s,state):
         shares=[v for v in s.get('dev_shares',{}).values() if v['state_id']==state['id']]
         adopted=any(e['type']=='design_document' and not e.get('retracted') and
-            e['data'].get('development_state')==state['id'] for e in s['entries'].values())
+            e['data'].get('development_state')==state['id'] for e in entry_values(s['entries'],'design_document'))
         return {k:state[k] for k in ('id','session_id','snapshot','summary','created_at','parents','work_status','capture','unfinished')} | {
             'change_id':state.get('change_id'),'rationale':state.get('rationale',''),
             'sharing':'integrated' if state.get('integrated_changes') else 'shared' if shares else 'unshared',
@@ -58,14 +69,7 @@ class StudioLibraryMixin(StudioTargetsMixin):
         manifest=self._manifest(s,state['snapshot'])
         nodes=state['hierarchy'];scope=None
         if a.get('component_id'):
-            node=next((h for h in nodes if h['id']==a['component_id']),None)
-            require(node,'invalid_input','Unknown component')
-            ids={node['id']}
-            for _ in nodes:
-                new=ids|{h['id'] for h in nodes if h.get('parent') in ids}
-                if new==ids: break
-                ids=new
-            scope=[p for h in nodes if h['id'] in ids for p in h['paths']]
+            scope=component_scope(nodes,a['component_id'])
         if section=='files':
             items=({'path':p,**info,'storage':'bytes_saved','components':[h['id'] for h in nodes if in_scope(p,h['paths'])]}
                 for p,info in manifest.items() if (scope is None or in_scope(p,scope)) and query in p.casefold() and (not a.get('path') or p==a['path']))
@@ -86,8 +90,8 @@ class StudioLibraryMixin(StudioTargetsMixin):
         anchor=a['anchor'];manifest=self._manifest(s,state['snapshot']);eng,cov=self._studio_coverage(s,state)
         if anchor.get('path'): paths={anchor['path']}
         elif anchor['kind']=='component':
-            node=next(h for h in state['hierarchy'] if h['id']==anchor['component_id'])
-            paths={p for p in manifest if in_scope(p,node['paths'])}
+            scope=component_scope(state['hierarchy'],anchor['component_id'])
+            paths={p for p in manifest if in_scope(p,scope)}
         else: paths=set()
         if anchor['kind']=='requirement':
             checks=[c for c in eng['checks'] if {'requirement_id':anchor['requirement_id'],'revision_id':anchor['revision_id']} in c.get('requirement_refs',[])]
