@@ -1,23 +1,34 @@
+import {armBase,armLinks,armGripper,armBracket} from './sample-arm.js?v=spatial-20261108';
 // Public, invented sample data. This adapter never opens a network connection.
-import {createLibraryFixture} from './demo-library.js?v=library-20261107';
-import {fileChanges} from './studio_model.js?v=library-20261107';
-import {componentScope} from './studio_context.js?v=library-20261107';
+import {createLibraryFixture} from './demo-library.js?v=spatial-20261108';
+import {fileChanges} from './studio_model.js?v=spatial-20261108';
+import {componentScope} from './studio_context.js?v=spatial-20261108';
 const clone=value=>structuredClone(value);
 const members=[{id:'designer',name:'Alex Morgan',role:'Project owner',kind:'human'},{id:'controls-agent',name:'Kai',role:'Controls Crew agent',kind:'agent'},{id:'design-agent',name:'Ari',role:'Mechanical Crew agent',kind:'agent'},{id:'mechanical-reviewer',name:'Sam Rivera',role:'Mechanical reviewer',kind:'human'}];
 const hierarchy=[
- {id:'robot',title:'Bench robot',kind:'robot',paths:['cad/','control/']},
- {id:'wrist',parent:'robot',title:'Wrist assembly',kind:'assembly',paths:['cad/','control/']},
- {id:'frame',parent:'wrist',title:'Frame',kind:'mechanical',paths:['cad/base.stl']},
- {id:'carriage',parent:'wrist',title:'Carriage',kind:'mechanical',paths:['cad/carriage.stl']},
- {id:'sensor',parent:'wrist',title:'Sensor bracket',kind:'mechanical',paths:['cad/sensor-bracket.stl']},
- {id:'control',parent:'wrist',title:'Motion control',kind:'software',paths:['control/']}];
-const box=(x,y,z,dx,dy,dz)=>{
- const points=[[0,0,0],[1,0,0],[1,1,0],[0,1,0],[0,0,1],[1,0,1],[1,1,1],[0,1,1]].map(([i,j,k])=>[x+i*dx,y+j*dy,z+k*dz]);
- return [[0,2,1],[0,3,2],[4,5,6],[4,6,7],[0,1,5],[0,5,4],[1,2,6],[1,6,5],[2,3,7],[2,7,6],[3,0,4],[3,4,7]].map(f=>'facet normal 0 0 0\nouter loop\n'+f.map(i=>'vertex '+points[i].join(' ')+'\n').join('')+'endloop\nendfacet\n').join('');
-};
-const mesh=body=>'solid sample\n'+body+'endsolid sample\n';
-const bracket=x=>mesh(box(x,-30,28,8,60,5)+box(x,25,28,8,5,26));
+ {id:'robot',title:'Desktop robot arm',kind:'robot',paths:['cad/','control/','robot/','sensor/','evidence/']},
+ {id:'wrist',parent:'robot',title:'Arm assembly',kind:'assembly',paths:['cad/','control/','robot/','sensor/','evidence/']},
+ {id:'frame',parent:'wrist',title:'Base',kind:'mechanical',paths:['cad/base.stl']},
+ {id:'carriage',parent:'wrist',title:'Arm & joints',kind:'mechanical',paths:['cad/arm-links.stl']},
+ {id:'gripper',parent:'wrist',title:'Gripper',kind:'mechanical',paths:['cad/gripper.stl']},
+ {id:'sensor',parent:'wrist',title:'Sensor bracket',kind:'mechanical',paths:['cad/sensor-bracket.stl','sensor/','evidence/bracket-offset.csv'],spatial_paths:['cad/sensor-bracket.stl']},
+ {id:'control',parent:'wrist',title:'Motion control',kind:'software',paths:['control/','robot/'],spatial_paths:['cad/arm-links.stl','cad/gripper.stl']}];
+const bracket=armBracket;
 const code=settle=>`# Illustrative control code. Not connected to a robot.\nSETTLE_TIME = ${settle}\n\ndef move_axis(axis, target):\n    axis.move_to(target)\n    axis.wait(SETTLE_TIME)\n    return axis.position()\n`;
+const calibration=offset=>`# Illustrative sensor calibration; not measured on hardware.\nsensor: wrist_camera\nframe: sensor_bracket\noffset_mm: [${offset}, 0, 18]\nrotation_deg: [0, 0, 0]\n`;
+const robotModel=`<?xml version="1.0"?>
+<!-- Illustrative kinematic excerpt; not a validated robot model. -->
+<robot name="desktop_arm">
+  <link name="base"/>
+  <link name="arm"/>
+  <joint name="shoulder" type="revolute">
+    <parent link="base"/><child link="arm"/>
+    <axis xyz="0 1 0"/>
+    <limit lower="-1.57" upper="1.57" effort="1" velocity="0.5"/>
+  </joint>
+</robot>
+`;
+const measurements='sample,offset_mm,clearance_mm,source\n1,24,3.2,illustrative\n2,24,3.1,illustrative\n3,24,3.3,illustrative\n';
 const digest=async bytes=>Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',bytes)),v=>v.toString(16).padStart(2,'0')).join('');
 const canonical=a=>JSON.stringify(Object.entries(a).sort());
 
@@ -35,7 +46,7 @@ export async function createDemoAPI(){
   }
   const value={state:{id,snapshot:id,summary,session_id:'sample-session',hierarchy:clone(hierarchy),parents:previous?[previous.state.id]:[],created_at:Date.UTC(2026,10,1,8)+counter*1000,capture:{missing:['Native CAD source','Real test execution','Live agents and external tools']},unfinished:['Verify full-motion clearance','Resolve and measure controller settling time']},manifest,
    status:{work:'working',sharing,verification:id==='state_base'?'pass':'unverified',adoption:'unadopted'},
-   diffs:previous?fileChanges(previous.manifest,manifest):[],engineering:{checks:[{id:'Full-motion clearance',scope:'Sample assembly · physical verification required',effective_status:'unverified'}]},
+   diffs:previous?fileChanges(previous.manifest,manifest):[],engineering:{checks:[{id:'Bracket offset sample',scope:'Illustrative points only · full-motion coverage missing',effective_status:'unverified',evidence:manifest['evidence/bracket-offset.csv']?{'evidence/bracket-offset.csv':manifest['evidence/bracket-offset.csv'].hash}:{}},{id:'Full-motion clearance',scope:'Sample assembly · physical verification required',effective_status:'unverified'}]},
    evaluations:[{state_id:'state_base',scope:'Sample result · controller syntax (illustrative, not executed)',verdict:'pass',applicable:id==='state_base'}],files};
   states[id]=value;return value;
  }
@@ -45,7 +56,7 @@ export async function createDemoAPI(){
   const selected=clone(state(id));delete selected.files;
   return {work:clone(w),selected,versions,threads:clone(threads.filter(t=>t.work_id===wid&&t.state_id===id)),
    discussion_index:threads.filter(t=>t.work_id===wid).map(t=>({...clone(t),message_count:t.messages.length})),
-   participants:clone(members),can_update:true,can_comment:true,source:{repository:'sample/bench-robot',commit:''},
+   participants:clone(members),can_update:true,can_comment:true,source:{repository:'sample/desktop-robot-arm',commit:''},
    capture:{missing:['Native CAD source','Real test execution','Live agents and external tools']},activity:[],activity_token:String(seq),
    demo_request:wid==='bracket'&&id==='state_bracket_v1'?{agent:'design-agent',agent_name:'Ari',thread_id:'thread_sample',state_id:id,anchor:clone(threads.find(t=>t.id==='thread_sample').anchor),
     reason:'The proposed controller wait exceeds the current 0.15-second requirement. Changing that requirement needs the project owner’s direction.',
@@ -57,11 +68,10 @@ export async function createDemoAPI(){
  }
  async function reset(){
   states=Object.create(null);works=Object.create(null);blobs=Object.create(null);threads=[];inbox=[];seq=1;counter=1;
-  const files={'cad/base.stl':mesh(box(-60,-40,0,120,80,6)+box(-50,-30,6,8,60,40)+box(42,-30,6,8,60,40)),
-   'cad/carriage.stl':mesh(box(-36,-22,20,72,44,8)+box(-30,-16,28,60,32,18)),
-   'cad/sensor-bracket.stl':bracket(26),'control/motion.py':code('0.15')};
+  const files={'cad/base.stl':armBase(),'cad/arm-links.stl':armLinks(),'cad/gripper.stl':armGripper(),
+   'cad/sensor-bracket.stl':bracket(26),'control/motion.py':code('0.15'),'robot/arm.urdf':robotModel,'sensor/calibration.yaml':calibration(26),'evidence/bracket-offset.csv':measurements};
   await saveState('state_base',files,'Sample baseline. Geometry and results are illustrative.','baseline');
-  await saveState('state_bracket_v1',{...files,'cad/sensor-bracket.stl':bracket(24),'control/motion.py':code('0.25')},'Moved bracket inward and increased settling time; motion checks pending.','shared',state('state_base'));
+  await saveState('state_bracket_v1',{...files,'cad/sensor-bracket.stl':bracket(24),'control/motion.py':code('0.25'),'sensor/calibration.yaml':calibration(24)},'Moved bracket inward and increased settling time; motion checks pending.','shared',state('state_base'));
   for(const [id,title,owner,components,purpose,head,status] of [
    ['bracket','Refine the sensor bracket','design-agent',['sensor','control'],'Resolve the timing requirement before evaluating the proposed change.','state_bracket_v1','working'],
    ['control','Adjust the settling interval','controls-agent',['control'],'Coordinate the controller with the assembly.','state_base','waiting'],
@@ -75,7 +85,7 @@ export async function createDemoAPI(){
    {author:'design-agent',at:Date.UTC(2026,10,1,8,50),body:'@Kai I am moving the bracket inward. Check the controller timing alongside this change.',mentions:['controls-agent']},
    {author:'controls-agent',at:Date.UTC(2026,10,1,8,55),body:'@Ari I propose 0.25 seconds to settle. That is 0.10 seconds above the current requirement; the owner needs to confirm the timing tradeoff before we evaluate this candidate.',mentions:['design-agent']},
    {author:'design-agent',at:Date.UTC(2026,10,1,9),body:'@Alex Morgan Can settling time increase from 0.15 to 0.25 seconds? This adds 0.10 seconds per move. Confirm the timing tradeoff, or ask us to revise within the current limit. Motion and timing checks are still pending.',mentions:['designer']}]});
-  inbox.push({id:'request_sample',work_id:'bracket',state_id:'state_bracket_v1',thread_id:'thread_sample',anchor,title:'Confirm the settling-time requirement',author:'design-agent',body:threads[0].messages.at(-1).body,read:false,kind:'Change review',project_id:'bench',project_name:'Bench robot',scope:'Sensor bracket + Motion control',contributors:['design-agent','controls-agent'],contributor_names:['Ari','Kai']});
+  inbox.push({id:'request_sample',work_id:'bracket',state_id:'state_bracket_v1',thread_id:'thread_sample',anchor,title:'Confirm the settling-time requirement',author:'design-agent',body:threads[0].messages.at(-1).body,read:false,kind:'Change review',project_id:'bench',project_name:'Desktop robot arm',scope:'Sensor bracket + Motion control',contributors:['design-agent','controls-agent'],contributor_names:['Ari','Kai']});
   const requirementAnchor={kind:'requirement',requirement_id:'settling-time',revision_id:'timing-r1'};
   threads.push({id:'thread_requirement_sample',project_id:'bench',state_id:'state_base',anchor:requirementAnchor,messages:[{id:'message_requirement_sample',author:'controls-agent',at:Date.UTC(2026,10,1,8,30),body:'@Alex Morgan The saved requirement is 0.15 seconds. A measured timing report is still missing. Confirm which evidence the team should acquire before any requirement change.',mentions:['designer']}]});
   inbox.push({id:'request_requirement_sample',project_id:'bench',state_id:'state_base',thread_id:'thread_requirement_sample',anchor:requirementAnchor,title:'Review the timing requirement',author:'controls-agent',body:threads.at(-1).messages[0].body,read:false,kind:'Requirement discussion'});
@@ -86,7 +96,7 @@ export async function createDemoAPI(){
    case 'studio_library':return clone(library.library(args));
    case 'studio_related':return library.related(args);
    case 'studio_context':return clone(library.context(args));
-   case 'studio_overview':return clone({projects:[{id:'bench',name:'Bench robot',hierarchy,structure_state:'state_base'}],works:Object.values(works),next:null,collaboration:{work_id:'bracket',state_id:'state_bracket_v1',thread_id:'thread_sample',messages:clone(threads.find(t=>t.id==='thread_sample').messages),replied:threads.find(t=>t.id==='thread_sample').messages.some(m=>m.author==='designer')},activity_token:String(seq)});
+   case 'studio_overview':return clone({projects:[{id:'bench',name:'Desktop robot arm',hierarchy,structure_state:'state_base'}],works:Object.values(works),next:null,collaboration:{work_id:'bracket',state_id:'state_bracket_v1',thread_id:'thread_sample',messages:clone(threads.find(t=>t.id==='thread_sample').messages),replied:threads.find(t=>t.id==='thread_sample').messages.some(m=>m.author==='designer')},activity_token:String(seq)});
    case 'studio_work':return detail(args.work_id,args.state_id);
    case 'get_development_state':{const value=clone(state(args.state_id));delete value.files;return value;}
    case 'read_artifact_chunk':{const file=state(args.revision_id).manifest[args.path];must(file&&(!args.index||args.index===0),'Sample artifact not found.');return clone(blobs[file.hash]);}
