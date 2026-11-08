@@ -1,7 +1,7 @@
-import {$} from './ui.js?v=library-20261107';
-import {sidebar} from './studio_views.js?v=library-20261107';
-import {createDemoCrew} from './demo-crew-model.js?v=library-20261107';
-import {crewView} from './demo-crew-views.js?v=library-20261107';
+import {$} from './ui.js?v=spatial-20261108';
+import {sidebar} from './studio_views.js?v=spatial-20261108';
+import {createDemoCrew} from './demo-crew-model.js?v=spatial-20261108';
+import {crewView} from './demo-crew-views.js?v=spatial-20261108';
 
 export function createCrewDemo({overview,toast}){
  const model=createDemoCrew();let active=false,dirtyForm=null;

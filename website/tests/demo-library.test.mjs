@@ -89,11 +89,11 @@ test('published demo module graph resolves with one cache revision',async()=>{
   if(!file.endsWith('.js'))continue;
   const source=await readFile(new URL(file,root),'utf8');
   for(const match of source.matchAll(/(?:from\s*|import\s*\()(['"])(\.\/[^'"]+\.js(?:\?[^'"]*)?)\1/g)){
-   const url=new URL(match[2],root);assert.equal(url.search,'?v=library-20261107',file+' import '+match[2]);url.search='';await access(url);
+   const url=new URL(match[2],root);assert.equal(url.search,'?v=spatial-20261108',file+' import '+match[2]);url.search='';await access(url);
   }
  }
  for(const file of ['workspace.html','index.html']){
   const html=await readFile(new URL(file,root),'utf8');
-  assert.match(html,/script type="module" src="\.\/(?:demo|showcase)\.js\?v=library-20261107"/);
+  assert.match(html,/script type="module" src="\.\/(?:demo|showcase)\.js\?v=spatial-20261108"/);
  }
 });
