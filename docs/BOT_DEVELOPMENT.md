@@ -217,6 +217,10 @@ until the customer enables `experience_learning` in their approved environment.
 
 ## Reading and editing across stateless model turns
 
+See [runtime efficiency and recovery](CREW_RUNTIME_EFFICIENCY.md) for batched
+observations, version-bound handoff indexes, phase timing and the default-off
+automatic recovery policy. Existing explicit recovery remains available.
+
 The action harness returns complete bounded read chunks with byte cursors; JSON context strings and collections also paginate at the amount actually delivered. `inspect_json` can inspect bounded saved JSON or validated compressed JSON envelopes without executing project code.
 
 `read_observations` retains a bounded set of recent same-task read chunks with source hashes, byte offsets and action provenance. Each is checked against the current authorized manifest and workspace. Source changes invalidate old observations. The packet is limited to 32 KiB, eight chunks, 64 scanned actions and at most four source files / 2 MiB of source checks per input; omissions remain retrievable in task history. This is working evidence, not model training or inferred internal reasoning.

@@ -1,5 +1,15 @@
 # Implementation checklist
 
+## Runtime efficiency follow-up (2026-11-09)
+
+- [x] Preserve previous continuation fixes; correct independent-review findings.
+- [x] Batch read-only observations and retain scoped source-checked receipts.
+- [x] Index exact handoff changes, open checks and child reports.
+- [x] Add owner-approved bounded recovery and local phase timing.
+- [x] Complete integrated tests/build and publish evidence with limitations.
+
+Details: [crew-runtime-efficiency.md](crew-runtime-efficiency.md).
+
 > Historical implementation record. “Current” and completion claims below refer to the recorded work, not the latest release or an active assignment. See the [record index](README.md), [current usage guides](../docs/README.md) and [verification index](../docs/VERIFICATION.md). Open items are retained.
 
 ## Personal Bot continuity (2026-11-03)
