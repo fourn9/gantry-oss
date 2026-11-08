@@ -1,4 +1,4 @@
-"""Explicit, journaled recovery of answer-free monthly Codex rate limits."""
+"""Explicit, journaled recovery of answer-free Codex rate limits and stopped timeouts."""
 import json
 import os
 import re
@@ -58,15 +58,39 @@ def rate_limit_fault(state):
                   'cooldown_source': 'local backoff; provider reset time is unknown'})
 
 
+def timeout_state(root, state):
+    """Only the adapter's confirmed stop receipt can classify a timeout for retry.
+
+    A dead PID alone does not establish how an old started invocation ended.
+    Missing or ambiguous response evidence therefore stays held.
+    """
+    if not (state.get('phase') == 'failed' and state.get('code') == 'provider_timeout'
+            and state.get('process_stopped') is True and type(state.get('returncode')) is int
+            and type(state.get('pid')) is int and state['pid'] > 0): return None
+    ensure_stopped(state)
+    root = Path(root)
+    answer = root/'answer.json'; events = root/'events.jsonl'
+    if answer.is_symlink() or (answer.exists() and answer.stat().st_size): return None
+    if events.is_symlink() or not events.is_file() or events.stat().st_size > 1024*1024: return None
+    try:
+        for line in events.read_text().splitlines():
+            event = json.loads(line)
+            if not isinstance(event, dict) or event.get('type') == 'turn.completed': return None
+            item = event.get('item')
+            if isinstance(item, dict) and item.get('type') == 'agent_message': return None
+    except (ValueError, UnicodeError): return None
+    return state
+
+
 def prepare_retry(root, reason, check_only=False):
     require(isinstance(reason, str) and bool(reason.strip()), 'invalid_input', 'Confirm previous processes stopped')
     root = Path(root); marker = root/'inference.json'
     require(marker.is_file(), 'outcome_unknown', 'No recognized provider journal; inspect before recovery')
     state = json.loads(marker.read_text()); ensure_stopped(state)
     if state.get('phase') in {'completed', 'retry_ready'}: return
-    failure = rate_limit_state(root, state)
-    require(failure is not None, 'outcome_unknown', 'Only a confirmed answer-free Codex 429 can be retried here')
-    if time.time() < failure['retry_at']: raise rate_limit_fault(failure)
+    failure = rate_limit_state(root, state) or timeout_state(root, state)
+    require(failure is not None, 'outcome_unknown', 'Only a confirmed answer-free Codex 429 or stopped timeout can be retried here')
+    if failure['code'] == 'provider_rate_limited' and time.time() < failure['retry_at']: raise rate_limit_fault(failure)
     if check_only: return
     archive = root/'recoveries'/uid('retry'); archive.mkdir(parents=True, mode=0o700)
     for source in root.iterdir():

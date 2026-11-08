@@ -10,16 +10,17 @@ from pathlib import Path
 
 from .bot_development import BOT_ANSWER
 from .contracts import CONTRACTS, S, validate
+from .crew_json import INSPECT_JSON_SCHEMA, inspect_json, pointer_value
 from .connection_policy import safe_path, clean_bytes
 from .continuity_adapter import capture_workspace
 from .development import in_scope
-from .model import Fault, digest, require
+from .model import Fault, canonical, digest, require
 from .project_files import read_file, write_file
 from .runner import persist
 from . import project_sandbox
 
 SCHEMA = {'type': 'object', 'properties': {
-    'action': {'enum': ['issue_open', 'issue_review', 'issue', 'issues', 'requirements', 'propose_requirements', 'integrate', 'read', 'edit', 'context', 'records', 'inspect', 'tool', 'publish_physical', 'ask', 'resolve', 'decision', 'remember', 'working_state', 'experience_use', 'team', 'stop', 'finish']},
+    'action': {'enum': ['issue_open', 'issue_review', 'issue', 'issues', 'requirements', 'propose_requirements', 'integrate', 'read', 'inspect_json', 'edit', 'replace', 'context', 'records', 'inspect', 'tool', 'publish_physical', 'ask', 'resolve', 'decision', 'remember', 'working_state', 'experience_use', 'team', 'stop', 'finish']},
     'arguments_json': S, 'rationale': S}, 'required': ['action', 'arguments_json', 'rationale'], 'additionalProperties': False}
 API_ACTIONS = {'issue_open': 'open_bot_issue', 'issue_review': 'review_bot_issue', 'ask': 'ask_bot', 'decision': 'record_bot_decision', 'remember': 'record_bot_experience',
                'working_state': 'update_bot_working_state', 'experience_use': 'record_bot_learning_use',
@@ -32,10 +33,12 @@ GUIDE = {
     'requirements': 'Optional after/limit. Page existing adopted requirement definitions in this project zone. Discovery is not assignment or fulfillment. Use exact reference IDs and saved source hashes to propose links; do not invent requirements from prose.',
     'propose_requirements': 'links [{requirement_id,revision_id,rationale,evidence:[{path,hash}]}], summary. Propose links to existing adopted requirements in a separate shared metadata change. Never invent IDs. The active task remains unchanged; inspect the candidate, then a delegated manager selects it for subsequent work. Missing formal requirements remain unlinked until defined through the existing requirement approval process.',
     'integrate': 'state_id (current pinned input), changes [{id,version}], summary. Integrates shared candidates as an intermediate action, restores their exact combined files, and keeps this task running. Then inspect/edit/test yourself or finish waiting with a child assignment using the returned state_id. Does not verify or adopt. Requires integration delegation and no prior saved edits in this task; conflicts remain unresolved.',
-    'read': 'path; optional offset and length (bytes). Returns exact hash and bounded text/base64.',
+    'read': 'path; optional offset and length (bytes, at most 6000 delivered per call). Returns the full chunk as UTF-8 text or base64 if a byte boundary splits UTF-8. Decode base64 to bytes; follow next_offset until null. Hash and size describe the entire source file.',
+    'inspect_json': 'Read-only saved file: path, optional pointer (JSON pointer), offset, limit (1-30). Supports plain JSON or verified zlib-base64-json-v1 envelope, at most 16 MiB input / 64 MiB decoded. Optional nonempty_at filters the selected array by a literal relative JSON pointer, never an expression: excludes missing fields, null, false, zero and empty strings/arrays/objects. filter_counts distinguishes missing from empty/false. Returns source hashes, original source_indices and pagination. Values are bounded previews; follow exact pointers for nested omissions. Inspection is not validation or adoption.',
     'edit': 'path, content, expected_hash (sha256 from read, or absent). Within task scope only.',
-    'context': 'pointer (JSON pointer into full authorized context), optional offset, limit for arrays/maps.',
-    'inspect': 'task_id. Read another task in this project, including its exact candidate and reports; use pointer/offset/limit to fetch a specific part.',
+    'replace': 'path, expected_hash (whole-file SHA-256 from read), old_text, new_text. Replace one exact unique nonempty UTF-8 match; new_text may be empty. All other bytes are preserved without re-emitting the file. No fuzzy/regex matching. Reread changed files; missing or ambiguous matches require more exact context. Within write_scope only.',
+    'context': 'pointer (JSON pointer into full authorized context), optional offset/limit. At most 30 entries or 6000 string characters per page; follow next_offset. Nested values remain bounded previews; use exact nested pointers for omitted content.',
+    'inspect': 'task_id. Read another task in this project, including its exact candidate and reports; use pointer/offset/limit to fetch a specific part. At most 30 entries or 6000 string characters per page; follow next_offset and exact nested pointers for omitted content.',
     'records': 'kind (actions/decisions/learning_uses), optional after/limit. Retrieves exact saved task history; paginated.',
     'publish_physical': 'plan_path: a frozen physical plan already saved in the current state. Imports reports from this workspace through the fenced Bot adapter; never adopts.',
     'tool': 'name from available_tools. No arbitrary argv. Results are observations, not adoption.',
@@ -56,9 +59,16 @@ def _schema(properties, required=None):
 
 def action_schemas():
     # Build from the authoritative contracts, not hand-maintained prose alone.
-    schemas = {'finish': BOT_ANSWER,
+    schemas = {'finish': BOT_ANSWER, 'inspect_json': INSPECT_JSON_SCHEMA,
         'edit': _schema({'path': S, 'content': {'type': 'string'}, 'expected_hash': S}),
-        'tool': _schema({'name': S}), 'publish_physical': _schema({'plan_path': S})}
+        'replace': _schema({'path': S, 'expected_hash': S, 'old_text': S, 'new_text': {'type': 'string'}}),
+        'tool': _schema({'name': S}), 'publish_physical': _schema({'plan_path': S}),
+        'read': _schema({'path': S, 'offset': {'type':'integer','minimum':0},
+                         'length': {'type':'integer','minimum':1,'maximum':65536}}, ['path']),
+        'context': _schema({'pointer': {'type':'string'}, 'offset': {'type':'integer','minimum':0},
+                            'limit': {'type':'integer','minimum':1,'maximum':65536}}, ['pointer']),
+        'inspect': _schema({'task_id': S, 'pointer': {'type':'string'}, 'offset': {'type':'integer','minimum':0},
+                            'limit': {'type':'integer','minimum':1,'maximum':65536}}, ['task_id'])}
     for name, op in {**API_ACTIONS, 'integrate': 'integrate_bot_task', 'resolve': 'resolve_bot_question', 'team': 'propose_bot_team',
                      'records': 'get_bot_records', 'requirements': 'get_bot_requirements', 'issue': 'get_bot_issue', 'issues': 'list_bot_issues'}.items():
         schema = json.loads(json.dumps(CONTRACTS[op]['schema']))
@@ -95,20 +105,16 @@ def _path(workspace, name, scope=None, create=False):
 
 
 def _context_value(context, args):
-    validate(args, _schema({'pointer': {'type': 'string'}, 'offset': {'type': 'integer', 'minimum': 0},
-                           'limit': {'type': 'integer', 'minimum': 1, 'maximum': 65536}}, ['pointer']))
-    value = context
-    pointer = args['pointer']; require(not pointer or pointer.startswith('/'), 'invalid_input', 'Use a JSON pointer')
-    for segment in pointer.split('/')[1:]:
-        segment = segment.replace('~1', '/').replace('~0', '~')
-        try: value = value[int(segment)] if isinstance(value, list) else value[segment]
-        except (KeyError, IndexError, ValueError, TypeError): raise Fault('not_found', 'Context pointer not found')
+    validate(args, action_schemas()['context'])
+    value = pointer_value(context, args['pointer'])
     start = args.get('offset', 0); count = args.get('limit', 30)
     if isinstance(value, str):
-        count = args.get('limit', 8192)
-        return {'value': value[start:start+count], 'total': len(value), 'next_offset': start+count if start+count < len(value) else None}
+        # Even escaped astral Unicode stays below the global inline JSON cap.
+        page = value[start:start+min(args.get('limit', 6000), 6000)]
+        end = start + len(page)
+        return {'value': page, 'total': len(value), 'next_offset': end if end < len(value) else None}
     if isinstance(value, (dict, list)):
-        count = min(count, 100)
+        count = min(count, 30)
         size = len(value)
         value = dict(list(value.items())[start:start+count]) if isinstance(value, dict) else value[start:start+count]
         return {'value': value, 'total': size, 'next_offset': start+count if start+count < size else None}
@@ -138,22 +144,33 @@ def _tool(client, ref, config, args, workspace, step, scope, zone):
                            'crew-tool-output:' + digest([ref['task_id'], str(step), output.hex()]))
     result.update(output=result['output'][:32000], output_artifact=artifact['revision_id'],
                   output_truncated=len(result['output']) > 32000)
+    # Execution happened even if later file validation rejects the entire import.
+    # Keep its sanitized receipt separately; an error must not become test evidence.
+    persist(step/'tool-execution.json', result)
     changes = []; refreshed = []
-    for file in sorted(scratch.rglob('*')):
-        rel = file.relative_to(scratch).as_posix()
-        if rel in {'.test-output', 'home', 'tmp'} or rel.startswith(('home/', 'tmp/')): continue
-        require(not file.is_symlink(), 'scope_denied', 'Tool created a symlink')
-        if not file.is_file(): continue
-        if original_times.get(rel) != file.stat().st_mtime_ns: refreshed.append(rel)
-        raw = read_file(scratch, rel)
-        original = workspace/rel
-        before = read_file(workspace, rel) if original.exists() else None
-        if raw != before:
-            _path(workspace, rel, scope)
-            changes.append((rel, raw, hashlib.sha256(before).hexdigest() if before is not None else 'absent'))
-    # Validate all outputs before copying any. Deletions are explicit unsupported effects.
-    require(all((scratch/f.relative_to(workspace)).exists() for f in workspace.rglob('*') if f.is_file()),
-            'scope_denied', 'Tool deletion requires an explicit supported operation')
+    try:
+        for file in sorted(scratch.rglob('*')):
+            rel = file.relative_to(scratch).as_posix()
+            if rel in {'.test-output', 'home', 'tmp'} or rel.startswith(('home/', 'tmp/')): continue
+            require(not file.is_symlink(), 'scope_denied', 'Tool created a symlink')
+            if not file.is_file(): continue
+            if original_times.get(rel) != file.stat().st_mtime_ns: refreshed.append(rel)
+            raw = read_file(scratch, rel)
+            original = workspace/rel
+            before = read_file(workspace, rel) if original.exists() else None
+            if raw != before:
+                _path(workspace, rel, scope)
+                changes.append((rel, raw, hashlib.sha256(before).hexdigest() if before is not None else 'absent'))
+        # Validate all outputs before copying any. Deletions are explicit unsupported effects.
+        require(all((scratch/f.relative_to(workspace)).exists() for f in workspace.rglob('*') if f.is_file()),
+                'scope_denied', 'Tool deletion requires an explicit supported operation')
+    except (Fault, FileNotFoundError) as exc:
+        if isinstance(exc, Fault) and exc.code not in {'invalid_input', 'scope_denied', 'capture_incomplete'}:
+            raise
+        client.call('check_bot_task', ref)
+        return {'error': 'tool_capture', 'cause': exc.code if isinstance(exc, Fault) else 'not_found',
+                'message': str(exc)[:500] if isinstance(exc, Fault) else 'Output file unavailable during capture',
+                'tool_result': result}
     client.call('check_bot_task', ref)
     for rel, raw, expected in changes:
         _path(workspace, rel, scope, create=True); write_file(workspace, rel, raw, expected)
@@ -169,7 +186,7 @@ def _api_effect(client, operation, args, step, key):
 
 def _execute(client, context, ref, config, action, args, workspace, step, key):
     scope = context['task']['write_scope']
-    require(context['task'].get('studio_mode') != 'ask' or action not in {'propose_requirements','integrate','edit','tool','publish_physical','team','stop','issue_open','issue_review'},
+    require(context['task'].get('studio_mode') != 'ask' or action not in {'propose_requirements','integrate','edit','replace','tool','publish_physical','team','stop','issue_open','issue_review'},
             'scope_denied', 'Ask cannot edit, execute tools or change team work')
     if action == 'integrate':
         from .bot_execution import safe_fingerprint
@@ -183,8 +200,7 @@ def _execute(client, context, ref, config, action, args, workspace, step, key):
         return publish_bot(client, ref['task_id'], ref['fence'], workspace, args['plan_path'], key)
     if action == 'context': return _context_value(context, args)
     if action == 'inspect':
-        validate(args, _schema({'task_id': S, 'pointer': {'type': 'string'},
-            'offset': {'type': 'integer', 'minimum': 0}, 'limit': {'type': 'integer', 'minimum': 1, 'maximum': 100}}, ['task_id']))
+        validate(args, action_schemas()['inspect'])
         other = client.call('get_bot_task', {'task_id': args['task_id']})
         require(other['task']['session_id'] == context['task']['session_id'], 'scope_denied', 'Inspect this project only')
         return _context_value(other, {k: v for k, v in args.items() if k != 'task_id'} | {'pointer': args.get('pointer', '')})
@@ -196,11 +212,16 @@ def _execute(client, context, ref, config, action, args, workspace, step, key):
     if action in {'records', 'requirements'}:
         require('task_id' not in args, 'invalid_input', 'Runtime supplies task identity')
         return client.call('get_bot_records' if action == 'records' else 'get_bot_requirements', {**args, 'task_id': ref['task_id']})
+    if action == 'inspect_json':
+        validate(args, INSPECT_JSON_SCHEMA)
+        _path(workspace, args['path'])
+        return inspect_json(workspace, args, _context_value, result_preview)
     if action == 'read':
-        validate(args, _schema({'path': S, 'offset': {'type': 'integer', 'minimum': 0},
-            'length': {'type': 'integer', 'minimum': 1, 'maximum': 65536}}, ['path']))
+        validate(args, action_schemas()['read'])
         _path(workspace, args['path']); raw = read_file(workspace, args['path'])
-        start = args.get('offset', 0); value = raw[start:start+args.get('length', 32768)]
+        # Keep the entire chunk below result_preview's 8000-character string
+        # bound, including base64; cursors must describe delivered bytes.
+        start = args.get('offset', 0); value = raw[start:start+min(args.get('length', 6000), 6000)]
         try: data = {'text': value.decode('utf-8')}
         except UnicodeError:
             import base64
@@ -212,6 +233,22 @@ def _execute(client, context, ref, config, action, args, workspace, step, key):
         _path(workspace, args['path'], scope, create=True)
         write_file(workspace, args['path'], args['content'].encode(), args['expected_hash'])
         return {'path': args['path'], 'hash': hashlib.sha256(args['content'].encode()).hexdigest()}
+    if action == 'replace':
+        validate(args, action_schemas()['replace'])
+        _path(workspace, args['path'], scope)
+        raw = read_file(workspace, args['path'])
+        require(hashlib.sha256(raw).hexdigest() == args['expected_hash'], 'stale_basis', 'File changed; reread before replacing')
+        try:
+            raw.decode('utf-8')
+            old = args['old_text'].encode('utf-8'); new = args['new_text'].encode('utf-8')
+        except UnicodeError:
+            raise Fault('invalid_input', 'Replace requires valid UTF-8 text')
+        offset = raw.find(old)
+        require(offset >= 0 and raw.find(old, offset+1) < 0, 'invalid_input',
+                'Replace needs exactly one matching old_text; read the target and include unique surrounding text')
+        updated = clean_bytes(raw[:offset] + new + raw[offset+len(old):])
+        write_file(workspace, args['path'], updated, args['expected_hash'])
+        return {'path': args['path'], 'hash': hashlib.sha256(updated).hexdigest()}
     if action == 'tool': return _tool(client, ref, config, args, workspace, step, scope, context['zone'])
     if action in API_ACTIONS:
         require(not set(args) & {'task_id', 'fence', 'basis', 'intent'}, 'invalid_input', 'Task identity is supplied by the runtime')
@@ -319,6 +356,26 @@ def _publish_tool_evidence(client, ref, config, workspace, saved, marker, key):
     persist(marker, saved)
 
 
+def action_input(full, workspace, config, last_result, number):
+    from .bot_execution import _input, _fit_optional_previews
+    context = _input(full, workspace)
+    context.update(action_guide=GUIDE, action_schemas=action_schemas(),
+        available_tools=config.get('local_tools', {}), tool_evidence=config.get('tool_evidence', {}),
+        last_result=result_preview(last_result), round=number,
+        instruction=context['instruction'] + ' Choose ONE action each turn; put its JSON object in arguments_json. '
+        'Use context to fetch omitted records, inspect to retrieve peer tasks, read for files, tool for real tests, and edit for changes. '
+        'Use your own judgment; report, ask or delegate rather than invent evidence. '
+        'Record consequential decisions and reusable lessons. Organization workers run independently.')
+    _fit_optional_previews(context, list(full['development']['manifest']), limit=480000)
+    if len(canonical(context).encode()) > 480000 and last_result is not None:
+        context['last_result'] = {'truncated': True, 'sha256': digest(last_result),
+            'error': last_result.get('error') if isinstance(last_result, dict) else None,
+            'detail_reference': {'operation': 'get_bot_records', 'kind': 'actions', 'task_id': full['task']['id']}}
+    require(len(canonical(context).encode()) <= 480000, 'context_limit',
+            'Complete action input exceeds budget; reduce task scope or runtime configuration')
+    return context
+
+
 def run_actions(client, initial, ref, infer, config, root):
     from .bot_execution import _input, safe_fingerprint
     root = Path(root); root.mkdir(parents=True, exist_ok=True)
@@ -332,14 +389,7 @@ def run_actions(client, initial, ref, infer, config, root):
         full = client.call('refresh_bot_task', ref)
         if saved is None:
             input_path = step/'input.json'
-            context = json.loads(input_path.read_text()) if input_path.exists() else _input(full, workspace)
-            if not input_path.exists(): context.update(action_guide=GUIDE, action_schemas=action_schemas(), available_tools=config.get('local_tools', {}),
-                tool_evidence=config.get('tool_evidence', {}),
-                last_result=result_preview(state['last_result']), round=number,
-                instruction=context['instruction'] + ' Choose ONE action each turn; put its JSON object in arguments_json. '
-                'Use context to fetch omitted records, inspect to retrieve peer tasks, read for files, tool for real tests, and edit for changes. '
-                'Use your own judgment; report, ask or delegate rather than invent evidence. '
-                'Record consequential decisions and reusable lessons. Organization workers run independently.')
+            context = json.loads(input_path.read_text()) if input_path.exists() else action_input(full, workspace, config, state['last_result'], number)
             persist(input_path, context)
             receipt = infer(context, SCHEMA, step/'model'); validate(receipt['output'], SCHEMA)
             saved = {'phase': 'prepared', 'receipt': receipt, 'before': safe_fingerprint(workspace),

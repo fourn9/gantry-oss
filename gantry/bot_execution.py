@@ -7,7 +7,7 @@ from .bot_development import BOT_ANSWER
 from .continuity_adapter import capture_workspace
 from .contracts import validate
 from .development import in_scope
-from .model import Fault, digest, require
+from .model import Fault, canonical, digest, require
 from .runner import persist, fingerprint
 
 
@@ -16,13 +16,106 @@ def safe_fingerprint(root):
     return fingerprint(root)
 
 
+def _bounded_collections(context, source):
+    """Keep evidence previews optional without changing active task authority."""
+    limits = {'/memory/items': 24576, '/team': 24576, '/task/reports': 16384,
+              '/actions': 8192, '/decisions': 8192}
+    coverage = {}
+    for pointer, budget in limits.items():
+        keys = pointer.strip('/').split('/')
+        parent = context; original = source
+        for key in keys[:-1]:
+            parent = parent.get(key, {}); original = original.get(key, {})
+        key = keys[-1]; items = parent.get(key)
+        if not isinstance(items, list) or len(canonical(items).encode()) <= budget: continue
+        selected = []; used = 2
+        # Reports are append-ordered. Core action/decision records already come
+        # newest-first; preserve their source order to retain recent records.
+        indexes = list(range(len(items)))
+        if pointer == '/task/reports': indexes.reverse()
+        for index in indexes:
+            size = len(canonical(items[index]).encode()) + 1
+            if used + size > budget: break
+            selected.append(index); used += size
+        selected.sort()
+        parent[key] = [items[index] for index in selected]
+        originals = original.get(key, items)
+        selected_set = set(selected)
+        omitted = [index for index in range(len(items)) if index not in selected_set]
+        references = []
+        for index in omitted[:16]:
+            record = originals[index]
+            reference = {'index': index, 'sha256': digest(record)}
+            if isinstance(record, dict):
+                ident = record.get('id')
+                if not ident and isinstance(record.get('bot'), dict): ident = record['bot'].get('id')
+                if isinstance(ident, str) and len(ident) <= 256: reference['id'] = ident
+            references.append(reference)
+        coverage[pointer] = {'total_count': len(items), 'omitted_count': len(items)-len(selected),
+            'source_indices': selected, 'sha256': digest(originals),
+            'omitted_records': references, 'omitted_records_truncated': len(omitted) > 16,
+            'json_pointer': pointer, 'context': 'full_context'}
+    return coverage
+
+
+def _completed_child_previews(context):
+    """Retain contracts and unknowns; fetch completed historical detail on demand."""
+    for index, child in enumerate(context.get('children', [])):
+        reports = child.get('reports', [])
+        if child.get('status') != 'completed' or not reports: continue
+        latest = reports[-1]; report = latest.get('report', {})
+        preview = {key: report[key] for key in ('status', 'unverified') if key in report}
+        text_coverage = {}
+        for key in ('summary', 'rationale'):
+            value = report.get(key)
+            if isinstance(value, str):
+                preview[key] = value[:1000]
+                text_coverage[key] = {'characters': len(value), 'truncated': len(value) > 1000}
+        child['report_count'] = len(reports)
+        child['reports_detail_reference'] = {'json_pointer': f'/children/{index}/reports',
+            'sha256': digest(reports), 'context': 'full_context', 'omitted_details': True,
+            'preview_fields': text_coverage,
+            'instruction': 'Retrieve the exact child report by task ID before relying on omitted comparison or verification details.'}
+        child['reports'] = [{**{key: latest[key] for key in ('attempt', 'state_id', 'principal_id') if key in latest},
+                             'report': preview}]
+
+
+def _fit_optional_previews(context, names, limit=400000):
+    """Reserve the total input allowance for authority before optional bodies."""
+    oversized = lambda: len(canonical(context).encode()) > limit
+    if not oversized(): return
+    trimmed = {'file_previews': 0, 'context_observations': 0, 'read_observations': 0}
+    context['context_capture']['budget_trimmed'] = trimmed
+    # Files were inserted in dependency/scope priority order. Drop the lowest
+    # priority first, leaving immutable native files and their inventory intact.
+    while context['files'] and oversized():
+        context['files'].pop(next(reversed(context['files'])))
+        trimmed['file_previews'] += 1
+        omitted = [name for name in names if name not in context['files']]
+        context['capture'].update(omitted_file_count=len(omitted),
+            omitted_file_bodies=omitted[:100], omitted_list_truncated=len(omitted) > 100)
+    # These observations are historical receipts, presented oldest-first. Current
+    # contracts, messages, issues, child contracts and unknowns remain untouched.
+    for key in ('context_observations', 'read_observations'):
+        observations = context[key]
+        while observations.get('items') and oversized():
+            observations['items'].pop(0)
+            trimmed[key] += 1
+            observations.setdefault('coverage', {})['omitted_by_total_budget'] = trimmed[key]
+
+
 def _input(context, workspace):
     # Keep recorded contracts and reports; send bounded source previews separately.
     context = json.loads(json.dumps(context))
-    full_context = workspace.parent/'context.json'
-    persist(full_context, context)
-    context['full_context'] = {'path': str(full_context.resolve()), 'sha256': digest(context),
-        'purpose': 'Complete authorized context, manifests and receipts remain available to the customer bridge.'}
+    source = json.loads(json.dumps(context)); source_hash = digest(source)
+    full_context = workspace.parent/('context-' + source_hash + '.json')
+    require(not full_context.is_symlink(), 'scope_denied', 'Context snapshot cannot be a symlink')
+    if full_context.exists():
+        require(digest(json.loads(full_context.read_text())) == source_hash,
+                'integrity_error', 'Saved context snapshot changed')
+    else: persist(full_context, source)
+    context['full_context'] = {'path': str(full_context.resolve()), 'sha256': source_hash,
+        'purpose': 'Immutable complete authorized context for the customer bridge. Context actions retrieve the current authorized view; check record IDs and hashes if it has advanced.'}
     # Action bodies are lossless ledger receipts, not repeated prompt history.
     context['actions'] = [{k: a[k] for k in ('id', 'kind', 'attempt', 'input_state')} | {
         'round': a['details'].get('round'),
@@ -64,7 +157,7 @@ def _input(context, workspace):
         memory['paths_truncated'] = len(paths) > 20
         memory['detail_reference'] = reference
     names = sorted(manifest, key=priority)
-    previews = {}; omitted = []; remaining = 200000
+    previews = {}; omitted = []; remaining = 49152 - 2
     text_types = {'.py', '.json', '.md', '.txt', '.xml', '.toml', '.yaml', '.yml', '.c', '.h', '.cpp', '.csv', '.ino', '.cmake'}
     for name in names:
         info = manifest[name]
@@ -74,7 +167,10 @@ def _input(context, workspace):
         try:
             value = path.read_text()
             if '\x00' in value: raise ValueError('binary')
-            previews[name] = value; remaining -= info['size']
+            encoded_size = len(canonical(name).encode()) + len(canonical(value).encode()) + 2
+            if encoded_size > remaining:
+                omitted.append(name); continue
+            previews[name] = value; remaining -= encoded_size
         except (UnicodeError, ValueError): omitted.append(name)
     context.update(workspace=str(workspace.resolve()), files=previews,
         capture={'scope': 'saved input files; bounded text previews prioritized by dependencies and write scope',
@@ -87,15 +183,34 @@ def _input(context, workspace):
             'Return concrete edits only within write_scope; a customer tool bridge may also edit that workspace. '
             'Report missing capabilities, failed checks and unresolved compatibility in unverified. '
             'For actionable remaining issues, use followups to choose fix, verify, consult or defer with reasons and evidence. '
+            'Record-reference evidence in decisions, consultations, followups and issue reviews takes saved state/task/message/action/decision/issue IDs from this project. '
+            'For those references, cite a saved state ID and explain any file path/hash in the rationale or reason; a path/hash alone is not a record ID. '
+            'Keep typed evidence required by other action schemas: propose_requirements links[].evidence uses objects with path and hash. '
+            'experience_use and finish.experience_uses are optional. Use them only with a learning_plan whose status is completed '
+            'and attempt matches this task, linking a non-rejected planned memory and actual actions from this attempt. '
+            'Otherwise omit finish.experience_uses or use []/null and do not call experience_use; absence of a plan does not block ordinary finish. '
+            'Reading a visible memory alone does not establish a planned experience-use claim. '
             'Fix/verify must reference a real assignments index, consult a saved consultation message_id; defer explains why. '
             'Use issue_open for a persistent residual issue; carry issue_ids into assignments. Use issue/issue_review to examine evidence and explicitly resolve or reopen. '
             'A completed child task still needs managerial review of its results; product completion is not inferred. '
             'Read design_assessment before choosing the next edit, test or handoff: it compares the assignment baseline with the current checkpoint. '
+            'Omitted context/file previews are not absent evidence. Fetch needed records with context/inspect/read before deciding. '
+            'Collection source_indices refer to the immutable full_context snapshot; current context may advance, so check record IDs/hashes rather than assuming an old index is unchanged. '
             'Use its open_checks, requirement transitions and impact gaps; choose corrections, retests or consultations with recorded reasons. '
             'A requirement is met only relative to its linked evidence; do not erase unknown dependencies or change acceptance to obtain a pass. '
             'Use exact shared change IDs/versions for integration; do not claim a test or formal adoption from file existence. '
             'Completed describes reported work only, not certified physical correctness. '
             'Do not call Mentor or create a review to perform this assignment.')
+    context['context_capture'] = {'collections': _bounded_collections(context, source),
+        'scope': 'Bounded optional evidence previews; active task authority, requirements, messages and known limitations are retained',
+        'full_context_sha256': source_hash}
+    _completed_child_previews(context)
+    from .bot_observations import recent_reads, recent_context
+    context['read_observations'] = recent_reads(source, workspace)
+    context['context_observations'] = recent_context(source)
+    _fit_optional_previews(context, names)
+    require(len(canonical(context).encode()) <= 400000, 'context_limit',
+            'Essential Bot context exceeds 400 KB after optional previews; narrow the task explicitly. Requirements and authority were not truncated.')
     if context['task'].get('studio_mode') == 'ask':
         context['instruction'] += ' This is a read-only Studio Ask. Answer the question and selection in studio_request; do not edit, run tools, delegate edits or integrate.'
     return context

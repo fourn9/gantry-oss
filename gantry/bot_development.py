@@ -557,7 +557,10 @@ class BotDevelopmentMixin:
     def _bd_evidence(self, s, actor, sid, refs):
         for ref in refs:
             obj = next((s[t][ref] for t in ('dev_states', 'bot_tasks', 'bot_task_messages', 'bot_actions', 'bot_decisions', 'bot_issues') if ref in s.get(t, {})), None)
-            require(obj and obj['session_id'] == sid, 'invalid_input', 'Evidence must belong to this project')
+            require(obj and obj['session_id'] == sid, 'invalid_input',
+                    'Evidence must use saved state, task, message, action, decision or issue IDs from this project. '
+                    'For file evidence, cite its saved state ID and describe the path and hash in the rationale; '
+                    'file paths and hashes alone are not record IDs.')
 
     def cmd_send_bot_message(self, s, actor, a, fx, n, con):
         task = self._dev_get(s, 'bot_tasks', a['task_id'])
