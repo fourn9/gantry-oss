@@ -64,3 +64,30 @@ The static site has no package lock or dependency installation/audit boundary.
 - Read current #22 and review. Created #23 with agreed specification.
 - 8 representative deployed HTML/module files match the retained published tree.
 - Reconciled published source; all 29 existing website tests passed.
+
+### Implementation and local verification (2026-11-08)
+
+- Added shared artifact format/scope helpers, explicit spatial mappings, robot URDF,
+  sensor calibration YAML, and illustrative measurement CSV. Work and Files use
+  identical state/path/hash targets. Verification links exact evidence and leaves
+  missing full-motion coverage unverified.
+- Added assembly below hierarchy, multiple-part highlights, format-driven Changes,
+  Verification, persistent References/Discussion, and a right drawer on narrow
+  screens. Expanded model restores the existing viewer DOM and draft.
+- Updated homepage and demo excerpts/copy; cache revision `spatial-20261108`.
+- All 32 Node tests pass; new tests first failed on the absent artifact helper,
+  then passed after implementation. All demo JS syntax checks and diff whitespace
+  checks pass. No added dependencies or authentication/backend changes.
+- Browser verified YAML diff and mapped part, expansion/return preserving file,
+  compare and draft; right tab switching; exact line comment with a named human;
+  Verification -> pinned CSV; model -> Gripper Files with right panel retained.
+- Browser verified import -> share -> original Inbox request still opens original
+  v1 / motion.py:2 / 0.15-to-0.25 comparison. Fixed retained previous-version
+  conversation loading so the three original messages remain visible after import.
+- Inspected 320, 768, 1024 and 1440 CSS-pixel layouts. 320/1024 document width
+  matched viewport; narrow context panel is a right dialog with inert background,
+  Tab containment, Escape and focus restoration. Desktop has all three regions.
+- Homepage and demo overview rendered updated excerpts; console had no warning or
+  error entries in inspected flows. All observations use invented browser-only data.
+- Eight representative production files still matched the reconciled baseline
+  immediately before release preparation; origin/main remained 0ab19dd.

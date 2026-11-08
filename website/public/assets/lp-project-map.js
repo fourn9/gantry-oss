@@ -1,4 +1,4 @@
-import {esc} from '../demo/ui.js?v=component-20261107';
+import {esc} from '../demo/ui.js?v=spatial-20261108';
 
 // An explanatory activity map using the Studio demo's project and work records.
 // Movement and messages are illustrative; no agent or external tool is started.

@@ -1,31 +1,35 @@
-import {componentForFile,componentWork,highlightComponent} from './studio_navigation.js?v=component-20261107';
-import {related as relatedView} from './studio_library_views.js?v=component-20261107';
-import {createLibraryUI} from './studio_library_ui.js?v=component-20261107';
-import {createStudioLayout} from './studio_layout.js?v=component-20261107';
-import {$,esc as e,short,icon,download} from './ui.js?v=component-20261107';
-import {requestContext,componentScope} from './studio_context.js?v=component-20261107';
-import * as view from './studio_views.js?v=component-20261107';
-import {cadFile,meshFile,codeFile,versionLabel,fileChanges,lineDiff,linesOf,relatedWorks,commentCount,libraryURL,participantName} from './studio_model.js?v=component-20261107';
-import {parseMesh,mountMesh} from './studio_mesh.js?v=component-20261107';
-import {createActivityMonitor} from './studio_activity.js?v=component-20261107';
+import {createSpatialContext} from './studio_spatial.js?v=spatial-20261108';
+import {workFiles,artifactKind} from './studio_artifacts.js?v=spatial-20261108';
+import {componentForFile,componentWork,highlightComponent} from './studio_navigation.js?v=spatial-20261108';
+import {related as relatedView} from './studio_library_views.js?v=spatial-20261108';
+import {createLibraryUI} from './studio_library_ui.js?v=spatial-20261108';
+import {createStudioLayout} from './studio_layout.js?v=spatial-20261108';
+import {$,esc as e,short,icon,download} from './ui.js?v=spatial-20261108';
+import {requestContext,componentScope} from './studio_context.js?v=spatial-20261108';
+import * as view from './studio_views.js?v=spatial-20261108';
+import {cadFile,meshFile,codeFile,versionLabel,fileChanges,lineDiff,linesOf,relatedWorks,commentCount,libraryURL,participantName} from './studio_model.js?v=spatial-20261108';
+import {parseMesh,mountMesh} from './studio_mesh.js?v=spatial-20261108';
+import {createActivityMonitor} from './studio_activity.js?v=spatial-20261108';
 
 export function createStudio({api,modal,toast,fail}){
   const layout=createStudioLayout();
-  const library=createLibraryUI({api,modal,toast,fail,bytes,layout,onSelection:(p,n)=>{project=p;node=n;sidebar();}});
+  const contextPanel={value:globalThis.innerWidth>1024?'related':''};
+  const spatial=createSpatialContext({api,bytes});
+  const library=createLibraryUI({api,modal,toast,fail,bytes,layout,contextPanel,onSelection:(p,n,state,path)=>{project=p;node=n;sidebar();spatial.set(state,path,n?.id,part=>library.selectFile(part));}});
   let overview,detail,project,node,viewEpoch=0,artifactEpoch=0,mesh,tab='cad',compare=false,compareState='',file='',selectedPart='',conversation=null,lastWork='',draft='',mentions=[],threadDetail,evidenceFocus=null;
   let downloadState=null,recent=[],cache=new Map(),drafts=new Map(),cameras=new Map(),meshKey='';
   const route=()=>location.hash.slice(1).split('/').map(x=>decodeURIComponent(x));
   const handles=()=>['studio','studio-work','studio-inbox','studio-recent'].includes(route()[0]||'studio');
   const a=view.action;
   const activity=createActivityMonitor({api,notice:text=>{const el=$('#studio-live-notice');if(el){el.hidden=!text;el.querySelector('span').textContent=text;}}});
-  function reset(){library.reset();layout.leave();activity.clear();viewEpoch++;artifactEpoch++;disposeMesh();cache.clear();drafts.clear();cameras.clear();overview=detail=undefined;recent=[];lastWork='';evidenceFocus=null;conversation=null;threadDetail=null;draft='';mentions=[];}
+  function reset(){spatial.clear();library.reset();layout.leave();activity.clear();viewEpoch++;artifactEpoch++;disposeMesh();cache.clear();drafts.clear();cameras.clear();overview=detail=undefined;recent=[];lastWork='';evidenceFocus=null;conversation=null;threadDetail=null;draft='';mentions=[];}
   function disposeMesh(){if(mesh){if(mesh.camera)cameras.set(meshKey,mesh.camera());mesh.destroy();mesh=null;while(cameras.size>50)cameras.delete(cameras.keys().next().value);}}
-  function chooseFile(path){node=componentForFile(project,path)||node;sidebar();$('#breadcrumb').innerHTML=view.projectHeader(project,node,'work',detail.selected.state.id);evidenceFocus=null;file=path;selectedPart=path;selectConversation(null);threadDetail=null;drawWork();}
+  function chooseFile(path){node=componentForFile(project,path)||node;sidebar();$('#breadcrumb').innerHTML=view.projectHeader(project,node,'work',detail.selected.state.id);evidenceFocus=null;file=path;selectedPart=path;tab=meshFile(path)?'cad':'code';drawWork();}
   function remember(){if(conversation)drafts.set(JSON.stringify([detail.work.id,conversation]),{draft,mentions:[...mentions]});}
   function selectConversation(value){remember();conversation=value;const saved=drafts.get(JSON.stringify([detail.work.id,value]));draft=saved?.draft||'';mentions=saved?.mentions||[];}
   function sidebar(){const side=view.sidebar(overview,recent,{project:project?.id,component:node?.id});$('#nav').innerHTML=side.nav;$('#sidebar-projects').innerHTML=side.projects;$('#recent-sessions').innerHTML=side.recent;}
   async function render(){
-    library.leave();layout.leave();
+    spatial.clear();library.leave();layout.leave();
     remember();activity.clear();const current=++viewEpoch,parts=route(),kind=parts[0]||'studio';artifactEpoch++;disposeMesh();
     document.body.classList.add('studio-mode');$('#main').className='studio-main';
     $('#main').innerHTML=view.hint('Loading workspace…');
@@ -41,12 +45,13 @@ export function createStudio({api,modal,toast,fail}){
       const context=kind==='studio-work'?requestContext(value,parts[3]):null;
       const showThread=Boolean(context);
       if(kind==='studio-work'&&parts[3]){selectConversation(null);threadDetail=null;}
-      if(context){tab=context.tab;file=context.file;selectedPart=context.part;compare=context.compare;compareState=context.compareState;evidenceFocus=context.conversation;selectConversation(context.conversation);}
+      if(context){tab=context.tab;file=context.file;selectedPart=context.part;compare=context.compare;compareState=context.compareState;evidenceFocus=context.conversation;selectConversation(context.conversation);contextPanel.value='discussion';}
 
-      if(directNode){const scoped=Object.keys(value.selected.manifest).find(path=>componentForFile(project,path)?.id===directNode.id);if(scoped){file=scoped;selectedPart=scoped;tab=codeFile(scoped)?'code':'cad';}selectConversation(null);threadDetail=null;}
+      if(directNode){const scoped=Object.keys(value.selected.manifest).find(path=>componentForFile(project,path)?.id===directNode.id);if(scoped){file=scoped;selectedPart=scoped;tab=codeFile(scoped)?'code':'cad';}}
+      if(conversation&&conversation.state_id!==detail.selected.state.id){threadDetail=await api('studio_work',{work_id:detail.work.id,state_id:conversation.state_id});if(current!==viewEpoch)return;}
       if(!node)node=componentForFile(project,file)||project?.hierarchy.find(n=>n.id===value.work.components[0]?.id);
       sidebar();$('#breadcrumb').innerHTML=project?view.projectHeader(project,node,'work',detail.selected.state.id):'Work';
-      await drawWork();if(current!==viewEpoch)return;if(showThread&&globalThis.innerWidth>1024)focusConversation();
+      await drawWork();if(current!==viewEpoch)return;if(showThread)focusConversation();
       if(kind==='studio-work'&&parts[4]&&detail.can_comment)api('studio_acknowledge',{notification_id:parts[4]}).catch(fail);
       return;
     }
@@ -59,6 +64,7 @@ export function createStudio({api,modal,toast,fail}){
     if(['files','requirements'].includes(parts[3])){await library.render(project,node,parts);return;}
     $('#breadcrumb').innerHTML=view.projectHeader(project,node,'work');
     $('#main').innerHTML='<div class="studio-list-tools">'+a('new-work','New work')+'</div>'+view.projectWork(project,overview.works,node,overview.collaboration)+(overview.next?a('more-work','Load more work',overview.next,'class="studio-more"'):'');
+    spatial.set(project.structure_state,'',node?.id,async path=>{const p=project,epoch=viewEpoch,v=await api('get_development_state',{state_id:p.structure_state});if(epoch!==viewEpoch)return;location.hash=libraryURL(p.id,componentForFile(p,path)?.id,'files',v.state.id,{kind:'file',path,hash:v.manifest[path].hash});});
     layout.mount();
   }
   function drawWork(){
@@ -68,10 +74,25 @@ export function createStudio({api,modal,toast,fail}){
     if(index===0)compare=false;
     const choices=node?relatedWorks(overview.works,project.id,node.id,project.hierarchy):[];
     const switcher=choices.length>1?`<div class="studio-work-switch"><label for="studio-work-choice">Work</label><select id="studio-work-choice">${choices.map(w=>`<option value="${e(view.projectURL(project.id,node.id,'work')+'/'+encodeURIComponent(w.id))}" ${w.id===detail.work.id?'selected':''}>${e(w.title)}</option>`).join('')}</select></div>`:'';
-    $('#main').innerHTML=switcher+view.workDetail(detail,{tab,compare,compareState,conversation});
+    $('#main').innerHTML=switcher+view.workDetail(detail,{tab,compare,compareState,conversation,panel:contextPanel.value});
     drawConversation();layout.mount();const epoch=viewEpoch;const load=loadArtifact();const request=artifactEpoch;return load.catch(error=>{if(epoch===viewEpoch&&request===artifactEpoch&&$('#studio-artifact'))$('#studio-artifact').innerHTML=view.hint('Unable to load artifact',error.message);});
   }
-  function drawConversation(){if(conversation&&$('#studio-conversation')){const panel=$('#studio-conversation');panel.innerHTML=view.conversation(threadDetail||detail,conversation,draft,mentions);const messages=panel.querySelector('.studio-messages');messages.scrollTop=messages.scrollHeight;layout.mount();}}
+  async function drawConversation(){
+    const panel=$('#studio-conversation');if(!panel||!contextPanel.value)return;
+    const selected=contextPanel.value,epoch=viewEpoch,path=file,sid=detail.selected.state.id;
+    panel.innerHTML=`<div class="library-panel-tabs" role="group" aria-label="Context panel">${a('related','References','',`aria-pressed="${selected==='related'}"`)}${a('discussions','Discussion','',`aria-pressed="${selected==='discussion'}"`)}${a('close-conversation','×','','aria-label="Close context panel"')}</div><div id="studio-panel-content"></div>`;
+    const content=panel.querySelector('#studio-panel-content');
+    if(selected==='discussion'){
+      content.innerHTML=conversation?view.conversation(threadDetail||detail,conversation,draft,mentions):view.discussionList(detail);
+    }else{
+      content.innerHTML=view.hint('Loading references…');
+      try{const info=detail.selected.manifest[path];const anchor=info?{kind:'file',path,hash:info.hash}:node?{kind:'component',component_id:node.id}:{kind:'project'};
+      const result=await api('studio_related',{project_id:project.id,state_id:sid,anchor});
+      if(epoch===viewEpoch&&content.isConnected&&contextPanel.value===selected)content.innerHTML=relatedView(result,project.id,node?.id);
+      }catch(error){if(content.isConnected)content.innerHTML=view.hint('References unavailable',error.message);}
+    }
+    layout.mount();
+  }
   async function bytes(state,path,max=16*1024*1024){
     const info=state.manifest[path];if(!info)throw new Error('File not present in this version.');if(info.size>max)throw new Error('Preview size limit reached. Restore the saved file with the local adapter.');
     if(cache.has(info.hash))return cache.get(info.hash);
@@ -84,15 +105,19 @@ export function createStudio({api,modal,toast,fail}){
   const options=(paths,selected)=>paths.map(p=>{const count=commentCount(detail,detail.selected.state.id,p);return `<option value="${e(p)}" ${p===selected?'selected':''}>${e(p)}${count?' · '+count+' comment'+(count===1?'':'s'):''}</option>`;}).join('');
   async function loadArtifact(){
     const current=++artifactEpoch;disposeMesh();downloadState=null;const target=$('#studio-artifact'),v=detail.selected;
-    if(tab==='checks'){target.innerHTML=view.checks(detail);return;}
+    if(tab==='checks'){target.innerHTML=view.checks(detail);spatial.set(v.state.id,file,node?.id,chooseFile);return;}
     const old=compare?await api('get_development_state',{state_id:compareState}):null;if(current!==artifactEpoch)return;
-    const match=tab==='cad'?cadFile:codeFile;const paths=[...new Set([...Object.keys(v.manifest),...(old?Object.keys(old.manifest):[])])].filter(match).sort();
-    if(!paths.length){target.innerHTML=view.hint(tab==='cad'?'No shared CAD files':'No shared code files','Import saved files or connect your local adapter to this work.')+a('import-help','Connection instructions');return;}
-    if(!paths.includes(file)){const changed=new Set(v.diffs.map(d=>d.path));const scoped=path=>detail.work.components.some(c=>c.paths?.some(p=>path===p||(p.endsWith('/')&&path.startsWith(p))));file=paths.find(p=>changed.has(p)&&(tab!=='cad'||meshFile(p)))||paths.find(p=>scoped(p)&&(tab!=='cad'||meshFile(p)))||paths.find(meshFile)||paths[0];}
+    const changed=old?fileChanges(old.manifest,v.manifest):workFiles(v);const paths=[...new Set([...changed.map(c=>c.path),...(file&&v.manifest[file]?[file]:[])])];
+    if(!paths.length){target.innerHTML=view.hint('No recorded file changes');return;}
+    if(!paths.includes(file))file=paths.find(p=>v.manifest[p])||paths[0];
+    tab=cadFile(file)?'cad':'code';
     node=componentForFile(project,file)||node;highlightComponent(project,node);$('#breadcrumb').innerHTML=view.projectHeader(project,node,'work',v.state.id);
-    target.innerHTML=`<div class="studio-filebar"><select id="studio-file" aria-label="Artifact file">${options(paths,file)}</select></div><div id="studio-file-content" aria-live="polite">${view.hint('Loading saved version…')}</div>`;
+    spatial.set(v.state.id,file,node?.id,chooseFile);drawConversation();
+    target.innerHTML=`<div class="studio-filebar"><select id="studio-file" aria-label="Artifact file">${options(paths,file)}</select><span class="studio-small">${e(artifactKind(file))} · ${e(changed.find(c=>c.path===file)?.kind||'Saved')}</span>${a('all-files','All files ↗')}</div><div id="studio-file-content" aria-live="polite">${view.hint('Loading saved version…')}</div>`;
     const body=$('#studio-file-content');
     downloadState=v.manifest[file]?v:old;
+    if(!downloadState){body.innerHTML=view.hint('File deleted in this version','Enable Compare to inspect its previous contents.');return;}
+    if(!cadFile(file)&&/\.(pdf|zip|png|jpg|jpeg|gif|bin)$/i.test(file)){body.innerHTML=view.hint('Saved source','Download this file to open it in its native tool.')+a('download-file','Download saved file',file);return;}
     if(tab==='cad'){
       if(!meshFile(file)){body.innerHTML=view.hint('Preview not supported for this format','The native source is saved. Export an STL or OBJ preview from your CAD tool and import it alongside the editable file.')+a('download-file','Download saved source',file)+a('import-help','Connect a CAD adapter');return;}
       const currentPaths=Object.keys(v.manifest).filter(meshFile);const previewPaths=currentPaths.length<=12?currentPaths:[file].filter(p=>v.manifest[p]);
@@ -120,10 +145,10 @@ export function createStudio({api,modal,toast,fail}){
     if(epoch!==viewEpoch||artifact!==artifactEpoch||detail.work.id!==wid||!handles())return;
     threadDetail=older;const source=threadDetail||detail;
     const t=source.threads.find(t=>JSON.stringify(Object.entries(t.anchor).sort())===JSON.stringify(Object.entries(anchor).sort()));
-    evidenceFocus={anchor,state_id:stateId};selectConversation({anchor,state_id:stateId,...(t?{thread_id:t.id}:{})});await drawWork();if(epoch!==viewEpoch)return;focusConversation();
+    contextPanel.value='discussion';evidenceFocus={anchor,state_id:stateId};selectConversation({anchor,state_id:stateId,...(t?{thread_id:t.id}:{})});await drawWork();if(epoch!==viewEpoch)return;focusConversation();
   }
-  function focusConversation(){const panel=$('#studio-conversation');if(!panel)return;if(globalThis.innerWidth<=1024)panel.scrollIntoView({block:'start'});panel.focus({preventScroll:true});const messages=panel.querySelector('.studio-messages');if(messages)messages.scrollTop=messages.scrollHeight;layout.mount();}
-  async function closeConversation(){selectConversation(null);threadDetail=null;const epoch=viewEpoch;await drawWork();if(epoch!==viewEpoch)return;const target=$('#studio-canvas')||$('#studio-artifact');if(globalThis.innerWidth<=1024)target?.scrollIntoView({block:'start'});target?.focus({preventScroll:true});}
+  function focusConversation(){const panel=$('#studio-conversation');if(!panel)return;panel.focus({preventScroll:true});const messages=panel.querySelector('.studio-messages');if(messages)messages.scrollTop=messages.scrollHeight;layout.mount();}
+  async function closeConversation(){remember();contextPanel.value='';const epoch=viewEpoch;await drawWork();if(epoch!==viewEpoch)return;const target=$('#studio-canvas')||$('#studio-artifact');if(globalThis.innerWidth<=1024)target?.scrollIntoView({block:'start'});target?.focus({preventScroll:true});}
   async function loadUpdates(){
     if(route()[0]!=='studio-work')return render();
     const epoch=viewEpoch,artifact=artifactEpoch,wid=detail.work.id,sid=detail.selected.state.id;
@@ -155,7 +180,7 @@ export function createStudio({api,modal,toast,fail}){
       remember();selectConversation(null);threadDetail=null;tab=value;compare=value!=='checks';file='';compareState=detail.versions[0].id;
       await drawWork();$('#studio-artifact')?.scrollIntoView({block:'start'});
     },
-    tab:async value=>{remember();selectConversation(null);threadDetail=null;tab=value;file='';evidenceFocus=null;
+    tab:async value=>{remember();tab=value==='changes'?(cadFile(file)?'cad':'code'):value;
       const context=requestContext(detail,detail.demo_request?.thread_id);
       if(context&&value===context.tab){file=context.file;compare=context.compare;compareState=context.compareState;evidenceFocus=context.conversation;}
       else if(context?.related_anchor&&value===context.related_anchor.kind){file=context.related_anchor.path;selectedPart=context.related_anchor.part||'';compare=context.compare;compareState=context.compareState;evidenceFocus={anchor:context.related_anchor,state_id:context.conversation.state_id};}
@@ -172,10 +197,11 @@ export function createStudio({api,modal,toast,fail}){
     import:importFiles,share,
     'load-updates':loadUpdates,
     latest:()=>{selectConversation(null);file='';const url='#'+view.workURL(detail.work.id);if(location.hash===url)return render();location.hash=url;},
-    related:async()=>{const args={project_id:project.id,state_id:detail.selected.state.id,anchor:node?{kind:'component',component_id:node.id}:{kind:'project'}};const result=await api('studio_related',args);modal('Related to '+(node?.title||project.name),relatedView(result,project.id,node?.id),null);},
-    discussions:()=>modal('Conversations',view.discussionList(detail),null),
+    related:async()=>{contextPanel.value='related';await drawWork();focusConversation();},
+    discussions:async()=>{contextPanel.value='discussion';await drawWork();focusConversation();},
+    'all-files':()=>{const hash=detail.selected.manifest[file]?.hash;location.hash=libraryURL(project.id,node?.id,'files',detail.selected.state.id,hash?{kind:'file',path:file,hash}:undefined);},
     'open-thread':id=>{const t=detail.discussion_index.find(t=>t.id===id);if(!t)return;$('#dialog').close();const url='#'+view.workURL(detail.work.id,t.state_id,t.id);if(location.hash===url)return render();location.hash=url;},
-    changes:()=>modal('Changed files',`<p>Compared with the previous checkpoint.</p><div class="studio-share-files">${detail.selected.diffs.map(d=>`<div><span>${e(d.path)}</span><span>${e(d.kind)}</span></div>`).join('')||'<p>No file changes in this checkpoint.</p>'}</div>`,null),
+    changes:()=>handlers.tab('changes'),
     'download-file':async path=>download(path.split('/').pop(),await bytes(downloadState,path,32*1024*1024),'application/octet-stream'),
     'import-help':()=>modal('About this demo','<p>Browse saved files and requirements, inspect shared context, compare versions, and discuss exact saved targets. Import changes loads a prepared sample edit. Share update makes it shared within this tab.</p><p>No live tools, agents, model calls, uploads, or teammates are connected. Comments and edits are held only in memory; reset or reload clears them.</p><p>Use Gantry locally to connect your own workspace and tools.</p><p><a href="https://github.com/fourn9/gantry-oss" target="_blank" rel="noopener noreferrer">Get Gantry on GitHub ↗</a></p>',null),
     details:()=>modal('Saved version',`<dl class="context-list"><dt>State</dt><dd>${e(detail.selected.state.id)}</dd><dt>Checkpoint note</dt><dd>${e(detail.selected.state.summary)}</dd><dt>Shared update notes</dt><dd>${e((detail.versions.find(v=>v.id===detail.selected.state.id)?.notes||[]).join(' · ')||'No note')}</dd><dt>Snapshot</dt><dd>${e(detail.selected.state.snapshot)}</dd><dt>Work</dt><dd>${e(detail.selected.status.work)}</dd><dt>Sharing</dt><dd>${e(detail.selected.status.sharing)}</dd><dt>Verification</dt><dd>${e(detail.selected.status.verification)}</dd><dt>Adoption</dt><dd>${e(detail.selected.status.adoption)}</dd><dt>Not captured</dt><dd>${e(detail.capture.missing.join(', ')||'No omissions declared')}</dd></dl><p>This is an illustrative version in a browser-only demo. In a connected workspace, saved artifacts can be restored through the local adapter.</p>`,null),
@@ -199,7 +225,7 @@ export function createStudio({api,modal,toast,fail}){
 
   };
   document.addEventListener('click',async event=>{if(library.active&&!event.target.closest('[data-studio=import-help]'))return;const el=event.target.closest('[data-studio]');if(!el||!handles()||el.disabled)return;const fn=handlers[el.dataset.studio];if(!fn)return;event.preventDefault();el.disabled=true;try{await fn(el.dataset.value,el);}catch(err){fail(err);}finally{el.disabled=false;}});
-  document.addEventListener('keydown',event=>{if(event.target.matches('.studio-node')&&['Enter',' '].includes(event.key)){event.preventDefault();handlers.component(event.target.dataset.value);}});
+  document.addEventListener('keydown',event=>{if(!event.defaultPrevented&&!library.active&&event.key==='Escape'&&$('#studio-conversation')&&contextPanel.value&&!$('#dialog').open){closeConversation();return;}if(event.target.matches('.studio-node')&&['Enter',' '].includes(event.key)){event.preventDefault();handlers.component(event.target.dataset.value);}});
   document.addEventListener('input',event=>{if(library.active)return;if(event.target.id==='studio-draft'){draft=event.target.value;remember();}});
   document.addEventListener('change',event=>{const target=event.target;if(['studio-view','studio-work-choice'].includes(target.id)){location.hash=target.value;return;}if(library.active)return;const el=event.target;const run=async()=>{
     if(el.id==='studio-artifact-kind')return handlers.tab(el.value);
@@ -223,5 +249,5 @@ export function createStudio({api,modal,toast,fail}){
       conversation.thread_id=result.thread_id;remember();await drawWork();toast('Comment saved');
     }catch(err){if(sameTarget()&&$('#studio-comment-error'))$('#studio-comment-error').textContent=err.message;else fail(err);}finally{submit.disabled=false;}
   });
-  return {handles,render,reset,checkUpdates:()=>handles()&&!document.hidden?(library.active?library.checkUpdates():activity.check()):undefined,leave:()=>{library.leave();layout.leave();activity.clear();remember();viewEpoch++;artifactEpoch++;disposeMesh();document.body.classList.remove('studio-mode');$('#main').className='';}};
+  return {handles,render,reset,checkUpdates:()=>handles()&&!document.hidden?(library.active?library.checkUpdates():activity.check()):undefined,leave:()=>{spatial.clear();library.leave();layout.leave();activity.clear();remember();viewEpoch++;artifactEpoch++;disposeMesh();document.body.classList.remove('studio-mode');$('#main').className='';}};
 }

@@ -1,10 +1,10 @@
-import {componentForFile,highlightComponent} from './studio_navigation.js?v=component-20261107';
-import {$,esc as e,short,download} from './ui.js?v=component-20261107';
-import * as view from './studio_views.js?v=component-20261107';
-import * as library from './studio_library_views.js?v=component-20261107';
-import {libraryURL,meshFile,lineDiff,linesOf,participantName} from './studio_model.js?v=component-20261107';
-import {parseMesh,mountMesh} from './studio_mesh.js?v=component-20261107';
-import {createActivityMonitor} from './studio_activity.js?v=component-20261107';
+import {componentForFile,highlightComponent} from './studio_navigation.js?v=spatial-20261108';
+import {$,esc as e,short,download} from './ui.js?v=spatial-20261108';
+import * as view from './studio_views.js?v=spatial-20261108';
+import * as library from './studio_library_views.js?v=spatial-20261108';
+import {libraryURL,meshFile,lineDiff,linesOf,participantName} from './studio_model.js?v=spatial-20261108';
+import {parseMesh,mountMesh} from './studio_mesh.js?v=spatial-20261108';
+import {createActivityMonitor} from './studio_activity.js?v=spatial-20261108';
 
 export function mergeThreads(old,latest){
   const by=new Map(old.map(t=>[t.id,t]));
@@ -13,8 +13,8 @@ export function mergeThreads(old,latest){
 }
 
 // Presentation of one saved state. No synthetic work records or mixed branch heads.
-export function createLibraryUI({api,modal,toast,fail,bytes,layout,onSelection=()=>{}}){
-  let active=false,ready=false,epoch=0,previewEpoch=0,project,node,section,state,list,anchor,data,panel='',mesh,compare=false,previous,selection,draft='',mentions=[],historyPage;
+export function createLibraryUI({api,modal,toast,fail,bytes,layout,contextPanel,onSelection=()=>{}}){
+  let active=false,ready=false,epoch=0,previewEpoch=0,project,node,section,state,list,anchor,data,mesh,compare=false,previous,selection,draft='',mentions=[],historyPage;
   const drafts=new Map(),cameras=new Map(),a=library.action;
   const activity=createActivityMonitor({api,notice:text=>{const el=$('#studio-live-notice');if(el){el.hidden=!text;el.querySelector('span').textContent=text;}}});
   const target=()=>({project_id:project.id,state_id:state.id,anchor});
@@ -41,9 +41,9 @@ export function createLibraryUI({api,modal,toast,fail,bytes,layout,onSelection=(
     const selectedNode=chosen.path?componentForFile(p,chosen.path):n;
     if(tab==='files'&&selectedNode&&n&&selectedNode.id!==n.id){loaded=await api('studio_library',{project_id:p.id,state_id:st.id,section:'files',component_id:selectedNode.id});if(!alive(generation))return;}
     const related=await api('studio_related',{project_id:p.id,state_id:st.id,anchor:chosen});if(!alive(generation))return;
-    project=p;node=chosen.path?componentForFile(p,chosen.path)||n:n;section=tab;list=loaded;state=st;anchor=chosen;data=related;ready=true;panel=parts[6]?'discussion':'';compare=false;previous=null;
+    project=p;node=chosen.path?componentForFile(p,chosen.path)||n:n;section=tab;list=loaded;state=st;anchor=chosen;data=related;ready=true;if(parts[6])contextPanel.value='discussion';compare=false;previous=null;
     activity.set('studio_related',target(),data);
-    onSelection(project,node);$('#breadcrumb').innerHTML=view.projectHeader(project,node,section,state.id);
+    onSelection(project,node,state.id,anchor.path);$('#breadcrumb').innerHTML=view.projectHeader(project,node,section,state.id);
     selection={anchor,state_id:state.id,...(parts[6]&&parts[6]!=='selection'?{thread_id:parts[6]}:{})};
     const saved=drafts.get(draftKey());draft=saved?.draft||'';mentions=saved?.mentions||[];
     await draw(generation);
@@ -57,14 +57,15 @@ export function createLibraryUI({api,modal,toast,fail,bytes,layout,onSelection=(
       return `<option value="${e(id)}" ${(fileMode?anchor.path:anchor.requirement_id)===id?'selected':''}>${e(label)}</option>`;
     }).join('')||'<option>No '+(fileMode?'files':'requirements')+' linked</option>'}</select></label>`;
   }
-  function controls(){return `<div class="library-toolbar">${picker()}<div class="studio-actions">${a('history',state.sharing==='baseline'?'Baseline':state.sharing==='shared'?'Shared version':'Saved version')}${a('related','Related','',`aria-pressed="${panel==='related'}"`)}${a('discussion','Discuss','',`aria-pressed="${panel==='discussion'}"`)}<details class="studio-more-menu"><summary aria-label="More saved state actions">•••</summary><div>${anchor.path?a('download','Download file'):''}${anchor.path&&state.parents?.length?a('compare','Compare to parent','',`aria-pressed="${compare}"`):''}${a('context','Shared context')}${a('restore','Restore / continue')}<span class="studio-small">${e(state.summary)}<br>${e(short(state.id))} · ${state.adoption==='human_adopted'?'Formally adopted':'Not adopted'}</span></div></details></div></div>`;}
+  function controls(){return `<div class="library-toolbar">${picker()}<div class="studio-actions">${a('history',state.sharing==='baseline'?'Baseline':state.sharing==='shared'?'Shared version':'Saved version')}${!contextPanel.value?a('related','References')+a('discussion','Discussion'):''}<details class="studio-more-menu"><summary aria-label="More saved state actions">•••</summary><div>${anchor.path?a('download','Download file'):''}${anchor.path&&state.parents?.length?a('compare','Compare to parent','',`aria-pressed="${compare}"`):''}${a('context','Shared context')}${a('restore','Restore / continue')}<span class="studio-small">${e(state.summary)}<br>${e(short(state.id))} · ${state.adoption==='human_adopted'?'Formally adopted':'Not adopted'}</span></div></details></div></div>`;}
   async function draw(generation=epoch){
-    const attempt=++previewEpoch;dispose();$('#main').innerHTML=`${controls()}<div class="library-body ${panel?'library-panel-open':''}"><section class="library-content"><div id="library-preview" class="library-preview" tabindex="-1">${view.hint('Loading saved content…')}</div>${list.next?`<div class="library-load">${a('more','Load more '+(section==='files'?'files':'requirements'),list.next)}</div>`:''}${list.unlinked_requirements?.length?`<details class="library-notes"><summary>Unlinked notes</summary>${list.unlinked_requirements.map(n=>`<p>${e(n)}</p>`).join('')}</details>`:''}</section>${panel?'<aside class="library-panel" aria-label="Related information and conversation" tabindex="-1"><div id="library-panel-content"></div></aside>':''}</div>`;
+    const attempt=++previewEpoch;dispose();$('#main').innerHTML=`${controls()}<div class="library-body ${contextPanel.value?'library-panel-open':''}"><section class="library-content"><div id="library-preview" class="library-preview" tabindex="-1">${view.hint('Loading saved content…')}</div>${list.next?`<div class="library-load">${a('more','Load more '+(section==='files'?'files':'requirements'),list.next)}</div>`:''}${list.unlinked_requirements?.length?`<details class="library-notes"><summary>Unlinked notes</summary>${list.unlinked_requirements.map(n=>`<p>${e(n)}</p>`).join('')}</details>`:''}</section>${contextPanel.value?'<aside class="library-panel" aria-label="Related information and conversation" tabindex="-1"><div id="library-panel-content"></div></aside>':''}</div>`;
     drawPanel();layout.mount();
     try{await preview(generation,attempt);}catch(err){if(alive(generation)&&attempt===previewEpoch&&$('#library-preview'))$('#library-preview').innerHTML=view.hint('Preview unavailable',err.message);}
   }
   function drawPanel(){const el=$('#library-panel-content');if(!el)return;
-    el.innerHTML=`<div class="library-panel-tabs"><strong>${panel==='related'?'Related':'Discuss'}</strong>${a('close','×','','aria-label="Close panel"')}</div>`+(panel==='related'?library.related(data,project.id,node?.id):view.conversation(detail(),selection,draft,mentions)+(data.message_next?a('more-messages','Load earlier messages',data.message_next):''));
+    el.innerHTML=`<div class="library-panel-tabs" role="group" aria-label="Context panel">${a('related','References','',`aria-pressed="${contextPanel.value==='related'}"`)}${a('discussion','Discussion','',`aria-pressed="${contextPanel.value==='discussion'}"`)}${a('close','×','','aria-label="Close context panel"')}</div>`+(contextPanel.value==='related'?library.related(data,project.id,node?.id):view.conversation(detail(),selection,draft,mentions)+(data.message_next?a('more-messages','Load earlier messages',data.message_next):''));
+
   }
   function fileInfo(){return list.items.find(f=>f.path===anchor.path)||list.selected_file||data.files.find(f=>f.path===anchor.path);}
   function wrapper(info,st=state){return {state:st,manifest:{[info.path]:info}};}
@@ -99,14 +100,14 @@ export function createLibraryUI({api,modal,toast,fail,bytes,layout,onSelection=(
   async function refresh(){const generation=epoch;remember();const fresh=await api('studio_related',target());if(!alive(generation))return;data={...fresh,threads:mergeThreads(data.threads,fresh.threads)};activity.set('studio_related',target(),data);await draw(epoch);}
   function openPart(){go({kind:'cad',path:anchor.path,part:anchor.path,hash:anchor.hash},'files',state.id,'selection');}
   // "selection" requests opening the panel, not a persisted thread ID.
-  async function openPanel(kind){panel=kind;await draw(epoch);const el=$('.library-panel');if(globalThis.innerWidth<=1024)el?.scrollIntoView({block:'start'});el?.focus({preventScroll:true});}
+  async function openPanel(kind){contextPanel.value=kind;await draw(epoch);const el=$('.library-panel');el?.focus({preventScroll:true});}
   function discussion(){selection={anchor,state_id:state.id};return openPanel('discussion');}
   async function showHistory(after){const generation=epoch;const page=await api('studio_library',{project_id:project.id,state_id:state.id,section:'versions',...(after?{after}:{})});if(!alive(generation))return;historyPage=after?{...page,items:[...historyPage.items,...page.items]}:page;modal('Saved states',library.history(historyPage,project.id,section,node?.id),null);}
   async function moreRelated(cursor){const generation=epoch;const fresh=await api('studio_related',{...target(),after:cursor});if(!alive(generation))return;data={...data,works:[...data.works,...fresh.works],next:fresh.next};drawPanel();}
   const handlers={
     file:path=>{const f=list.items.find(f=>f.path===path)||list.selected_file;if(!f||f.path!==path)return;node=componentForFile(project,path)||node;go({kind:'file',path,hash:f.hash});},
     requirement:id=>{const r=list.items.find(r=>r.requirement_id===id);go({kind:'requirement',requirement_id:id,revision_id:r.revision_id});},
-    related:()=>openPanel('related'),discussion,close:async()=>{panel='';await draw(epoch);$('#library-choice')?.focus({preventScroll:true});},
+    related:()=>openPanel('related'),discussion,close:async()=>{contextPanel.value='';await draw(epoch);$('#library-choice')?.focus({preventScroll:true});},
     compare:()=>{compare=!compare;draw(epoch);},orientation:v=>mesh?.view(v),part:openPart,
     line:(line,button)=>{const old=button.dataset.side==='before';go({kind:'code',path:anchor.path,hash:old?previous.items[0].hash:anchor.hash,line:Number(line)},'files',old?previous.state.id:state.id,'selection');},
     download:async()=>{const f=fileInfo();download(f.path.split('/').pop(),await bytes(wrapper(f),f.path,32*1024*1024),'application/octet-stream');},
@@ -134,6 +135,6 @@ export function createLibraryUI({api,modal,toast,fail,bytes,layout,onSelection=(
       if(drafts.get(key)?.draft===body)drafts.delete(key);if(!alive(generation))return;if(draft===body){draft='';mentions=[];}selection.thread_id=message.thread_id;await refresh();toast('Comment saved');
     }catch(err){if(alive(generation)&&$('#studio-comment-error'))$('#studio-comment-error').textContent=err.message;else fail(err);}finally{b.disabled=false;}
   });
-  document.addEventListener('keydown',ev=>{if(active&&ready&&ev.key==='Escape'&&panel&&!$('#dialog').open)handlers.close();});
-  return {render,leave,reset,checkUpdates:()=>active&&ready?activity.check():undefined,get active(){return active;}};
+  document.addEventListener('keydown',ev=>{if(!ev.defaultPrevented&&active&&ready&&ev.key==='Escape'&&contextPanel.value&&!$('#dialog').open)handlers.close();});
+  return {render,leave,reset,selectFile:async path=>{const generation=epoch;const exact=await api('studio_library',{project_id:project.id,state_id:state.id,section:'files',path});if(!alive(generation)||!exact.items[0])return;const f=exact.items[0];node=componentForFile(project,path)||node;go({kind:'file',path,hash:f.hash},'files');},checkUpdates:()=>active&&ready?activity.check():undefined,get active(){return active;}};
 }

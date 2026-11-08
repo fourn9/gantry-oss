@@ -1,5 +1,5 @@
-import {mountStructureCamera} from './studio_camera.js?v=component-20261107';
-import {esc as e} from './ui.js?v=component-20261107';
+import {mountStructureCamera} from './studio_camera.js?v=spatial-20261108';
+import {esc as e} from './ui.js?v=spatial-20261108';
 
 // The graph uses only recorded parent relations. Leaves are stacked per branch.
 function layoutTree(nodes){
@@ -54,9 +54,25 @@ export function createStudioLayout(){
   document.addEventListener('dblclick',event=>{const h=event.target.closest('[data-pane]');if(h)size(h.dataset.pane,h.dataset.pane==='sidebar'?240:340);});
   window.addEventListener('resize',()=>{for(const k of ['sidebar','detail'])size(k,parseFloat(getComputedStyle(root).getPropertyValue(`--studio-${k}-width`))||(k==='sidebar'?240:340));});
   document.addEventListener('click',event=>{const b=event.target.closest('[data-tree]');if(b)document.querySelectorAll('#sidebar-projects details').forEach(d=>d.open=b.dataset.tree==='expand');});
+  const drawerSiblings=()=>document.querySelectorAll('.sidebar,.topbar,.demo-banner,.studio-content,.library-content,.library-toolbar,.studio-work-switch');
+  function drawer(){
+    const panel=document.querySelector('#studio-conversation,.library-panel');
+    const narrow=innerWidth<=1024&&Boolean(panel);
+    drawerSiblings().forEach(el=>el.inert=narrow);
+    if(panel){if(narrow){panel.setAttribute('role','dialog');panel.setAttribute('aria-modal','true');if(!panel.contains(document.activeElement))panel.focus({preventScroll:true});}else{panel.removeAttribute('role');panel.removeAttribute('aria-modal');}}
+    return narrow?panel:null;
+  }
+  document.addEventListener('keydown',event=>{
+    if(event.key!=='Tab')return;const panel=drawer();if(!panel)return;
+    const items=[...panel.querySelectorAll('a[href],button:not(:disabled),input,textarea,select,[tabindex="0"]')].filter(el=>el.getClientRects().length);
+    if(!items.length)return;const first=items[0],last=items.at(-1);
+    if(!panel.contains(document.activeElement)||(event.shiftKey&&document.activeElement===first)){event.preventDefault();(event.shiftKey?last:first).focus();}
+    else if(!event.shiftKey&&document.activeElement===last){event.preventDefault();first.focus();}
+  });
+  window.addEventListener('resize',drawer);
   function mount(){
-    stopGraph();
-    for(const selector of ['.structure-inspector','#studio-conversation']){const p=document.querySelector(selector);if(p&&!p.querySelector('[data-pane]'))p.prepend(handle('detail','Resize detail panel'));}
+    stopGraph();drawer();
+    for(const selector of ['.structure-inspector','#studio-conversation','.library-panel']){const p=document.querySelector(selector);if(p&&!p.querySelector('[data-pane]'))p.prepend(handle('detail','Resize detail panel'));}
     for(const k of ['sidebar','detail'])size(k,parseFloat(getComputedStyle(root).getPropertyValue(`--studio-${k}-width`))||(k==='sidebar'?240:340));
     const v=document.querySelector('#structure-viewport'),g=document.querySelector('#structure-graph');if(!v||!g)return;
     const w=Number(g.dataset.width),h=Number(g.dataset.height);
@@ -66,5 +82,5 @@ export function createStudioLayout(){
     const previous=cameras.get(key),saved=previous?{...previous.camera,x:previous.camera.x+(v.clientWidth-previous.width)/2,y:previous.camera.y+(v.clientHeight-previous.height)/2}:null;
     stopGraph=mountStructureCamera(v,g,document.querySelector('.structure-toolbar'),saved,camera=>cameras.set(key,{camera,width:v.clientWidth,height:v.clientHeight}));
   }
-  return {mount,leave:()=>stopGraph()};
+  return {mount,leave:()=>{stopGraph();drawerSiblings().forEach(el=>el.inert=false);}};
 }

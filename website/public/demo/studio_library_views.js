@@ -1,6 +1,6 @@
-import {esc as e,short,time} from './ui.js?v=component-20261107';
-import {libraryURL} from './studio_model.js?v=component-20261107';
-import {hint,link,workList} from './studio_views.js?v=component-20261107';
+import {esc as e,short,time} from './ui.js?v=spatial-20261108';
+import {libraryURL} from './studio_model.js?v=spatial-20261108';
+import {hint,link,workList} from './studio_views.js?v=spatial-20261108';
 export const action=(name,label,value='',extra='')=>`<button type="button" data-library="${name}" data-value="${e(value)}" ${extra}>${label}</button>`;
 export const requirementName=r=>{const name=(r.requirement_id||'Requirement').replaceAll('-',' ');return name[0].toUpperCase()+name.slice(1);};
 export const requirementLabel=s=>({met:'Met on recorded evidence',unmet:'Unmet',unverified:'Unverified',needs_review:'Needs review'}[s]||s);
@@ -17,6 +17,6 @@ export function requirementDetail(r){
 }
 export function related(data,pid,component){
  const sid=data.state.id;
- return `<div class="library-related"><h2>Requirements</h2>${data.requirements.map(r=>link(libraryURL(pid,component,'requirements',sid,{kind:'requirement',requirement_id:r.requirement_id,revision_id:r.revision_id}),`<strong>${e(r.description||r.requirement_id)}</strong><small>${e(requirementLabel(r.status))}</small>`,'library-relation')).join('')||'<p class="studio-small">Not linked to a requirement.</p>'}<h2>Files used by checks</h2>${data.files.map(f=>link(libraryURL(pid,component,'files',sid,{kind:'file',path:f.path,hash:f.hash}),`${e(f.path)}`,'library-relation')).join('')||'<p class="studio-small">No file-to-check links recorded.</p>'}${data.files_truncated?'<p>First 100 files shown. Browse Files for the full state.</p>':''}<h2>Related work</h2>${workList(data.works,'No linked work on this page.')}${data.next?action('more-related','Load more work',data.next):''}<p class="studio-small">Recorded links between files, checks and requirements.</p></div>`;
+ return `<div class="library-related"><h2>Requirements</h2>${data.requirements.map(r=>link(libraryURL(pid,component,'requirements',sid,{kind:'requirement',requirement_id:r.requirement_id,revision_id:r.revision_id}),`<strong>${e(r.description||r.requirement_id)}</strong><small>${e(requirementLabel(r.status))}</small>`,'library-relation')).join('')||'<p class="studio-small">Not linked to a requirement.</p>'}<h2>Files used by checks</h2>${data.files.map(f=>link(libraryURL(pid,component,'files',sid,{kind:'file',path:f.path,hash:f.hash}),`${e(f.path)}`,'library-relation')).join('')||'<p class="studio-small">No file-to-check links recorded.</p>'}${data.files_truncated?'<p>First 100 files shown. Browse Files for the full state.</p>':''}<h2>Work</h2>${workList(data.works,'No linked work on this page.')}${data.next?action('more-related','Load more work',data.next):''}<p class="studio-small">Recorded links between files, checks and requirements.</p></div>`;
 }
 export function history(data){return `<div class="library-history">${data.items.map(s=>action('select-state',`<strong>${e(s.summary)}</strong><small>${e(time(s.created_at))} · ${e(short(s.id))} · ${e(s.sharing)}</small>`,s.id,'class="library-relation"')).join('')}${data.next?action('more-history','Load more states',data.next):''}</div>`;}

@@ -1,4 +1,4 @@
-import {esc as e} from './ui.js?v=component-20261107';
+import {esc as e} from './ui.js?v=spatial-20261108';
 // The product crew setup's steps and role disclosures, with explicit sample controls.
 const button=(action,label,primary=false)=>`<button type="button" data-demo-crew="${action}" ${primary?'class="primary"':''}>${label}</button>`;
 const list=items=>`<ul>${items.map(x=>`<li>${e(x)}</li>`).join('')}</ul>`;

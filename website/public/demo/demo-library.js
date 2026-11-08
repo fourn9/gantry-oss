@@ -1,5 +1,5 @@
 // Invented, in-memory read models. No network, tool execution or inferred evidence.
-import {fileChanges,linesOf} from './studio_model.js?v=component-20261107';
+import {fileChanges,linesOf} from './studio_model.js?v=spatial-20261108';
 const clone=value=>structuredClone(value);
 const same=(a,b)=>JSON.stringify(Object.entries(a).sort())===JSON.stringify(Object.entries(b).sort());
 const must=(v,message)=>{if(!v)throw new Error(message);return v;};

@@ -1,7 +1,7 @@
-import {$,toast,esc} from './ui.js?v=component-20261107';
-import {createStudio} from './studio.js?v=component-20261107';
-import {createDemoAPI} from './demo-data.js?v=component-20261107';
-import {createCrewDemo} from './demo-crew.js?v=component-20261107';
+import {$,toast,esc} from './ui.js?v=spatial-20261108';
+import {createStudio} from './studio.js?v=spatial-20261108';
+import {createDemoAPI} from './demo-data.js?v=spatial-20261108';
+import {createCrewDemo} from './demo-crew.js?v=spatial-20261108';
 let submitHandler=null,studio,demo,crew;
 function modal(title,body,submit,label='Save'){
  $('#dialog-title').textContent=title;$('#dialog-body').innerHTML=body;$('#dialog-error').textContent='';

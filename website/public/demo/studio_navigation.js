@@ -1,4 +1,4 @@
-import {relatedWorks} from './studio_model.js?v=component-20261107';
+import {relatedWorks} from './studio_model.js?v=spatial-20261108';
 // Resolve a file to the most specific mapped component, never an unrelated branch.
 export function componentForFile(project,path){
  if(!project||!path)return;
@@ -15,6 +15,6 @@ export function highlightComponent(project,node){
  document.querySelectorAll('.studio-tree-link').forEach(el=>{
   const active=el.dataset.project===project?.id&&el.dataset.component===node?.id;
   el.classList.toggle('is-selected',active);
-  if(active)el.setAttribute('aria-current','page');else el.removeAttribute('aria-current');
+  if(active){el.setAttribute('aria-current','page');el.scrollIntoView({block:'nearest'});}else el.removeAttribute('aria-current');
  });
 }

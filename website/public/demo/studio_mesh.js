@@ -28,7 +28,7 @@ export function parseMesh(bytes,path){
   }else throw new Error('This format needs a saved STL or OBJ preview.');
   if(!triangles.length)throw new Error('No triangles in this preview.');return triangles;
 }
-export function mountMesh(canvas,meshes,onSelect,initial='iso',comments={}){
+export function mountMesh(canvas,meshes,onSelect,initial='iso',comments={},compact=false){
   const ctx=canvas.getContext('2d');if(!ctx)throw new Error('Canvas preview is unavailable.');
   let yaw=-.65,pitch=.75,zoom=1,pressed=null,frame=0,selected='',faces=[],closed=false;
   let min=[Infinity,Infinity,Infinity],max=[-Infinity,-Infinity,-Infinity];
@@ -49,12 +49,12 @@ export function mountMesh(canvas,meshes,onSelect,initial='iso',comments={}){
     faces.sort((a,b)=>a.z-b.z);
     for(const f of faces){
       ctx.beginPath();f.p.forEach((v,i)=>i?ctx.lineTo(...v):ctx.moveTo(...v));ctx.closePath();
-      const old=f.mesh.previous,chosen=f.mesh.path===selected,base=chosen?[119,173,151]:[218,224,228];
+      const old=f.mesh.previous,chosen=Array.isArray(selected)?selected.includes(f.mesh.path):f.mesh.path===selected,base=chosen?[119,173,151]:[218,224,228];
       ctx.fillStyle=old?'rgba(172,129,87,.12)':`rgb(${base.map(v=>Math.round(v*f.shade)).join(',')})`;
       ctx.fill();ctx.strokeStyle=old?'rgba(172,129,87,.22)':ctx.fillStyle;ctx.lineWidth=old?.35:.5;ctx.stroke();
     }
     for(const m of markers){const p=point(m.at),x=w/2+p[0]*scale,y=h/2+p[1]*scale;ctx.beginPath();ctx.arc(x,y,10,0,2*Math.PI);ctx.fillStyle='#fff';ctx.fill();ctx.strokeStyle='#477c70';ctx.stroke();ctx.fillStyle='#31594e';ctx.font='11px system-ui';ctx.textAlign='center';ctx.fillText(String(comments[m.path]),x,y+4);ctx.textAlign='left';}
-    ctx.fillStyle='#6d737d';ctx.font='11px system-ui';ctx.fillText('Drag to orbit · Alt + scroll to zoom',14,h-15);
+    ctx.fillStyle='#6d737d';ctx.font='11px system-ui';if(!compact)ctx.fillText('Drag to orbit · Alt + scroll to zoom',14,h-15);
   }
   const schedule=()=>{cancelAnimationFrame(frame);frame=requestAnimationFrame(draw);};
   const selectAt=(x,y)=>{for(const f of [...faces].reverse()){if(f.mesh.previous)continue;const [a,b,c]=f.p;const sign=(p,q)=>(x-q[0])*(p[1]-q[1])-(p[0]-q[0])*(y-q[1]);const signs=[sign(a,b),sign(b,c),sign(c,a)];if(signs.every(v=>v>=0)||signs.every(v=>v<=0)){selected=f.mesh.path;schedule();onSelect(selected);break;}}};

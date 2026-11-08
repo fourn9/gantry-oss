@@ -1,4 +1,4 @@
-import {meshFile} from './studio_model.js?v=component-20261107';
+import {meshFile} from './studio_model.js?v=spatial-20261108';
 const matches=(path,p)=>path===p||(p.endsWith('/')&&path.startsWith(p));
 // Saved mappings only: never infer a physical location from a filename or agent text.
 export function spatialPaths(saved,path,nodeId){

@@ -1,8 +1,8 @@
-import {armBase,armLinks,armGripper,armBracket} from './sample-arm.js?v=component-20261107';
+import {armBase,armLinks,armGripper,armBracket} from './sample-arm.js?v=spatial-20261108';
 // Public, invented sample data. This adapter never opens a network connection.
-import {createLibraryFixture} from './demo-library.js?v=component-20261107';
-import {fileChanges} from './studio_model.js?v=component-20261107';
-import {componentScope} from './studio_context.js?v=component-20261107';
+import {createLibraryFixture} from './demo-library.js?v=spatial-20261108';
+import {fileChanges} from './studio_model.js?v=spatial-20261108';
+import {componentScope} from './studio_context.js?v=spatial-20261108';
 const clone=value=>structuredClone(value);
 const members=[{id:'designer',name:'Alex Morgan',role:'Project owner',kind:'human'},{id:'controls-agent',name:'Kai',role:'Controls Crew agent',kind:'agent'},{id:'design-agent',name:'Ari',role:'Mechanical Crew agent',kind:'agent'},{id:'mechanical-reviewer',name:'Sam Rivera',role:'Mechanical reviewer',kind:'human'}];
 const hierarchy=[
