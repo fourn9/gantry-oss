@@ -11,6 +11,8 @@ from pathlib import Path
 from .bot_development import BOT_ANSWER
 from .contracts import CONTRACTS, S, validate
 from .crew_json import INSPECT_JSON_SCHEMA, inspect_json, pointer_value
+from .crew_observe import OBSERVE_SCHEMA, observe
+from .crew_timing import span
 from .connection_policy import safe_path, clean_bytes
 from .continuity_adapter import capture_workspace
 from .development import in_scope
@@ -20,12 +22,13 @@ from .runner import persist
 from . import project_sandbox
 
 SCHEMA = {'type': 'object', 'properties': {
-    'action': {'enum': ['issue_open', 'issue_review', 'issue', 'issues', 'requirements', 'propose_requirements', 'integrate', 'read', 'inspect_json', 'edit', 'replace', 'context', 'records', 'inspect', 'tool', 'publish_physical', 'ask', 'resolve', 'decision', 'remember', 'working_state', 'experience_use', 'team', 'stop', 'finish']},
+    'action': {'enum': ['observe', 'issue_open', 'issue_review', 'issue', 'issues', 'requirements', 'propose_requirements', 'integrate', 'read', 'inspect_json', 'edit', 'replace', 'context', 'records', 'inspect', 'tool', 'publish_physical', 'ask', 'resolve', 'decision', 'remember', 'working_state', 'experience_use', 'team', 'stop', 'finish']},
     'arguments_json': S, 'rationale': S}, 'required': ['action', 'arguments_json', 'rationale'], 'additionalProperties': False}
 API_ACTIONS = {'issue_open': 'open_bot_issue', 'issue_review': 'review_bot_issue', 'ask': 'ask_bot', 'decision': 'record_bot_decision', 'remember': 'record_bot_experience',
                'working_state': 'update_bot_working_state', 'experience_use': 'record_bot_learning_use',
                'propose_requirements': 'propose_bot_requirements'}
 GUIDE = {
+    'observe': 'Retrieve 1-4 independent read/context/inspect/inspect_json requests in ONE turn: requests [{action,arguments}]. Read chunks deliver at most 2000 bytes each, with exact next_offset. Individual source versions/errors are preserved. Large results explicitly require narrower follow-up retrieval. No writes, tools, recursion or decisions. This is not an atomic cross-task snapshot. Prefer this when several known inputs are needed together.',
     'issue_open': 'Promote a saved followup: source_task_id, source_attempt, followup_id, owner_bot_id, paths, completion, verification_plan (saved physical plan path), check_ids. Explicitly declare scoped operational acceptance; preserve historical source. Returns stable issue ID and links this task. No adoption.',
     'issue_review': 'issue_id, version, status (working/verifying/deferred/reopened/resolved), state_id, reason, evidence; verification_task_ids for resolved. Responsible Bot or manager only, using an issue-linked task. Resolve the exact completed verification output state with fresh matching tool evidence and frozen passing checks. Completed child work alone is not resolution. Reopen explicitly for a new cycle. Optional reassessment while reopening sets a new verification_plan/check_ids/requirement_refs at this task state, preserves old acceptance and requires fresh verification; never silently drop requirements.',
     'issue': 'issue_id, optional state_id/after/limit and pointer/offset for detailed retrieval. Issue and paginated lifecycle history. effective_status is relative to selected state, not a universal pass.',
@@ -59,7 +62,7 @@ def _schema(properties, required=None):
 
 def action_schemas():
     # Build from the authoritative contracts, not hand-maintained prose alone.
-    schemas = {'finish': BOT_ANSWER, 'inspect_json': INSPECT_JSON_SCHEMA,
+    schemas = {'finish': BOT_ANSWER, 'inspect_json': INSPECT_JSON_SCHEMA, 'observe': OBSERVE_SCHEMA,
         'edit': _schema({'path': S, 'content': {'type': 'string'}, 'expected_hash': S}),
         'replace': _schema({'path': S, 'expected_hash': S, 'old_text': S, 'new_text': {'type': 'string'}}),
         'tool': _schema({'name': S}), 'publish_physical': _schema({'plan_path': S}),
@@ -186,6 +189,9 @@ def _api_effect(client, operation, args, step, key):
 
 def _execute(client, context, ref, config, action, args, workspace, step, key):
     scope = context['task']['write_scope']
+    if action == 'observe':
+        return observe(args, action_schemas(), lambda kind, request:
+            _execute(client, context, ref, config, kind, request, workspace, step, key))
     require(context['task'].get('studio_mode') != 'ask' or action not in {'propose_requirements','integrate','edit','replace','tool','publish_physical','team','stop','issue_open','issue_review'},
             'scope_denied', 'Ask cannot edit, execute tools or change team work')
     if action == 'integrate':
@@ -363,6 +369,7 @@ def action_input(full, workspace, config, last_result, number):
         available_tools=config.get('local_tools', {}), tool_evidence=config.get('tool_evidence', {}),
         last_result=result_preview(last_result), round=number,
         instruction=context['instruction'] + ' Choose ONE action each turn; put its JSON object in arguments_json. '
+        'Use observe to fetch up to four independent observations in one turn. '
         'Use context to fetch omitted records, inspect to retrieve peer tasks, read for files, tool for real tests, and edit for changes. '
         'Use your own judgment; report, ask or delegate rather than invent evidence. '
         'Record consequential decisions and reusable lessons. Organization workers run independently.')
@@ -377,7 +384,7 @@ def action_input(full, workspace, config, last_result, number):
 
 
 def run_actions(client, initial, ref, infer, config, root):
-    from .bot_execution import _input, safe_fingerprint
+    from .bot_execution import safe_fingerprint
     root = Path(root); root.mkdir(parents=True, exist_ok=True)
     state_path = root/'loop.json'
     state = json.loads(state_path.read_text()) if state_path.exists() else {'next': 0, 'last_result': None}
@@ -386,12 +393,15 @@ def run_actions(client, initial, ref, infer, config, root):
     while True:
         number = state['next']; step = root/str(number); step.mkdir(exist_ok=True)
         marker = step/'action.json'; saved = json.loads(marker.read_text()) if marker.exists() else None
-        full = client.call('refresh_bot_task', ref)
+        with span(step, 'context'):
+            full = client.call('refresh_bot_task', ref)
         if saved is None:
             input_path = step/'input.json'
-            context = json.loads(input_path.read_text()) if input_path.exists() else action_input(full, workspace, config, state['last_result'], number)
+            with span(step, 'context'):
+                context = json.loads(input_path.read_text()) if input_path.exists() else action_input(full, workspace, config, state['last_result'], number)
             persist(input_path, context)
-            receipt = infer(context, SCHEMA, step/'model'); validate(receipt['output'], SCHEMA)
+            with span(step, 'model'):
+                receipt = infer(context, SCHEMA, step/'model'); validate(receipt['output'], SCHEMA)
             saved = {'phase': 'prepared', 'receipt': receipt, 'before': safe_fingerprint(workspace),
                      'input_state': full['development']['state']['id'],
                      'discussion_version': context['task']['discussion_version']}
@@ -435,7 +445,8 @@ def run_actions(client, initial, ref, infer, config, root):
                     saved.update(phase='completed', result={'report': args}); persist(marker, saved)
                 else:
                     saved['phase'] = 'executing'; persist(marker, saved)
-                    result = _execute(client, full, ref, config, action, args, workspace, step, key)
+                    with span(step, 'action'):
+                        result = _execute(client, full, ref, config, action, args, workspace, step, key)
                     saved.update(phase='completed', result=result); persist(marker, saved)
             except (Fault, FileNotFoundError) as exc:
                 if isinstance(exc, Fault) and exc.code not in {'invalid_input', 'scope_denied', 'not_found',
@@ -459,17 +470,20 @@ def run_actions(client, initial, ref, infer, config, root):
                 'workspace_before': saved['before'], 'workspace_after': safe_fingerprint(workspace),
                 'provider': saved['receipt'].get('provider', {'kind': 'injected_test_inference'}), 'round': number}}
             persist(marker, saved)
-        _return_effect(client, saved, marker, 'record_args', 'record_bot_action', key + ':record', ref)
+        with span(step, 'record'):
+            _return_effect(client, saved, marker, 'record_args', 'record_bot_action', key + ':record', ref)
         if action != 'integrate' and safe_fingerprint(workspace) != saved['before']:
-            if 'checkpoint_args' not in saved:
-                snapshot, missing = capture_workspace(client, workspace, key+':capture', full['zone'])
-                saved['checkpoint_args'] = {**ref, 'snapshot': snapshot['revision_id'], 'summary': output['rationale'],
-                    'rationale': output['rationale'], 'unfinished': ['Intermediate Bot action; not adopted'],
-                    'capture': {'scope': 'Brokered action and saved workspace', 'missing': missing}}
-                persist(marker, saved)
-            _return_effect(client, saved, marker, 'checkpoint_args', 'checkpoint_bot_task', key + ':checkpoint', ref)
+            with span(step, 'checkpoint'):
+                if 'checkpoint_args' not in saved:
+                    snapshot, missing = capture_workspace(client, workspace, key+':capture', full['zone'])
+                    saved['checkpoint_args'] = {**ref, 'snapshot': snapshot['revision_id'], 'summary': output['rationale'],
+                        'rationale': output['rationale'], 'unfinished': ['Intermediate Bot action; not adopted'],
+                        'capture': {'scope': 'Brokered action and saved workspace', 'missing': missing}}
+                    persist(marker, saved)
+                _return_effect(client, saved, marker, 'checkpoint_args', 'checkpoint_bot_task', key + ':checkpoint', ref)
         if action == 'tool' and 'error' not in saved.get('tool_result', saved['result']):
-            _publish_tool_evidence(client, ref, config, workspace, saved, marker, key)
+            with span(step, 'record'):
+                _publish_tool_evidence(client, ref, config, workspace, saved, marker, key)
         if saved.get('evidence_record_args'):
             _return_effect(client, saved, marker, 'evidence_record_args', 'record_bot_action', key+':evidence-record', ref)
         if action == 'finish' and 'report' in saved['result']:
@@ -479,7 +493,8 @@ def run_actions(client, initial, ref, infer, config, root):
                              phase='finalizing')
                 persist(marker, saved)
             try:
-                result = _return_effect(client, saved, marker, 'final_args', 'finish_bot_task', key+':finish', ref)
+                with span(step, 'record'):
+                    result = _return_effect(client, saved, marker, 'final_args', 'finish_bot_task', key+':finish', ref)
             except Fault as exc:
                 # Only definite contract rejections are correction requests. Transport
                 # uncertainty and changed authority/basis must not launch a new turn.

@@ -208,6 +208,8 @@ def _input(context, workspace):
     from .bot_observations import recent_reads, recent_context
     context['read_observations'] = recent_reads(source, workspace)
     context['context_observations'] = recent_context(source)
+    from .crew_handoff import handoff_index
+    context['handoff'] = handoff_index(source)
     _fit_optional_previews(context, names)
     require(len(canonical(context).encode()) <= 400000, 'context_limit',
             'Essential Bot context exceeds 400 KB after optional previews; narrow the task explicitly. Requirements and authority were not truncated.')

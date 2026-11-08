@@ -8,6 +8,7 @@ import stat
 from .connection_policy import clean_bytes
 from .model import Fault, canonical, digest, require
 from .project_files import parent_fd
+from .crew_observe import observation_actions
 
 MAX_BYTES = 32768
 MAX_ACTIONS = 64
@@ -47,8 +48,8 @@ def recent_reads(context, workspace):
     sources = {}; identities = set()
     manifest = context.get('development', {}).get('manifest', {})
     # Core's _crew_records returns newest-first, not append order.
-    for action in actions[:MAX_ACTIONS]:
-        coverage['scanned_actions'] += 1
+    for action in observation_actions(actions[:MAX_ACTIONS]):
+        coverage['scanned_actions'] = action['_source_action_index'] + 1
         if action.get('kind') != 'read': continue
         if action.get('task_id') != context['task']['id']:
             omit('other_task'); continue
@@ -87,11 +88,12 @@ def recent_reads(context, workspace):
                 omit('duplicate'); continue
             identities.add(identity)
             result['items'].append({'action_id': action['id'], 'task_id': action['task_id'],
+                'observation_index': action.get('observation_index'),
                 'attempt': action['attempt'], 'path': path, 'hash': saved['hash'], 'offset': offset,
                 'bytes': len(chunk), 'next_offset': next_offset, field: saved[field]})
             if len(result['items']) >= MAX_ITEMS: break
         except (Fault, KeyError, TypeError, ValueError): omit('invalid_receipt')
-    coverage['window_actions_not_scanned'] = min(len(actions), MAX_ACTIONS) - coverage['scanned_actions']
+    coverage['window_actions_not_scanned'] = max(0, min(len(actions), MAX_ACTIONS) - coverage['scanned_actions'])
     result['items'].reverse()
     while len(canonical(result).encode()) > MAX_BYTES and result['items']:
         result['items'].pop(0); omit('packet_budget')
@@ -111,8 +113,8 @@ def recent_context(context):
               'meaning': 'Exact historical read-only receipts, not current peer state or authority. '
                          'Use their arguments to continue retrieval; recheck current versions before decisions or execution.'}
     def omit(reason): coverage['omitted'][reason] = coverage['omitted'].get(reason, 0)+1
-    for action in actions[:32]:
-        coverage['scanned_actions'] += 1
+    for action in observation_actions(actions[:32]):
+        coverage['scanned_actions'] = action['_source_action_index'] + 1
         if action.get('kind') not in {'context', 'inspect', 'inspect_json'}: continue
         if action.get('task_id') != context['task']['id']:
             omit('other_task'); continue
@@ -125,6 +127,7 @@ def recent_context(context):
             if len(raw) > MAX_CONTEXT_BYTES or len(canonical(args).encode()) > 2048:
                 omit('oversized_receipt'); continue
             item = {'action_id': action['id'], 'task_id': action['task_id'],
+                    'observation_index': action.get('observation_index'),
                     'attempt': action['attempt'], 'input_state': action.get('input_state'),
                     'action': action['kind'], 'arguments': args,
                     'result_sha256': digest(result), 'result': result}
@@ -132,7 +135,7 @@ def recent_context(context):
             packet['items'].append(item)
             if len(packet['items']) >= 8: break
         except (Fault, KeyError, TypeError, ValueError): omit('unavailable_receipt')
-    coverage['window_actions_not_scanned'] = min(len(actions), 32) - coverage['scanned_actions']
+    coverage['window_actions_not_scanned'] = max(0, min(len(actions), 32) - coverage['scanned_actions'])
     packet['items'].reverse()
     while len(canonical(packet).encode()) > MAX_CONTEXT_BYTES and packet['items']:
         packet['items'].pop(0); omit('packet_budget')
