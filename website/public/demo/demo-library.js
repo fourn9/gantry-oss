@@ -18,7 +18,7 @@ export function createLibraryFixture({state,getStates,getWorks,getThreads,member
  }
  function checks(v){return [
   {id:'timing-check',inputs:['control/motion.py'],evidence:{},requirement_refs:[{requirement_id:'settling-time',revision_id:'timing-r1'}],effective_status:'unverified'},
-  {id:'clearance-check',inputs:['cad/sensor-bracket.stl','cad/arm-links.stl'],evidence:{},requirement_refs:[{requirement_id:'motion-clearance',revision_id:'clearance-r1'}],effective_status:'unverified'}
+  {id:'clearance-check',inputs:['cad/sensor-bracket.stl','cad/arm-links.stl','sensor/calibration.yaml'],evidence:{'evidence/bracket-offset.csv':v.manifest['evidence/bracket-offset.csv'].hash},requirement_refs:[{requirement_id:'motion-clearance',revision_id:'clearance-r1'}],effective_status:'unverified'}
  ];}
  function validate(args){
   const v=saved(args),a=args.anchor;
@@ -46,8 +46,8 @@ export function createLibraryFixture({state,getStates,getWorks,getThreads,member
  function related(args){
   const v=validate(args),a=args.anchor;
   const paths=a.path?[a.path]:a.kind==='component'?Object.keys(v.manifest).filter(p=>inScope(p,scope(a.component_id))):[];
-  const linked=checks(v).filter(c=>a.kind==='requirement'?c.requirement_refs.some(r=>r.requirement_id===a.requirement_id):['project','work'].includes(a.kind)||c.inputs.some(p=>paths.includes(p)));
-  const ids=linked.flatMap(c=>c.requirement_refs.map(r=>r.requirement_id)),allPaths=[...new Set([...paths,...linked.flatMap(c=>c.inputs)])].sort();
+  const linked=checks(v).filter(c=>a.kind==='requirement'?c.requirement_refs.some(r=>r.requirement_id===a.requirement_id):['project','work'].includes(a.kind)||[...c.inputs,...Object.keys(c.evidence)].some(p=>paths.includes(p)));
+  const ids=linked.flatMap(c=>c.requirement_refs.map(r=>r.requirement_id)),allPaths=[...new Set([...paths,...linked.flatMap(c=>[...c.inputs,...Object.keys(c.evidence)])])].sort();
   const works=Object.values(getWorks()).filter(w=>w.versions.includes(v.state.id)&&(['project','work'].includes(a.kind)||allPaths.some(p=>inScope(p,w.write_scope)))).map(w=>({...clone(w),relation:w.versions[0]===v.state.id?'starts_from_state':'contains_checkpoint'}));
   const workPage=page(works,args,'id');
   const threads=getThreads().filter(t=>!t.work_id&&t.project_id==='bench'&&t.state_id===v.state.id&&same(t.anchor,a));

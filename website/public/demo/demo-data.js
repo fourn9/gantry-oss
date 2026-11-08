@@ -6,15 +6,29 @@ import {componentScope} from './studio_context.js?v=component-20261107';
 const clone=value=>structuredClone(value);
 const members=[{id:'designer',name:'Alex Morgan',role:'Project owner',kind:'human'},{id:'controls-agent',name:'Kai',role:'Controls Crew agent',kind:'agent'},{id:'design-agent',name:'Ari',role:'Mechanical Crew agent',kind:'agent'},{id:'mechanical-reviewer',name:'Sam Rivera',role:'Mechanical reviewer',kind:'human'}];
 const hierarchy=[
- {id:'robot',title:'Desktop robot arm',kind:'robot',paths:['cad/','control/']},
- {id:'wrist',parent:'robot',title:'Arm assembly',kind:'assembly',paths:['cad/','control/']},
+ {id:'robot',title:'Desktop robot arm',kind:'robot',paths:['cad/','control/','robot/','sensor/','evidence/']},
+ {id:'wrist',parent:'robot',title:'Arm assembly',kind:'assembly',paths:['cad/','control/','robot/','sensor/','evidence/']},
  {id:'frame',parent:'wrist',title:'Base',kind:'mechanical',paths:['cad/base.stl']},
  {id:'carriage',parent:'wrist',title:'Arm & joints',kind:'mechanical',paths:['cad/arm-links.stl']},
  {id:'gripper',parent:'wrist',title:'Gripper',kind:'mechanical',paths:['cad/gripper.stl']},
- {id:'sensor',parent:'wrist',title:'Sensor bracket',kind:'mechanical',paths:['cad/sensor-bracket.stl']},
- {id:'control',parent:'wrist',title:'Motion control',kind:'software',paths:['control/']}];
+ {id:'sensor',parent:'wrist',title:'Sensor bracket',kind:'mechanical',paths:['cad/sensor-bracket.stl','sensor/','evidence/bracket-offset.csv'],spatial_paths:['cad/sensor-bracket.stl']},
+ {id:'control',parent:'wrist',title:'Motion control',kind:'software',paths:['control/','robot/'],spatial_paths:['cad/arm-links.stl','cad/gripper.stl']}];
 const bracket=armBracket;
 const code=settle=>`# Illustrative control code. Not connected to a robot.\nSETTLE_TIME = ${settle}\n\ndef move_axis(axis, target):\n    axis.move_to(target)\n    axis.wait(SETTLE_TIME)\n    return axis.position()\n`;
+const calibration=offset=>`# Illustrative sensor calibration; not measured on hardware.\nsensor: wrist_camera\nframe: sensor_bracket\noffset_mm: [${offset}, 0, 18]\nrotation_deg: [0, 0, 0]\n`;
+const robotModel=`<?xml version="1.0"?>
+<!-- Illustrative kinematic excerpt; not a validated robot model. -->
+<robot name="desktop_arm">
+  <link name="base"/>
+  <link name="arm"/>
+  <joint name="shoulder" type="revolute">
+    <parent link="base"/><child link="arm"/>
+    <axis xyz="0 1 0"/>
+    <limit lower="-1.57" upper="1.57" effort="1" velocity="0.5"/>
+  </joint>
+</robot>
+`;
+const measurements='sample,offset_mm,clearance_mm,source\n1,24,3.2,illustrative\n2,24,3.1,illustrative\n3,24,3.3,illustrative\n';
 const digest=async bytes=>Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',bytes)),v=>v.toString(16).padStart(2,'0')).join('');
 const canonical=a=>JSON.stringify(Object.entries(a).sort());
 
@@ -32,7 +46,7 @@ export async function createDemoAPI(){
   }
   const value={state:{id,snapshot:id,summary,session_id:'sample-session',hierarchy:clone(hierarchy),parents:previous?[previous.state.id]:[],created_at:Date.UTC(2026,10,1,8)+counter*1000,capture:{missing:['Native CAD source','Real test execution','Live agents and external tools']},unfinished:['Verify full-motion clearance','Resolve and measure controller settling time']},manifest,
    status:{work:'working',sharing,verification:id==='state_base'?'pass':'unverified',adoption:'unadopted'},
-   diffs:previous?fileChanges(previous.manifest,manifest):[],engineering:{checks:[{id:'Full-motion clearance',scope:'Sample assembly · physical verification required',effective_status:'unverified'}]},
+   diffs:previous?fileChanges(previous.manifest,manifest):[],engineering:{checks:[{id:'Bracket offset sample',scope:'Illustrative points only · full-motion coverage missing',effective_status:'unverified',evidence:manifest['evidence/bracket-offset.csv']?{'evidence/bracket-offset.csv':manifest['evidence/bracket-offset.csv'].hash}:{}},{id:'Full-motion clearance',scope:'Sample assembly · physical verification required',effective_status:'unverified'}]},
    evaluations:[{state_id:'state_base',scope:'Sample result · controller syntax (illustrative, not executed)',verdict:'pass',applicable:id==='state_base'}],files};
   states[id]=value;return value;
  }
@@ -55,9 +69,9 @@ export async function createDemoAPI(){
  async function reset(){
   states=Object.create(null);works=Object.create(null);blobs=Object.create(null);threads=[];inbox=[];seq=1;counter=1;
   const files={'cad/base.stl':armBase(),'cad/arm-links.stl':armLinks(),'cad/gripper.stl':armGripper(),
-   'cad/sensor-bracket.stl':bracket(26),'control/motion.py':code('0.15')};
+   'cad/sensor-bracket.stl':bracket(26),'control/motion.py':code('0.15'),'robot/arm.urdf':robotModel,'sensor/calibration.yaml':calibration(26),'evidence/bracket-offset.csv':measurements};
   await saveState('state_base',files,'Sample baseline. Geometry and results are illustrative.','baseline');
-  await saveState('state_bracket_v1',{...files,'cad/sensor-bracket.stl':bracket(24),'control/motion.py':code('0.25')},'Moved bracket inward and increased settling time; motion checks pending.','shared',state('state_base'));
+  await saveState('state_bracket_v1',{...files,'cad/sensor-bracket.stl':bracket(24),'control/motion.py':code('0.25'),'sensor/calibration.yaml':calibration(24)},'Moved bracket inward and increased settling time; motion checks pending.','shared',state('state_base'));
   for(const [id,title,owner,components,purpose,head,status] of [
    ['bracket','Refine the sensor bracket','design-agent',['sensor','control'],'Resolve the timing requirement before evaluating the proposed change.','state_bracket_v1','working'],
    ['control','Adjust the settling interval','controls-agent',['control'],'Coordinate the controller with the assembly.','state_base','waiting'],

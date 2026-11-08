@@ -20,7 +20,7 @@ test('request context restores the recorded CAD or code selection after unrelate
 
 test('component scope is deduplicated, can narrow but cannot broaden or traverse',async()=>{
  const {api}=await createDemoAPI(),nodes=(await api('studio_overview')).projects[0].hierarchy;
- assert.deepEqual(componentScope(nodes,'sensor'),['cad/sensor-bracket.stl']);
+ assert.deepEqual(componentScope(nodes,'sensor'),['cad/sensor-bracket.stl','sensor/','evidence/bracket-offset.csv']);
  assert.deepEqual(componentScope(nodes,'wrist','cad/\ncad/base.stl\ncad/'),['cad/']);
  assert.deepEqual(componentScope(nodes,'control','control/motion.py'),['control/motion.py']);
  for(const p of ['cad/','control/../cad/base.stl','/control/motion.py','control/./motion.py','control\\motion.py'])assert.throws(()=>componentScope(nodes,'control',p));
@@ -36,7 +36,7 @@ test('human request names the tradeoff; visible context uses versions and a sing
  const {api}=await createDemoAPI(),d=await api('studio_work',{work_id:'bracket'});
  assert.match(d.demo_request.reason,/requirement/);assert.match(d.demo_request.changed,/0.10 seconds/);
  assert.match(d.demo_request.remaining,/does not run checks/);
- assert.doesNotMatch(checks(d),/state_bracket|state_base/);
+ assert.doesNotMatch(checks(d).replace(/<[^>]*>/g,''),/state_bracket|state_base/);
  const t=d.threads[0];assert.doesNotMatch(conversation(d,{...t},'',[]),/state_bracket/);
  const overview=await api('studio_overview');const side=sidebar(overview,[],{project:'bench'});
  assert.equal((side.projects.match(/Desktop robot arm/g)||[]).length,1);assert.match(side.projects,/Arm assembly/);
