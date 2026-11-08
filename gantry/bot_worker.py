@@ -2,6 +2,7 @@
 
 The process supervisor (launchd/systemd/container) keeps this worker alive. Core's
 submission queue survives its absence; uncertain work requires explicit recovery.
+An owner-hashed recovery policy may resume positively identified inference stops.
 """
 import fcntl
 import json
@@ -27,6 +28,7 @@ def environment_manifest(config):
     if config.get('personal_continuity'): fields += ('personal_continuity',)
     if config.get('agent_loop'): fields += ('agent_loop', 'local_tools', 'tool_runtime', 'sandbox')
     if 'tool_evidence' in config: fields += ('tool_evidence',)
+    if 'recovery_policy' in config: fields += ('recovery_policy',)
     return {'name': config['name'], 'backend': config['backend'], 'tools': config.get('tools', []),
             'definition': digest({k: config.get(k) for k in fields})}
 
@@ -82,12 +84,15 @@ class BotWorker:
         require(not config.get('personal_continuity') or config.get('workflow') == 'bot_development',
                 'invalid_input', 'Personal continuity belongs to independent Bot development')
         self.client, self.config = client, config
+        from .bot_auto_recovery import policy
+        self.recovery_policy = policy(config)
         self.bot_id = config['bot_id']
         self.root = Path(journal) / digest(self.bot_id)
         require(not self.root.is_symlink(), 'scope_denied', 'Runtime root must not be a symlink')
         self.root.mkdir(parents=True, exist_ok=True, mode=0o700)
         os.chmod(self.root, 0o700)
         self.runtime = None; self.stop = threading.Event(); self.lost = threading.Event(); self.lock = None
+        self.restart = threading.Event()
         # The override exists for deterministic acceptance tests, not exposed in CLI.
         self.infer = infer_fn
         if self.infer is None:
@@ -157,7 +162,11 @@ class BotWorker:
                 if self.config.get('workflow') and workflow != self.config['workflow']:
                     continue
                 if job['status'] != 'pending':
-                    results.append({'job_id': job['id'], 'status': 'held', 'reason': 'explicit_recovery_required'})
+                    if self.recovery_policy and workflow == 'bot_development':
+                        from .bot_auto_recovery import recover_held
+                        results.append(recover_held(self, job))
+                    else:
+                        results.append({'job_id': job['id'], 'status': 'held', 'reason': 'explicit_recovery_required'})
                     continue
                 require(not self.lost.is_set(), 'runtime_offline', 'Runtime heartbeat lost')
                 try:
@@ -239,6 +248,8 @@ def run_bot(config, journal, iterations=0, interval=10):
         with BotWorker(configured_client(config), config, journal) as worker:
             while not done.is_set() and (iterations == 0 or count < iterations):
                 result = worker.tick(); print(json.dumps({'bot_id': worker.bot_id, 'results': result}), flush=True)
+                require(not worker.restart.is_set(), 'runtime_reconnect_required',
+                        'Safe recovery needs a fresh fence; the configured supervisor may restart this worker')
                 count += 1
                 if iterations == 0 or count < iterations: done.wait(interval)
     except KeyboardInterrupt: pass
