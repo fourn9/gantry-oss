@@ -88,6 +88,7 @@ def _input(context, workspace):
             'Report missing capabilities, failed checks and unresolved compatibility in unverified. '
             'For actionable remaining issues, use followups to choose fix, verify, consult or defer with reasons and evidence. '
             'Fix/verify must reference a real assignments index, consult a saved consultation message_id; defer explains why. '
+            'Use issue_open for a persistent residual issue; carry issue_ids into assignments. Use issue/issue_review to examine evidence and explicitly resolve or reopen. '
             'A completed child task still needs managerial review of its results; product completion is not inferred. '
             'Read design_assessment before choosing the next edit, test or handoff: it compares the assignment baseline with the current checkpoint. '
             'Use its open_checks, requirement transitions and impact gaps; choose corrections, retests or consultations with recorded reasons. '
@@ -112,6 +113,15 @@ def process_bot_task(client, queued, root, infer_fn, runtime_fence, recovered=No
         journal['claim'] = recovered; persist(marker, journal)
     if journal['phase'] == 'done': return journal['result']
     if journal['phase'] == 'new':
+        previous = journal.get('request')
+        if previous and previous['runtime_fence'] != runtime_fence:
+            current = client.call('get_bot_task', {'task_id': queued['id']})['task']
+            require(current['status'] == 'pending' and current['version'] == previous['version']
+                    and current['attempt'] == queued['attempt'], 'outcome_unknown',
+                    'Prior claim outcome requires reconciliation before changing its runtime')
+            # The unchanged pending version proves no successful claim committed.
+            journal['request'] = {**previous, 'runtime_fence': runtime_fence}
+            journal['key'] = 'bot-task:' + queued['id'] + ':' + str(attempt) + ':' + digest(runtime_fence)
         journal.setdefault('request', {'task_id': queued['id'], 'version': queued['version'], 'runtime_fence': runtime_fence})
         persist(marker, journal)
         journal['claim'] = client.call('claim_bot_task', journal['request'], journal['key'] + ':claim')

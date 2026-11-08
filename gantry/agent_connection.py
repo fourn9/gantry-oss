@@ -29,6 +29,9 @@ BOT_WRITES = set('propose_bot_requirements integrate_bot_task capture_artifact a
     'start_bot_runtime heartbeat_bot_runtime stop_bot_runtime record_state_restore'.split())
 BOT_READS.add('list_bot_handoffs')
 BOT_READS.add('get_bot_requirements')
+BOT_READS.update({'get_bot_issue', 'list_bot_issues'})
+BOT_WRITES.update({'open_bot_issue', 'review_bot_issue'})
+READ_TOOLS.update({'get_bot_issue', 'list_bot_issues'})
 BOT_WRITES.update({'request_bot_handoff','acknowledge_bot_handoff','accept_bot_handoff'})
 PROFILES['bot'] = BOT_READS | BOT_WRITES | {'get_design_assessment','studio_library','studio_related','studio_context','studio_overview','studio_work','studio_inbox','studio_team','studio_comment','studio_acknowledge'}
 PROFILES['bot'].update({'get_bot_working_state', 'update_bot_working_state', 'record_bot_learning_use', 'poll_bot_continuations'})

@@ -6,6 +6,7 @@ For current usage start at the [documentation index](README.md). For security re
 
 | Area / report | Evidence |
 | --- | --- |
+| Persistent Crew issues — 2026-11-08 | [Implementation and verification record](../tasks/crew-issue-lifecycle.md) |
 | Crew integration, evidence and continuation — 2026-11-07 | [Implementation and verification record](../tasks/crew-development-continuation.md) |
 | Studio Bot requests and handoff — 2026-11-04 | [Report](STUDIO_BOT_WORKFLOW_VERIFICATION.md) |
 | Shared product paths — verification, 2026-11-04 | [Report](PRODUCT_READINESS_VERIFICATION.md) |

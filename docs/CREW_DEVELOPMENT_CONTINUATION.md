@@ -152,3 +152,5 @@ correcting only the diagnostic wrapper's path, the Bot integrated, regenerated,
 checked, corrected a rejected report and finished its assigned static stage.
 Physical unknowns and semantic document inconsistencies remained explicit.
 These observations establish execution paths, not speedup or manufacturing readiness.
+
+For residual work across multiple tasks, see [persistent issues](CREW_ISSUES.md).

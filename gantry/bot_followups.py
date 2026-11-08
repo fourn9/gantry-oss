@@ -3,7 +3,7 @@ import copy
 from collections import deque
 from .contracts import S, A
 from .requirement_traceability import REFS, _subset_refs
-from .model import require
+from .model import require, digest
 
 FOLLOWUPS = {'type': ['array', 'null'], 'maxItems': 40, 'items': {'type': 'object',
     'properties': {'id': S, 'summary': S, 'disposition': {'enum': ['fix', 'verify', 'consult', 'defer']},
@@ -57,6 +57,10 @@ def view(s, task):
                 if len(result) == 500:
                     return {'followups': result, 'followups_truncated': True}
                 row = copy.deepcopy(item)
+                issue_id = 'bissue_' + digest([source['session_id'], source['id'], report['seq'], item['id']])
+                if issue_id in s.get('bot_issues', {}):
+                    row['persistent_issue'] = {'id': issue_id, 'operation': 'get_bot_issue',
+                        'applicability': 'Query against the state you intend to use; source disposition is historical.'}
                 child = s['bot_tasks'].get(item.get('assigned_task_id'))
                 message = s.get('bot_task_messages', {}).get(item.get('message_id'))
                 status = ('work_completed_review_required' if child and child['status'] == 'completed' else

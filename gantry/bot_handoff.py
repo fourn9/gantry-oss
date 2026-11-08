@@ -89,7 +89,7 @@ class BotHandoffMixin:
         old=s['bot_tasks'][h['task_id']]
         require(old['status']=='handoff_requested','invalid_state','Source task changed')
         data={k:copy.deepcopy(old[k]) for k in ('session_id','kind','title','completion','write_scope','dependencies','after_tasks','requirement_refs')}
-        data.update(bot_id=h['to_bot_id'],state_id=h['state_id'])
+        data.update(bot_id=h['to_bot_id'],state_id=h['state_id'], issue_ids=copy.deepcopy(old.get('issue_ids', [])))
         if old.get('candidate_id'): data['candidate_id']=old['candidate_id']
         new=self._bd_assign(s,actor,data,fx,n,con,handoff=h)
         successor=s['bot_tasks'][new['id']]

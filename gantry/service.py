@@ -35,6 +35,7 @@ from .connections import ConnectionMixin
 from .bots import BotMixin
 from .persistent_bots import PersistentBotMixin
 from .bot_development import BotDevelopmentMixin
+from .bot_issues import BotIssuesMixin
 from .crew_coordination import CrewCoordinationMixin
 from .crew_onboarding import CrewOnboardingMixin
 from .bot_learning import BotLearningMixin
@@ -47,7 +48,7 @@ from .crew_setup import CrewSetupMixin
 from .crew_setup_jobs import CrewSetupJobsMixin
 
 
-class Service(CrewSetupJobsMixin, CrewSetupMixin, MembershipMixin, StudioMixin, DesignAssessmentMixin, BotWakeMixin, BotContinuityMixin, BotLearningMixin, ConnectionMixin, CrewOnboardingMixin, CrewCoordinationMixin, BotDevelopmentMixin, PersistentBotMixin, BotMixin, ReviewContextMixin, MentorJobsMixin, ChangeReviewMixin, ValidationMixin, EvidenceMixin, AutonomyMixin, ProductMixin, ContinuityMixin, DevelopmentMixin):
+class Service(BotIssuesMixin, CrewSetupJobsMixin, CrewSetupMixin, MembershipMixin, StudioMixin, DesignAssessmentMixin, BotWakeMixin, BotContinuityMixin, BotLearningMixin, ConnectionMixin, CrewOnboardingMixin, CrewCoordinationMixin, BotDevelopmentMixin, PersistentBotMixin, BotMixin, ReviewContextMixin, MentorJobsMixin, ChangeReviewMixin, ValidationMixin, EvidenceMixin, AutonomyMixin, ProductMixin, ContinuityMixin, DevelopmentMixin):
     READS = {"state", "design", "diff", "history", "impact", "open", "reviews", "why",
              "outcomes", "operations", "restore_artifact", "read_artifact_chunk", "verify", "work", "context", "events", "export", "identity", "review_context", "development_state", "mentor_context", "check_execution"}
 
@@ -65,6 +66,7 @@ class Service(CrewSetupJobsMixin, CrewSetupMixin, MembershipMixin, StudioMixin, 
     READS |= {'get_persistent_bot', 'list_organization_bots', 'list_persistent_memories', 'bot_inbox'}
     READS |= {'get_bot_learning_plan', 'get_bot_reflection', 'list_bot_reflections'}
     READS.add('get_bot_working_state')
+    READS |= {'get_bot_issue', 'list_bot_issues'}
     READS.add('render_evidence_view')
     READS |= {'get_bot_project', 'get_bot_task', 'list_bot_tasks', 'check_bot_task'}
     READS |= {'get_bot_team_proposal', 'get_bot_records', 'get_bot_requirements'}

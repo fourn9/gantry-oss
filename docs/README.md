@@ -54,3 +54,5 @@ Start with **Bot development**, then choose the extra behavior you need. These g
 - [Contributing](../CONTRIBUTING.md) and [implementation records](../tasks/README.md).
 
 Supporting configuration: [CI template](ci-workflow.yml) (not active by itself) and [hardware runtime constraints](hardware-runtime-constraints.txt).
+
+- [Persistent Crew issues](CREW_ISSUES.md): responsibility, linked work, verification and state-relative resolution.

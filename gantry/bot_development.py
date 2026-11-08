@@ -22,6 +22,7 @@ ASSIGNMENT = {'type': 'object', 'properties': TASK, 'required': list(TASK), 'add
 # Optional branch label; the task/state IDs remain authoritative identities.
 TASK['candidate_id'] = S
 TASK['requirement_refs'] = REFS
+TASK['issue_ids'] = {**A, 'maxItems': 40}
 EDIT = {'type': 'object', 'properties': {'path': S, 'content': {'type': 'string'}},
         'required': ['path', 'content'], 'additionalProperties': False}
 REPORT = {'summary': S, 'rationale': S, 'unverified': A,
@@ -53,7 +54,7 @@ register('bind_development_bot', {'session_id': S, 'bot_id': S, 'principal_id': 
     'write_scope': A, 'can_assign': FLAG, 'can_integrate': FLAG, 'enabled': FLAG},
     ['session_id', 'bot_id', 'principal_id', 'version', 'write_scope', 'can_assign', 'can_integrate', 'enabled'])
 register('assign_bot_task', {'session_id': S, 'requested_by_bot': S, 'parent_task_id': S, **TASK},
-    ['session_id', *[k for k in TASK if k not in {'candidate_id', 'requirement_refs'}]])
+    ['session_id', *[k for k in TASK if k not in {'candidate_id', 'requirement_refs', 'issue_ids'}]])
 register('get_bot_project list_bot_tasks', {'session_id': S, **PAGE}, ['session_id'])
 register('get_bot_task', {'task_id': S}, ['task_id'])
 register('get_bot_requirements', {'task_id': S, **PAGE}, ['task_id'])
@@ -208,6 +209,7 @@ class BotDevelopmentMixin:
                     'scope_denied', 'Child scope exceeds this assignment')
             if old.get('candidate_id'): a.setdefault('candidate_id', old['candidate_id'])
             a.setdefault('requirement_refs', copy.deepcopy(old.get('requirement_refs', [])))
+            a.setdefault('issue_ids', copy.deepcopy(old.get('issue_ids', [])))
             require(old['session_id'] == d['id'] and old['status'] == 'running', 'invalid_state', 'Parent must be running')
             require(not self._bd_subordinate(s, bot['id'], old['bot_id']) or bot['id'] == old['bot_id'],
                     'invalid_input', 'Child work cannot be assigned to a parent manager')
@@ -217,6 +219,7 @@ class BotDevelopmentMixin:
             children=[], reports=[], created_seq=s['seq'] + 1, created_at=self.clock(), author=actor['id'])
         if parent: self._inherit_continuation(old, task)
         task['requirement_refs'] = selected_refs(s, state['context'], a.get('requirement_refs'))
+        self._issue_assignment(s, actor, task, fx)
         self._dev_save(s, fx, 'bot_tasks', task)
         n.append({'type': 'bot_assignment', 'target': d['id'], 'session_id': d['id'], 'task_id': task['id'], 'zones': [d['zone']]})
         return self._bd_public(task)
@@ -322,6 +325,7 @@ class BotDevelopmentMixin:
         result['candidate_changes'] = candidates
         from .bot_followups import view as followup_view
         result.update(followup_view(s, task))
+        result['issues'] = self._issue_context(s, actor, task, con)
         result['candidates_truncated'] = bool(pending)
         if self._binding_access(s, actor, self._bd_binding(s, task['session_id'], task['bot_id'])):
             result['memory'] = self._persistent_memory_page(s, actor, bot, org, {'limit': 30}, con, recent=True)
@@ -552,7 +556,7 @@ class BotDevelopmentMixin:
 
     def _bd_evidence(self, s, actor, sid, refs):
         for ref in refs:
-            obj = next((s[t][ref] for t in ('dev_states', 'bot_tasks', 'bot_task_messages', 'bot_actions', 'bot_decisions') if ref in s.get(t, {})), None)
+            obj = next((s[t][ref] for t in ('dev_states', 'bot_tasks', 'bot_task_messages', 'bot_actions', 'bot_decisions', 'bot_issues') if ref in s.get(t, {})), None)
             require(obj and obj['session_id'] == sid, 'invalid_input', 'Evidence must belong to this project')
 
     def cmd_send_bot_message(self, s, actor, a, fx, n, con):

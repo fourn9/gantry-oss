@@ -19,12 +19,16 @@ from .runner import persist
 from . import project_sandbox
 
 SCHEMA = {'type': 'object', 'properties': {
-    'action': {'enum': ['requirements', 'propose_requirements', 'integrate', 'read', 'edit', 'context', 'records', 'inspect', 'tool', 'publish_physical', 'ask', 'resolve', 'decision', 'remember', 'working_state', 'experience_use', 'team', 'stop', 'finish']},
+    'action': {'enum': ['issue_open', 'issue_review', 'issue', 'issues', 'requirements', 'propose_requirements', 'integrate', 'read', 'edit', 'context', 'records', 'inspect', 'tool', 'publish_physical', 'ask', 'resolve', 'decision', 'remember', 'working_state', 'experience_use', 'team', 'stop', 'finish']},
     'arguments_json': S, 'rationale': S}, 'required': ['action', 'arguments_json', 'rationale'], 'additionalProperties': False}
-API_ACTIONS = {'ask': 'ask_bot', 'decision': 'record_bot_decision', 'remember': 'record_bot_experience',
+API_ACTIONS = {'issue_open': 'open_bot_issue', 'issue_review': 'review_bot_issue', 'ask': 'ask_bot', 'decision': 'record_bot_decision', 'remember': 'record_bot_experience',
                'working_state': 'update_bot_working_state', 'experience_use': 'record_bot_learning_use',
                'propose_requirements': 'propose_bot_requirements'}
 GUIDE = {
+    'issue_open': 'Promote a saved followup: source_task_id, source_attempt, followup_id, owner_bot_id, paths, completion, verification_plan (saved physical plan path), check_ids. Explicitly declare scoped operational acceptance; preserve historical source. Returns stable issue ID and links this task. No adoption.',
+    'issue_review': 'issue_id, version, status (working/verifying/deferred/reopened/resolved), state_id, reason, evidence; verification_task_ids for resolved. Responsible Bot or manager only, using an issue-linked task. Resolve the exact completed verification output state with fresh matching tool evidence and frozen passing checks. Completed child work alone is not resolution. Reopen explicitly for a new cycle. Optional reassessment while reopening sets a new verification_plan/check_ids/requirement_refs at this task state, preserves old acceptance and requires fresh verification; never silently drop requirements.',
+    'issue': 'issue_id, optional state_id/after/limit and pointer/offset for detailed retrieval. Issue and paginated lifecycle history. effective_status is relative to selected state, not a universal pass.',
+    'issues': 'optional state_id/after/limit. Page project issues, including those outside the default bounded context. Use issue_ids in assignments; children and consultations inherit links.',
     'requirements': 'Optional after/limit. Page existing adopted requirement definitions in this project zone. Discovery is not assignment or fulfillment. Use exact reference IDs and saved source hashes to propose links; do not invent requirements from prose.',
     'propose_requirements': 'links [{requirement_id,revision_id,rationale,evidence:[{path,hash}]}], summary. Propose links to existing adopted requirements in a separate shared metadata change. Never invent IDs. The active task remains unchanged; inspect the candidate, then a delegated manager selects it for subsequent work. Missing formal requirements remain unlinked until defined through the existing requirement approval process.',
     'integrate': 'state_id (current pinned input), changes [{id,version}], summary. Integrates shared candidates as an intermediate action, restores their exact combined files, and keeps this task running. Then inspect/edit/test yourself or finish waiting with a child assignment using the returned state_id. Does not verify or adopt. Requires integration delegation and no prior saved edits in this task; conflicts remain unresolved.',
@@ -56,11 +60,13 @@ def action_schemas():
         'edit': _schema({'path': S, 'content': {'type': 'string'}, 'expected_hash': S}),
         'tool': _schema({'name': S}), 'publish_physical': _schema({'plan_path': S})}
     for name, op in {**API_ACTIONS, 'integrate': 'integrate_bot_task', 'resolve': 'resolve_bot_question', 'team': 'propose_bot_team',
-                     'records': 'get_bot_records', 'requirements': 'get_bot_requirements'}.items():
+                     'records': 'get_bot_records', 'requirements': 'get_bot_requirements', 'issue': 'get_bot_issue', 'issues': 'list_bot_issues'}.items():
         schema = json.loads(json.dumps(CONTRACTS[op]['schema']))
         for key in ('task_id', 'fence', 'basis', 'intent'):
             schema['properties'].pop(key, None)
             if key in schema['required']: schema['required'].remove(key)
+        if name in {'issue','issues'}:
+            schema['properties'].update(pointer={'type':'string'}, offset={'type':'integer','minimum':0})
         schemas[name] = schema
     return schemas
 
@@ -163,7 +169,7 @@ def _api_effect(client, operation, args, step, key):
 
 def _execute(client, context, ref, config, action, args, workspace, step, key):
     scope = context['task']['write_scope']
-    require(context['task'].get('studio_mode') != 'ask' or action not in {'propose_requirements','integrate','edit','tool','publish_physical','team','stop'},
+    require(context['task'].get('studio_mode') != 'ask' or action not in {'propose_requirements','integrate','edit','tool','publish_physical','team','stop','issue_open','issue_review'},
             'scope_denied', 'Ask cannot edit, execute tools or change team work')
     if action == 'integrate':
         from .bot_execution import safe_fingerprint
@@ -182,6 +188,11 @@ def _execute(client, context, ref, config, action, args, workspace, step, key):
         other = client.call('get_bot_task', {'task_id': args['task_id']})
         require(other['task']['session_id'] == context['task']['session_id'], 'scope_denied', 'Inspect this project only')
         return _context_value(other, {k: v for k, v in args.items() if k != 'task_id'} | {'pointer': args.get('pointer', '')})
+    if action in {'issue', 'issues'}:
+        require('task_id' not in args, 'invalid_input', 'Runtime supplies task identity')
+        selected = {k:v for k,v in args.items() if k not in {'pointer','offset'}}
+        result = client.call('get_bot_issue' if action == 'issue' else 'list_bot_issues', {**selected, 'task_id': ref['task_id']})
+        return _context_value(result, {'pointer':args['pointer'], 'offset':args.get('offset',0)}) if 'pointer' in args else result
     if action in {'records', 'requirements'}:
         require('task_id' not in args, 'invalid_input', 'Runtime supplies task identity')
         return client.call('get_bot_records' if action == 'records' else 'get_bot_requirements', {**args, 'task_id': ref['task_id']})
@@ -378,7 +389,7 @@ def run_actions(client, initial, ref, infer, config, root):
                     saved.update(phase='completed', result=result); persist(marker, saved)
             except (Fault, FileNotFoundError) as exc:
                 if isinstance(exc, Fault) and exc.code not in {'invalid_input', 'scope_denied', 'not_found',
-                    'dependency_pending', 'conflict', 'invalid_state', 'capture_incomplete',
+                    'dependency_pending', 'evidence_required', 'conflict', 'invalid_state', 'capture_incomplete',
                     'sandbox_unavailable', 'reauthorization_required'}: raise
                 saved.update(phase='completed', result={'error': exc.code if isinstance(exc, Fault) else 'invalid_input',
                                                       'message': str(exc)[:500], 'details': exc.details if isinstance(exc, Fault) else {}}); persist(marker, saved)
