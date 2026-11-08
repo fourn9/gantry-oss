@@ -151,6 +151,11 @@ report from overwriting a task's own saved edits.
 
 ## Interruptions and migration
 
+- Tool execution and output capture are separate outcomes. A rejected output
+  import keeps the bounded execution receipt (exit code, duration and captured
+  stdout reference), with `tool_capture` describing the failure. No workspace
+  changes or physical-evidence publication follow that rejected import. Inspect
+  the saved receipt before deciding whether to revise outputs or run again.
 - Stop the old process before recovery. Keep its per-Bot journal, tool environment
   and credentials. A runtime fence prevents two active instances owning one Bot.
 - Pending tasks survive offline periods. Running/held tasks are not blindly replayed.
@@ -164,7 +169,10 @@ report from overwriting a task's own saved edits.
   saved answers. An uncertain model/tool result without a saved receipt is held;
   it is not repeated automatically. A confirmed answer-free monthly Codex 429 can
   be retried with `--retry-inference` on this same recovery command after the local
-  cooldown. Only the pending planning/action inference is armed; completed actions
+  cooldown. A timeout with a saved adapter receipt confirming process termination
+  and no answer can also be explicitly retried. An old `started` journal or a dead
+  PID alone is insufficient: keep it held for separate outcome reconciliation.
+  Only the pending planning/action inference is armed; completed actions
   and exact inputs are preserved. The previous worker must be stopped. Unknown
   outcomes, missing process identity and known active provider processes
   block recovery. Changed scope, baseline, hierarchy or discussion needs a new task.
@@ -206,3 +214,28 @@ is claimed.
 The optional [learning loop](BOT_LEARNING.md) adds explicit recall, planning and
 post-report reflection to this execution path. Existing workers remain unchanged
 until the customer enables `experience_learning` in their approved environment.
+
+## Reading and editing across stateless model turns
+
+See [runtime efficiency and recovery](CREW_RUNTIME_EFFICIENCY.md) for batched
+observations, version-bound handoff indexes, phase timing and the default-off
+automatic recovery policy. Existing explicit recovery remains available.
+
+The action harness returns complete bounded read chunks with byte cursors; JSON context strings and collections also paginate at the amount actually delivered. `inspect_json` can inspect bounded saved JSON or validated compressed JSON envelopes without executing project code.
+
+`read_observations` retains a bounded set of recent same-task read chunks with source hashes, byte offsets and action provenance. Each is checked against the current authorized manifest and workspace. Source changes invalidate old observations. The packet is limited to 32 KiB, eight chunks, 64 scanned actions and at most four source files / 2 MiB of source checks per input; omissions remain retrievable in task history. This is working evidence, not model training or inferred internal reasoning.
+
+For a localized text edit, `replace` requires the whole-file SHA-256 and exactly one nonempty old-text match. It preserves every other byte and applies the existing scope, read-only, symlink and credential checks. Ambiguous, missing or stale matches fail instead of using fuzzy replacement.
+
+Small `context_observations` retain the exact request and response provenance for recent read-only context/peer inspections (eight receipts /48KiB /32scanned actions). They are labeled historical and may be stale; live task checks and explicit rereads remain necessary. Large or credential-bearing receipts are omitted, with coverage counts. The read/context/inspect schemas advertised to the model are the same schemas used to validate its requests.
+
+Recent action and peer observations follow Core's newest-first history ordering;
+selection preserves the newest bounded records before presenting them in time
+order. Appended task reports use their separate chronological order. Full history
+remains available when a bounded preview omits older records.
+
+When their combined size reaches the overall input allowance, optional file
+previews and then older historical observations are omitted with explicit counts
+and retrieval references. Current task contracts, requirements, unresolved
+messages, issues and known limitations are not shortened to fit. If those still
+exceed the allowance, the task is held explicitly for scope/context review.

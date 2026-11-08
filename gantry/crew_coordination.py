@@ -109,6 +109,7 @@ class CrewCoordinationMixin:
         self._bd_evidence(s, actor, task['session_id'], a['evidence'])
         response = self._bd_assign(s, actor, {'session_id': task['session_id'],
             'requested_by_bot': task['bot_id'], 'bot_id': a['to_bot_id'],
+            'issue_ids': copy.deepcopy(task.get('issue_ids', [])),
             'requirement_refs': copy.deepcopy(task.get('requirement_refs', [])),
             'state_id': task.get('output_state', task['state_id']), 'kind': 'report',
             'title': a['question'], 'completion': ['Answer the recorded question with evidence and limitations'],

@@ -12,6 +12,8 @@ from .continuity_contracts import CONTEXT
 from .model import require, uid, digest
 from .persistent_bots import VERSION, FLAG
 from .requirement_traceability import REFS, selected_refs, stale_refs
+from .bot_followups import FOLLOWUPS, validate_followups, bind_followups
+from .requirement_mapping import LINKS
 
 PAGE = {'after': S, 'limit': {'type': 'integer', 'minimum': 1, 'maximum': 100}}
 TASK = {'bot_id': S, 'state_id': S, 'kind': {'enum': ['plan', 'develop', 'verify', 'integrate', 'report']},
@@ -20,6 +22,7 @@ ASSIGNMENT = {'type': 'object', 'properties': TASK, 'required': list(TASK), 'add
 # Optional branch label; the task/state IDs remain authoritative identities.
 TASK['candidate_id'] = S
 TASK['requirement_refs'] = REFS
+TASK['issue_ids'] = {**A, 'maxItems': 40}
 EDIT = {'type': 'object', 'properties': {'path': S, 'content': {'type': 'string'}},
         'required': ['path', 'content'], 'additionalProperties': False}
 REPORT = {'summary': S, 'rationale': S, 'unverified': A,
@@ -29,6 +32,7 @@ REPORT = {'summary': S, 'rationale': S, 'unverified': A,
               'type': 'object', 'properties': {'id': S, 'version': I},
               'required': ['id', 'version'], 'additionalProperties': False}}}
 REPORT_REQUIRED = list(REPORT)
+REPORT['followups'] = FOLLOWUPS
 # Shared with the standalone endpoint; optional for saved reports/older clients.
 LEARNING_USE = {'memory_id': S,
     'action_ids': {'type': 'array', 'minItems': 1, 'maxItems': 40, 'items': {**S, 'maxLength': 4000}},
@@ -41,6 +45,8 @@ REPORT['experience_check'] = {'type': ['object', 'null'], 'properties': {
     'required':['verdict','reason','action_ids'], 'additionalProperties':False}
 BOT_ANSWER = {'type': 'object', 'properties': {**REPORT, 'edits': {'type': 'array', 'maxItems': 100, 'items': EDIT}},
               'required': [*REPORT_REQUIRED, 'edits'], 'additionalProperties': False}
+register('integrate_bot_task', {'task_id': S, 'fence': S, 'state_id': S, 'changes': {**REPORT['integrate_changes'], 'minItems': 1}, 'summary': S}, ['task_id','fence','state_id','changes','summary'])
+register('propose_bot_requirements', {'task_id': S, 'fence': S, 'links': LINKS, 'summary': S}, ['task_id','fence','links','summary'])
 register('configure_bot_project', {'session_id': S, 'organization_id': S, 'version': VERSION,
     'goal': S, 'acceptance': A, 'lead_bot_id': S, 'enabled': FLAG},
     ['session_id', 'organization_id', 'version', 'goal', 'acceptance', 'lead_bot_id', 'enabled'])
@@ -48,9 +54,10 @@ register('bind_development_bot', {'session_id': S, 'bot_id': S, 'principal_id': 
     'write_scope': A, 'can_assign': FLAG, 'can_integrate': FLAG, 'enabled': FLAG},
     ['session_id', 'bot_id', 'principal_id', 'version', 'write_scope', 'can_assign', 'can_integrate', 'enabled'])
 register('assign_bot_task', {'session_id': S, 'requested_by_bot': S, 'parent_task_id': S, **TASK},
-    ['session_id', *[k for k in TASK if k not in {'candidate_id', 'requirement_refs'}]])
+    ['session_id', *[k for k in TASK if k not in {'candidate_id', 'requirement_refs', 'issue_ids'}]])
 register('get_bot_project list_bot_tasks', {'session_id': S, **PAGE}, ['session_id'])
 register('get_bot_task', {'task_id': S}, ['task_id'])
+register('get_bot_requirements', {'task_id': S, **PAGE}, ['task_id'])
 register('claim_bot_task', {'task_id': S, 'version': I, 'runtime_fence': S}, ['task_id', 'version', 'runtime_fence'])
 register('check_bot_task', {'task_id': S, 'fence': S}, ['task_id', 'fence'])
 register('checkpoint_bot_task', {'task_id': S, 'fence': S, 'snapshot': S, 'summary': S,
@@ -71,6 +78,13 @@ register('send_bot_message', {'task_id': S, 'from_bot_id': S, 'body': S,
 register('resolve_bot_message', {'message_id': S, 'reason': S, 'evidence': A}, ['message_id', 'reason', 'evidence'])
 
 TERMINAL = {'completed', 'failed', 'blocked', 'cancelled'}
+
+
+def _fixed_context(context):
+    """Evidence may advance; assignment premises require reassessment."""
+    fixed = copy.deepcopy(context)
+    fixed.get('environment', {}).pop('engineering', None)
+    return fixed
 
 
 class BotDevelopmentMixin:
@@ -195,6 +209,7 @@ class BotDevelopmentMixin:
                     'scope_denied', 'Child scope exceeds this assignment')
             if old.get('candidate_id'): a.setdefault('candidate_id', old['candidate_id'])
             a.setdefault('requirement_refs', copy.deepcopy(old.get('requirement_refs', [])))
+            a.setdefault('issue_ids', copy.deepcopy(old.get('issue_ids', [])))
             require(old['session_id'] == d['id'] and old['status'] == 'running', 'invalid_state', 'Parent must be running')
             require(not self._bd_subordinate(s, bot['id'], old['bot_id']) or bot['id'] == old['bot_id'],
                     'invalid_input', 'Child work cannot be assigned to a parent manager')
@@ -204,6 +219,7 @@ class BotDevelopmentMixin:
             children=[], reports=[], created_seq=s['seq'] + 1, created_at=self.clock(), author=actor['id'])
         if parent: self._inherit_continuation(old, task)
         task['requirement_refs'] = selected_refs(s, state['context'], a.get('requirement_refs'))
+        self._issue_assignment(s, actor, task, fx)
         self._dev_save(s, fx, 'bot_tasks', task)
         n.append({'type': 'bot_assignment', 'target': d['id'], 'session_id': d['id'], 'task_id': task['id'], 'zones': [d['zone']]})
         return self._bd_public(task)
@@ -269,6 +285,18 @@ class BotDevelopmentMixin:
         return [self._dev_get(s, 'bot_task_messages', row[0]) for row in con.execute(
             'SELECT id FROM records WHERE collection=? AND subject_id=? ORDER BY created_seq, id', ('bot_task_messages', task['id']))]
 
+    def cmd_get_bot_requirements(self, s, actor, a, fx, n, con):
+        task = self._dev_get(s, 'bot_tasks', a['task_id'])
+        _, session = self._bd_project(s, actor, task['session_id'], active=False)
+        limit = a.get('limit', 30)
+        entries = sorted((v for v in s['entries'].values() if v['type'] == 'requirement'
+            and not v.get('retracted') and v['zone'] == session['zone'] and v['id'] > a.get('after','')), key=lambda v:v['id'])
+        return {'items':[{'reference':{'requirement_id':v['id'],'revision_id':v['revision_id']},
+                    'description':v['data'].get('description',v['id']),
+                    'verification_checks':v['data'].get('verification_checks',[])} for v in entries[:limit]],
+                'next_cursor':entries[limit-1]['id'] if len(entries)>limit else None,
+                'purpose':'Available definitions, not assigned requirements or fulfillment'}
+
     def cmd_get_bot_task(self, s, actor, a, fx, n, con):
         task = self._dev_get(s, 'bot_tasks', a['task_id'])
         p, d = self._bd_project(s, actor, task['session_id'], active=False)
@@ -295,6 +323,9 @@ class BotDevelopmentMixin:
             'baseline_state_id': task['state_id'], 'state_id': task.get('output_state', task['state_id'])}, fx, n, con)
         result['design_assessment']['task_requirement_refs'] = copy.deepcopy(task.get('requirement_refs', []))
         result['candidate_changes'] = candidates
+        from .bot_followups import view as followup_view
+        result.update(followup_view(s, task))
+        result['issues'] = self._issue_context(s, actor, task, con)
         result['candidates_truncated'] = bool(pending)
         if self._binding_access(s, actor, self._bd_binding(s, task['session_id'], task['bot_id'])):
             result['memory'] = self._persistent_memory_page(s, actor, bot, org, {'limit': 30}, con, recent=True)
@@ -336,14 +367,10 @@ class BotDevelopmentMixin:
         require(task['write_scope'], 'scope_denied', 'This assignment has no file write scope')
         if 'context' in a:
             current = self._continuity_state(s, actor, task.get('output_state', task['state_id']))
-            def fixed_context(context):
-                fixed = copy.deepcopy(context)
-                fixed.get('environment', {}).pop('engineering', None)
-                return fixed
-            require(fixed_context(a['context']) == fixed_context(current['context']),
+            require(_fixed_context(a['context']) == _fixed_context(current['context']),
                     'scope_denied', 'Bot evidence checkpoint cannot change goals or constraints; request reassessment and new assignment')
         if not task.get('change_id'):
-            change = self.cmd_begin_change(s, actor, {'state_id': task['state_id'], 'title': task['title'],
+            change = self.cmd_begin_change(s, actor, {'state_id': task.get('output_state', task['state_id']), 'title': task['title'],
                 'purpose': task['title'], 'write_scope': task['write_scope'], 'dependencies': task['dependencies'],
                 'assignee': actor['id'], 'requirement_refs': task.get('requirement_refs', [])}, fx, n, con)
             task['change_id'] = change['id']
@@ -354,6 +381,46 @@ class BotDevelopmentMixin:
         task.update(output_state=result['state']['id'], version=task['version'] + 1)
         self._dev_save(s, fx, 'bot_tasks', task)
         return result
+
+    def cmd_propose_bot_requirements(self, s, actor, a, fx, n, con):
+        from .requirement_mapping import validate_links, mapped_context
+        task = self._bd_checked(s, actor, a, con)
+        require(task.get('studio_mode') != 'ask', 'scope_denied', 'Ask cannot create a change')
+        require(a['links'], 'invalid_input', 'At least one sourced requirement link required')
+        state = self._continuity_state(s, actor, task.get('output_state', task['state_id']))
+        refs = validate_links(self, s, actor, a['links'], self._manifest(s, state['snapshot']))
+        context = mapped_context(state['context'], a['links'], refs, {'task_id':task['id'],'author':actor['id']})
+        change = self.cmd_begin_change(s, actor, {'state_id':state['id'],'title':a['summary'],
+            'purpose':'Proposed requirement mapping','assignee':actor['id'],'write_scope':task['write_scope'],
+            'dependencies':task['dependencies']}, fx,n,con)
+        result = self.cmd_checkpoint_change(s,actor,{'change_id':change['id'],'version':change['version'],
+            'snapshot':state['snapshot'],'summary':a['summary'],'rationale':'Sourced requirement link proposal; existing acceptance unchanged',
+            'unfinished':['Requirement mapping needs review; verification is still required'], 'work_status':'working',
+            'context':context,'capture':{'scope':'Existing saved files; metadata-only mapping proposal','missing':[]}},fx,n,con)
+        result['change'] = self.cmd_share_change(s,actor,{'change_id':change['id'],'version':result['change']['version']},fx,n,con)['change']
+        return {**result,'proposed':True,'formal_adoption':False,'active_task_unchanged':True}
+
+    def cmd_integrate_bot_task(self, s, actor, a, fx, n, con):
+        task = self._bd_checked(s, actor, a, con)
+        binding = self._bd_binding(s, task['session_id'], task['bot_id'])
+        require(task.get('studio_mode') != 'ask' and binding['can_integrate'],
+                'unauthorized', 'Integration is not delegated to this Bot')
+        require(not task.get('output_state'), 'invalid_state',
+                'Integration requires an unedited task; preserve saved edits in a separate change')
+        require(a['state_id'] == task['state_id'], 'stale_basis', 'Integration target is not the pinned task input')
+        for ref in a['changes']:
+            change = self._dev_get(s, 'dev_changes', ref['id'])
+            require(all(in_scope(path, binding['write_scope']) and in_scope(path, task['write_scope'])
+                for path in self._changed(s, s['dev_states'][change['base_state']]['snapshot'], s['dev_states'][change['head']]['snapshot'])),
+                'scope_denied', 'Integration exceeds delegated write scope')
+        result = self.cmd_integrate_changes(s, actor, {'state_id': a['state_id'],
+            'changes': a['changes'], 'summary': a['summary']}, fx, n, con)
+        require(result['integrated'], 'conflict', 'Candidate integration remains unresolved', conflicts=result['conflicts'])
+        require(_fixed_context(result['state']['context']) == _fixed_context(s['dev_states'][task['state_id']]['context']),
+                'scope_denied', 'Integrated assignment premises changed; select the candidate in a new assignment')
+        task.update(output_state=result['state']['id'], version=task['version']+1)
+        self._dev_save(s, fx, 'bot_tasks', task)
+        return {**result, 'task': self._bd_public(task), 'formal_adoption': False}
 
     def _bd_wake_parent(self, s, task, fx, n, con):
         if not task.get('parent_task_id'): return
@@ -367,6 +434,7 @@ class BotDevelopmentMixin:
     def cmd_finish_bot_task(self, s, actor, a, fx, n, con):
         task = self._bd_checked(s, actor, a, con); self.allowed(actor, 'record')
         report = copy.deepcopy(a['report']); b = self._bd_binding(s, task['session_id'], task['bot_id'])
+        validate_followups(self, s, actor, task, report)
         require(task.get('studio_mode') != 'ask' or (not report['assignments'] and not report['integrate_changes']),
                 'scope_denied', 'Ask cannot delegate edits or integrate candidates')
         if report['status'] == 'completed':
@@ -386,10 +454,13 @@ class BotDevelopmentMixin:
         from .bot_experience_checks import finish
         finish(self, s, actor, task, report, fx, con)
         require(not report['assignments'] or report['status'] == 'waiting', 'invalid_input', 'Parent must wait for assigned work')
+        assigned = []
         for assignment in report['assignments']:
             child = self._bd_assign(s, actor, {**assignment, 'session_id': task['session_id'],
                 'requested_by_bot': task['bot_id'], 'parent_task_id': task['id']}, fx, n, con)
             task['children'].append(child['id'])
+            assigned.append(child['id'])
+        bind_followups(report, assigned)
         outstanding = any(s['bot_tasks'][i]['status'] not in TERMINAL for i in task['children'])
         questions = [s['bot_task_messages'][i] for i in task.get('consultations', [])]
         require(report['status'] != 'waiting' or outstanding or questions,
@@ -406,6 +477,8 @@ class BotDevelopmentMixin:
             integration = self.cmd_integrate_changes(s, actor, {'state_id': task['state_id'],
                 'changes': report['integrate_changes'], 'summary': report['summary']}, fx, n, con)
             require(integration['integrated'], 'conflict', 'Candidate integration remains unresolved', conflicts=integration['conflicts'])
+            require(_fixed_context(integration['state']['context']) == _fixed_context(s['dev_states'][task['state_id']]['context']),
+                    'scope_denied', 'Integrated assignment premises changed; select the candidate in a new assignment')
             task['output_state'] = integration['state']['id']
         if task.get('change_id'):
             change = self._dev_get(s, 'dev_changes', task['change_id'])
@@ -483,8 +556,11 @@ class BotDevelopmentMixin:
 
     def _bd_evidence(self, s, actor, sid, refs):
         for ref in refs:
-            obj = next((s[t][ref] for t in ('dev_states', 'bot_tasks', 'bot_task_messages', 'bot_actions', 'bot_decisions') if ref in s.get(t, {})), None)
-            require(obj and obj['session_id'] == sid, 'invalid_input', 'Evidence must belong to this project')
+            obj = next((s[t][ref] for t in ('dev_states', 'bot_tasks', 'bot_task_messages', 'bot_actions', 'bot_decisions', 'bot_issues') if ref in s.get(t, {})), None)
+            require(obj and obj['session_id'] == sid, 'invalid_input',
+                    'Evidence must use saved state, task, message, action, decision or issue IDs from this project. '
+                    'For file evidence, cite its saved state ID and describe the path and hash in the rationale; '
+                    'file paths and hashes alone are not record IDs.')
 
     def cmd_send_bot_message(self, s, actor, a, fx, n, con):
         task = self._dev_get(s, 'bot_tasks', a['task_id'])

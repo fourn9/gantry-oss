@@ -1,5 +1,12 @@
 # Organization and personal Bot foundations
 
+## Runtime efficiency follow-up (2026-11-09)
+
+Implement the elapsed-time audit follow-up in
+[crew-runtime-efficiency.md](crew-runtime-efficiency.md): batched retrieval,
+bounded handoffs, opt-in stopped-inference recovery and phase timing.
+Existing historical plans and open items below are preserved.
+
 > Historical implementation record. “Current” and completion claims below refer to the recorded work, not the latest release or an active assignment. See the [record index](README.md), [current usage guides](../docs/README.md) and [verification index](../docs/VERIFICATION.md). Open items are retained.
 
 ## Current extension: connected workspace

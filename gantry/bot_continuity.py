@@ -71,7 +71,10 @@ class BotContinuityMixin:
         task = self._bd_checked(s, actor, a, con)
         plan = self._learning_context(s, actor, task)
         require(plan and plan['attempt'] == task['attempt'] and plan['status'] == 'completed',
-                'invalid_input', 'Complete this attempt learning plan first')
+                'invalid_input', 'Experience-use annotations are optional and require a completed learning plan for this attempt. '
+                'Without one, do not call experience_use; omit finish.experience_uses or use []/null. '
+                'Ordinary finish can proceed subject to the other task requirements. '
+                'A visible memory alone is not a completed learning plan.')
         require(any(d['memory_id']==a['memory_id'] and d['use']!='reject' for d in plan['output']['decisions']),
                 'invalid_input', 'Link a non-rejected planned memory')
         self._learning_source(s, actor, task, a['memory_id'])

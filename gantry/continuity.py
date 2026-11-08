@@ -210,7 +210,10 @@ class ContinuityMixin:
             change = self._dev_get(s, 'dev_changes', ref['id'])
             require(change['session_id'] == d['id'], 'invalid_input', 'Cross-project integration unsupported')
             require(change['version'] == ref['version'], 'stale_basis', 'Change advanced')
-            require(change['sharing'] == 'shared', 'invalid_state', 'Share this checkpoint before integration')
+            # Integration seals a shared checkpoint; it does not consume its
+            # availability to other candidate branches. Exact version, target
+            # baseline, dependency and conflict checks still apply below.
+            require(change['sharing'] in {'shared', 'integrated'}, 'invalid_state', 'Share this checkpoint before integration')
             base = self._continuity_state(s, actor, change['base_state'])
             head = self._continuity_state(s, actor, change['head'])
             base_files, files = self._manifest(s, base['snapshot']), self._manifest(s, head['snapshot'])

@@ -47,7 +47,7 @@ def publish_bot(client, task_id, fence, root, plan_path, key):
     return client.call('checkpoint_bot_task',{**ref,**args},key+':checkpoint')
 
 
-def _physical_checkpoint(client, before, root, zone, plan_path, key, baseline):
+def _physical_checkpoint(client, before, root, zone, plan_path, key, baseline, execution=None):
     Store.safe_name(plan_path)
     state=before['state']
     artifact,missing=capture_workspace(client,root,key,zone)
@@ -110,6 +110,11 @@ def _physical_checkpoint(client, before, root, zone, plan_path, key, baseline):
         require(not old or old.get('requirement_refs', []) == refs,
                 'conflict', 'Requirement mapping changed; save a reassessed check in a new state first')
         result=evaluate({**c, 'requirement_refs': refs},report,hashes)
+        if execution is not None:
+            result['execution']={k:v for k,v in execution.items() if k != 'refreshed_paths'}
+            if execution['exit_code'] != 0: result['reasons'].append('tool_execution_failed')
+            if c['report'] not in execution['refreshed_paths']: result['reasons'].append('report_not_refreshed_by_execution')
+            if result['reasons']: result['status']='unknown'
         checkmap[c['id']]={k:c[k] for k in ('id','scope','components','required')}
         if old and old.get('source_submission'):
             checkmap[c['id']].update({k:copy.deepcopy(old[k]) for k in ('source_submission','source_state','source_evidence','provenance') if k in old})

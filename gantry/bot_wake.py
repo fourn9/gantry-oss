@@ -94,11 +94,17 @@ class BotWakeMixin:
         reasons, signal, session = self._continuation_signal(s, policy, note)
         if not reasons or signal==policy.get('last_signal'):
             return {'status':'idle','continuation_id':policy['id']}
+        # Carry explicit watched work, not every project issue. Ownership and
+        # engineering disposition remain the Bot's decision under its scope.
+        issue_ids = list(dict.fromkeys(ident for tid in note['content']['watch_tasks']
+            for ident in s['bot_tasks'][tid].get('issue_ids', [])))
+        issue_ids = [ident for ident in issue_ids if all(in_scope(p, policy['write_scope'])
+            for p in s['bot_issues'][ident]['paths'])][:40]
         task = self._bd_assign(s, actor, {'session_id':session['id'], 'bot_id':policy['bot_id'],
             'requested_by_bot':policy['bot_id'], 'state_id':session['active_state'], 'kind':'plan',
             'title':'Reassess standing responsibility',
             'completion':policy['completion'], 'write_scope':policy['write_scope'],
-            'dependencies':policy['dependencies'], 'after_tasks':[]}, fx, n, con, standing=policy)
+            'dependencies':policy['dependencies'], 'after_tasks':[], 'issue_ids':issue_ids}, fx, n, con, standing=policy)
         stored = self._dev_get(s, 'bot_tasks', task['id'])
         stored.update(continuation_id=policy['id'], continuation_version=policy['version'],
                       continuation_reason=reasons, working_note_version=note['version'])

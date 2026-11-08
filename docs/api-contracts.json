@@ -562,6 +562,14 @@
         "intent": {
           "type": "object"
         },
+        "issue_ids": {
+          "items": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "maxItems": 40,
+          "type": "array"
+        },
         "kind": {
           "enum": [
             "plan",
@@ -4577,6 +4585,14 @@
                     },
                     "type": "array"
                   },
+                  "issue_ids": {
+                    "items": {
+                      "minLength": 1,
+                      "type": "string"
+                    },
+                    "maxItems": 40,
+                    "type": "array"
+                  },
                   "kind": {
                     "enum": [
                       "plan",
@@ -4705,6 +4721,87 @@
                   "action_ids",
                   "change",
                   "condition_check"
+                ],
+                "type": "object"
+              },
+              "maxItems": 40,
+              "type": [
+                "array",
+                "null"
+              ]
+            },
+            "followups": {
+              "items": {
+                "additionalProperties": false,
+                "properties": {
+                  "assignment_index": {
+                    "minimum": 0,
+                    "type": [
+                      "integer",
+                      "null"
+                    ]
+                  },
+                  "disposition": {
+                    "enum": [
+                      "fix",
+                      "verify",
+                      "consult",
+                      "defer"
+                    ]
+                  },
+                  "evidence": {
+                    "items": {
+                      "minLength": 1,
+                      "type": "string"
+                    },
+                    "type": "array"
+                  },
+                  "id": {
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "message_id": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "reason": {
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "requirement_refs": {
+                    "items": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "requirement_id": {
+                          "type": "string"
+                        },
+                        "revision_id": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "requirement_id",
+                        "revision_id"
+                      ],
+                      "type": "object"
+                    },
+                    "maxItems": 200,
+                    "type": "array"
+                  },
+                  "summary": {
+                    "minLength": 1,
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "id",
+                  "summary",
+                  "disposition",
+                  "reason",
+                  "evidence",
+                  "requirement_refs"
                 ],
                 "type": "object"
               },
@@ -5075,6 +5172,46 @@
       "type": "object"
     }
   },
+  "get_bot_issue": {
+    "description": "get bot issue",
+    "schema": {
+      "additionalProperties": false,
+      "properties": {
+        "after": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "basis": {
+          "type": "object"
+        },
+        "intent": {
+          "type": "object"
+        },
+        "issue_id": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "limit": {
+          "maximum": 100,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "state_id": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "task_id": {
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "required": [
+        "task_id",
+        "issue_id"
+      ],
+      "type": "object"
+    }
+  },
   "get_bot_learning_plan": {
     "description": "get bot learning plan",
     "schema": {
@@ -5185,6 +5322,37 @@
       },
       "required": [
         "reflection_id"
+      ],
+      "type": "object"
+    }
+  },
+  "get_bot_requirements": {
+    "description": "get bot requirements",
+    "schema": {
+      "additionalProperties": false,
+      "properties": {
+        "after": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "basis": {
+          "type": "object"
+        },
+        "intent": {
+          "type": "object"
+        },
+        "limit": {
+          "maximum": 100,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "task_id": {
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "required": [
+        "task_id"
       ],
       "type": "object"
     }
@@ -6048,6 +6216,67 @@
       "type": "object"
     }
   },
+  "integrate_bot_task": {
+    "description": "integrate bot task",
+    "schema": {
+      "additionalProperties": false,
+      "properties": {
+        "basis": {
+          "type": "object"
+        },
+        "changes": {
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "id": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "version": {
+                "minimum": 1,
+                "type": "integer"
+              }
+            },
+            "required": [
+              "id",
+              "version"
+            ],
+            "type": "object"
+          },
+          "maxItems": 32,
+          "minItems": 1,
+          "type": "array"
+        },
+        "fence": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "intent": {
+          "type": "object"
+        },
+        "state_id": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "summary": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "task_id": {
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "required": [
+        "task_id",
+        "fence",
+        "state_id",
+        "changes",
+        "summary"
+      ],
+      "type": "object"
+    }
+  },
   "integrate_changes": {
     "description": "integrate changes",
     "schema": {
@@ -6215,6 +6444,41 @@
       },
       "required": [
         "bot_id"
+      ],
+      "type": "object"
+    }
+  },
+  "list_bot_issues": {
+    "description": "list bot issues",
+    "schema": {
+      "additionalProperties": false,
+      "properties": {
+        "after": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "basis": {
+          "type": "object"
+        },
+        "intent": {
+          "type": "object"
+        },
+        "limit": {
+          "maximum": 100,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "state_id": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "task_id": {
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "required": [
+        "task_id"
       ],
       "type": "object"
     }
@@ -6878,6 +7142,88 @@
       "type": "object"
     }
   },
+  "open_bot_issue": {
+    "description": "open bot issue",
+    "schema": {
+      "additionalProperties": false,
+      "properties": {
+        "basis": {
+          "type": "object"
+        },
+        "check_ids": {
+          "items": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "maxItems": 40,
+          "minItems": 1,
+          "type": "array"
+        },
+        "completion": {
+          "items": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "maxItems": 40,
+          "minItems": 1,
+          "type": "array"
+        },
+        "fence": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "followup_id": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "intent": {
+          "type": "object"
+        },
+        "owner_bot_id": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "paths": {
+          "items": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "maxItems": 40,
+          "minItems": 1,
+          "type": "array"
+        },
+        "source_attempt": {
+          "minimum": 1,
+          "type": "integer"
+        },
+        "source_task_id": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "task_id": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "verification_plan": {
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "required": [
+        "task_id",
+        "fence",
+        "source_task_id",
+        "source_attempt",
+        "followup_id",
+        "owner_bot_id",
+        "paths",
+        "completion",
+        "verification_plan",
+        "check_ids"
+      ],
+      "type": "object"
+    }
+  },
   "operations": {
     "description": "operations",
     "schema": {
@@ -7130,6 +7476,93 @@
       "required": [
         "title",
         "changes"
+      ],
+      "type": "object"
+    }
+  },
+  "propose_bot_requirements": {
+    "description": "propose bot requirements",
+    "schema": {
+      "additionalProperties": false,
+      "properties": {
+        "basis": {
+          "type": "object"
+        },
+        "fence": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "intent": {
+          "type": "object"
+        },
+        "links": {
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "evidence": {
+                "items": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "hash": {
+                      "minLength": 1,
+                      "type": "string"
+                    },
+                    "path": {
+                      "minLength": 1,
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "path",
+                    "hash"
+                  ],
+                  "type": "object"
+                },
+                "maxItems": 100,
+                "minItems": 1,
+                "type": "array"
+              },
+              "rationale": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "requirement_id": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "revision_id": {
+                "minLength": 1,
+                "type": "string"
+              }
+            },
+            "required": [
+              "requirement_id",
+              "revision_id",
+              "rationale",
+              "evidence"
+            ],
+            "type": "object"
+          },
+          "maxItems": 100,
+          "type": [
+            "array",
+            "null"
+          ]
+        },
+        "summary": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "task_id": {
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "required": [
+        "task_id",
+        "fence",
+        "links",
+        "summary"
       ],
       "type": "object"
     }
@@ -7835,6 +8268,60 @@
               },
               "maxItems": 10,
               "type": "array"
+            },
+            "requirement_links": {
+              "items": {
+                "additionalProperties": false,
+                "properties": {
+                  "evidence": {
+                    "items": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "hash": {
+                          "minLength": 1,
+                          "type": "string"
+                        },
+                        "path": {
+                          "minLength": 1,
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "path",
+                        "hash"
+                      ],
+                      "type": "object"
+                    },
+                    "maxItems": 100,
+                    "minItems": 1,
+                    "type": "array"
+                  },
+                  "rationale": {
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "requirement_id": {
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "revision_id": {
+                    "minLength": 1,
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "requirement_id",
+                  "revision_id",
+                  "rationale",
+                  "evidence"
+                ],
+                "type": "object"
+              },
+              "maxItems": 100,
+              "type": [
+                "array",
+                "null"
+              ]
             }
           },
           "required": [
@@ -10238,6 +10725,124 @@
       },
       "required": [
         "session_id"
+      ],
+      "type": "object"
+    }
+  },
+  "review_bot_issue": {
+    "description": "review bot issue",
+    "schema": {
+      "additionalProperties": false,
+      "properties": {
+        "basis": {
+          "type": "object"
+        },
+        "evidence": {
+          "items": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "maxItems": 40,
+          "type": "array"
+        },
+        "fence": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "intent": {
+          "type": "object"
+        },
+        "issue_id": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "reason": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "reassessment": {
+          "additionalProperties": false,
+          "properties": {
+            "check_ids": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "maxItems": 40,
+              "minItems": 1,
+              "type": "array"
+            },
+            "requirement_refs": {
+              "items": {
+                "additionalProperties": false,
+                "properties": {
+                  "requirement_id": {
+                    "type": "string"
+                  },
+                  "revision_id": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "requirement_id",
+                  "revision_id"
+                ],
+                "type": "object"
+              },
+              "maxItems": 200,
+              "type": "array"
+            },
+            "verification_plan": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "verification_plan",
+            "check_ids",
+            "requirement_refs"
+          ],
+          "type": "object"
+        },
+        "state_id": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "status": {
+          "enum": [
+            "working",
+            "verifying",
+            "deferred",
+            "reopened",
+            "resolved"
+          ]
+        },
+        "task_id": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "verification_task_ids": {
+          "items": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "maxItems": 40,
+          "type": "array"
+        },
+        "version": {
+          "minimum": 1,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "task_id",
+        "fence",
+        "issue_id",
+        "version",
+        "status",
+        "state_id",
+        "reason",
+        "evidence"
       ],
       "type": "object"
     }

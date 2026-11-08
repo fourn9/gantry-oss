@@ -39,7 +39,8 @@ def assess(context, manifest):
                 'invalid_input', 'Unique check IDs required')
         check_ids.add(check['id'])
         require(check.get('scope') in {'placement','motion','service','connection','structural','electrical','thermal','other'},
-                'invalid_input', 'Specify an engineering check scope')
+                'invalid_input', 'Check scope must be placement, motion, service, connection, structural, electrical, thermal or other. '
+                'Put free-text scope descriptions in conditions; this enum does not establish physical validity.')
         require(isinstance(check.get('required'), bool) and check.get('status') in {'unverified','pass','fail','unknown','not_applicable'},
                 'invalid_input', 'Specify required and check status')
         require(isinstance(check.get('components'), list) and bool(check['components']) and set(check['components']) <= ids,
