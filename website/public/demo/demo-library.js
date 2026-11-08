@@ -1,11 +1,11 @@
 // Invented, in-memory read models. No network, tool execution or inferred evidence.
-import {fileChanges,linesOf} from './studio_model.js?v=library-20261107';
+import {fileChanges,linesOf} from './studio_model.js?v=component-20261107';
 const clone=value=>structuredClone(value);
 const same=(a,b)=>JSON.stringify(Object.entries(a).sort())===JSON.stringify(Object.entries(b).sort());
 const must=(v,message)=>{if(!v)throw new Error(message);return v;};
 const inScope=(path,paths)=>paths.some(p=>path===p||(p.endsWith('/')&&path.startsWith(p)));
 export function createLibraryFixture({state,getStates,getWorks,getThreads,members,hierarchy,getSeq}){
- const project={id:'bench',name:'Bench robot'};
+ const project={id:'bench',name:'Desktop robot arm'};
  function saved(args){must(args.project_id==='bench','Unknown sample project.');return state(args.state_id||'state_base');}
  function meta(v){return {...clone(v.state),sharing:v.status.sharing,adoption:v.status.adoption};}
  function scope(id){const node=must(hierarchy.find(n=>n.id===id),'Unknown sample component.');const ids=new Set([node.id]);for(const _ of hierarchy)for(const n of hierarchy)if(ids.has(n.parent))ids.add(n.id);return hierarchy.filter(n=>ids.has(n.id)).flatMap(n=>n.paths);}
@@ -18,7 +18,7 @@ export function createLibraryFixture({state,getStates,getWorks,getThreads,member
  }
  function checks(v){return [
   {id:'timing-check',inputs:['control/motion.py'],evidence:{},requirement_refs:[{requirement_id:'settling-time',revision_id:'timing-r1'}],effective_status:'unverified'},
-  {id:'clearance-check',inputs:['cad/sensor-bracket.stl','cad/carriage.stl'],evidence:{},requirement_refs:[{requirement_id:'motion-clearance',revision_id:'clearance-r1'}],effective_status:'unverified'}
+  {id:'clearance-check',inputs:['cad/sensor-bracket.stl','cad/arm-links.stl'],evidence:{},requirement_refs:[{requirement_id:'motion-clearance',revision_id:'clearance-r1'}],effective_status:'unverified'}
  ];}
  function validate(args){
   const v=saved(args),a=args.anchor;

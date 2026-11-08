@@ -1,4 +1,4 @@
-import {esc} from '../demo/ui.js';
+import {esc} from '../demo/ui.js?v=component-20261107';
 
 // An explanatory activity map using the Studio demo's project and work records.
 // Movement and messages are illustrative; no agent or external tool is started.
@@ -19,7 +19,7 @@ export function mountProjectMap(host, overview, detail){
  <div class="map-header"><div><h4>${esc(project.name)}</h4><p>${esc(assembly.title)} / Project activity</p></div><span class="activity"><i class="dot"></i><span id="activity-status">Working in parallel</span></span></div>
  <div class="map-columns"><span>Project parts</span><div class="phases"><span>Read</span><span>Change</span><span>Review</span></div></div>
  ${passive.map(n=>`<div class="context-row"><span>${esc(n.title)}</span><span>Outside this change</span></div>`).join('')}
- <div class="active-map"><div><div class="part"><strong>Sensor bracket</strong><small>Hardware</small><span class="agent"><i></i>${esc(design.owner.id)}</span></div><div class="part"><strong>Motion control</strong><small>Software</small><span class="agent"><i></i>${esc(controls.owner.id)}</span></div></div>
+ <div class="active-map"><div><div class="part"><strong>Sensor bracket</strong><small>Hardware</small><span class="agent"><i></i>${esc(design.owner.name)}</span></div><div class="part"><strong>Motion control</strong><small>Software</small><span class="agent"><i></i>${esc(controls.owner.name)}</span></div></div>
  <div class="lanes"><svg class="lane-svg" viewBox="0 0 300 192" preserveAspectRatio="none"><defs><marker id="map-arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="4" markerHeight="4" orient="auto-start-reverse"><path d="M0 0 10 5 0 10" fill="none" stroke="#a7b49f" stroke-width="1.5"/></marker></defs>
  <path class="grid-line" d="M50 0V152M150 0V152M250 0V152"/><path class="route" d="M20 38H280" marker-end="url(#map-arrow)"/><path class="route" d="M20 114H280" marker-end="url(#map-arrow)"/>
  <path class="flow" id="flow-a" d="M20 38H50"/><path class="flow" id="flow-b" d="M20 114H50"/>
@@ -28,9 +28,9 @@ export function mountProjectMap(host, overview, detail){
  <div class="shared"><strong>Gantry / shared history</strong><span id="history-status">Context → both agents</span></div>
  <div class="update"><strong id="note-author"></strong><p id="note-body"></p></div></div>`;
  const steps=[
- {x:50,status:'Working in parallel',output:'Same project context',history:'Context → both agents',author:design.owner.id+' → '+controls.owner.id,note:'Checking bracket clearance. Can you check the controller timing?'},
- {x:150,status:'Working in parallel',output:'Two connected changes',history:'Design + code → history',author:controls.owner.id+' → '+design.owner.id,note:'Proposed wait: 0.25 seconds. The owner needs to confirm the timing tradeoff; motion checks remain open.'},
- {x:250,status:'Decision needed',output:'Timing requirement decision',history:'Changes + reasons recorded',author:design.owner.id+' → you',note:detail.demo_request.question}
+ {x:50,status:'Working in parallel',output:'Same project context',history:'Context → both agents',author:design.owner.name+' → '+controls.owner.name,note:'Checking bracket clearance. Can you check the controller timing?'},
+ {x:150,status:'Working in parallel',output:'Two connected changes',history:'Design + code → history',author:controls.owner.name+' → '+design.owner.name,note:'Proposed wait: 0.25 seconds. The owner needs to confirm the timing tradeoff; motion checks remain open.'},
+ {x:250,status:'Decision needed',output:'Timing requirement decision',history:'Changes + reasons recorded',author:design.owner.name+' → you',note:detail.demo_request.question}
  ];
  let index=0,visible=false,timer;const reduced=matchMedia('(prefers-reduced-motion: reduce)');
  function render(){const step=steps[index];
@@ -38,7 +38,7 @@ export function mountProjectMap(host, overview, detail){
  root.querySelectorAll('.phases span').forEach((e,i)=>e.classList.toggle('current',i===index));root.querySelector('.lanes').classList.toggle('merged',index===2);
  root.querySelectorAll('.runner').forEach(e=>e.style.left=(step.x/3)+'%');root.querySelector('#flow-a').setAttribute('d',`M20 38H${step.x}`);root.querySelector('#flow-b').setAttribute('d',`M20 114H${step.x}`);
  const note=root.querySelector('.update');note.classList.remove('changed');root.querySelector('#note-author').textContent=step.author;root.querySelector('#note-body').textContent=step.note;requestAnimationFrame(()=>requestAnimationFrame(()=>note.classList.add('changed')));
- host.dataset.step=String(index);host.setAttribute('aria-label',`${project.name}, ${assembly.title}. Frame and carriage are outside this change. ${design.owner.id} works on the sensor bracket; ${controls.owner.id} works on motion control. ${step.status}. ${step.output}. ${step.note} Illustrative demo, not live.`);
+ host.dataset.step=String(index);host.setAttribute('aria-label',`${project.name}, ${assembly.title}. Base, arm links and gripper are outside this change. ${design.owner.name} works on the sensor bracket; ${controls.owner.name} works on motion control. ${step.status}. ${step.output}. ${step.note} Illustrative demo, not live.`);
  }
  function sync(){clearInterval(timer);const active=visible&&!document.hidden&&!reduced.matches;host.dataset.playing=String(active);if(active)timer=setInterval(()=>{index=(index+1)%steps.length;render();},5000);}
  new IntersectionObserver(entries=>{visible=entries[0].isIntersecting;sync();},{threshold:.2}).observe(host);document.addEventListener('visibilitychange',sync);reduced.addEventListener('change',sync);render();sync();

@@ -1,5 +1,5 @@
-import {mountStructureCamera} from './studio_camera.js?v=library-20261107';
-import {esc as e} from './ui.js?v=library-20261107';
+import {mountStructureCamera} from './studio_camera.js?v=component-20261107';
+import {esc as e} from './ui.js?v=component-20261107';
 
 // The graph uses only recorded parent relations. Leaves are stacked per branch.
 function layoutTree(nodes){

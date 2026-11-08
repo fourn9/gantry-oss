@@ -1,6 +1,6 @@
 // Browser-only sample. No account, runtime, network or persistence adapter exists here.
 const sampleSources=[
- {path:'project-brief.md',type:'Project brief',text:'Bench robot: review the sensor bracket and motion controller together. Keep full-motion clearance and physical verification open until checked.'},
+ {path:'project-brief.md',type:'Project brief',text:'Desktop robot arm: review the sensor bracket and motion controller together. Keep full-motion clearance and physical verification open until checked.'},
  {path:'team-notes.md',type:'Team context',text:'A project lead coordinates planning and review. A design agent owns CAD changes; a controls agent owns motion code. The project owner decides formal adoption.'},
  {path:'work.csv',type:'Task export',text:'Sensor bracket — move inward within cad/. Motion control — review the settling interval within control/. Agree on checks before adopting either change.'}
 ];

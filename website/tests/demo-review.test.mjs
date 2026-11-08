@@ -39,7 +39,7 @@ test('human request names the tradeoff; visible context uses versions and a sing
  assert.doesNotMatch(checks(d),/state_bracket|state_base/);
  const t=d.threads[0];assert.doesNotMatch(conversation(d,{...t},'',[]),/state_bracket/);
  const overview=await api('studio_overview');const side=sidebar(overview,[],{project:'bench'});
- assert.equal((side.projects.match(/Bench robot/g)||[]).length,1);assert.match(side.projects,/Wrist assembly/);
+ assert.equal((side.projects.match(/Desktop robot arm/g)||[]).length,1);assert.match(side.projects,/Arm assembly/);
 });
 
 test('only an explicit earlier comparison is used; CAD requests select their part',async()=>{
