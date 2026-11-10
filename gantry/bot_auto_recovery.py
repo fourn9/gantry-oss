@@ -42,7 +42,7 @@ def recover_held(worker, job):
     remains responsible for authority, requirements, dependencies and fences.
     """
     from .bot_inference_recovery import pending_inference
-    from .monthly_recovery import ensure_stopped, prepare_retry
+    from .monthly_recovery import ensure_stopped, prepare_retry, rate_limit_state
     root = worker.root/'jobs'
     directory = root/'development'/digest(job['id'])/str(job['attempt'])
     marker = directory/'auto-recovery.json'
@@ -101,6 +101,9 @@ def recover_held(worker, job):
                 require(isinstance(event, dict) and event.get('type') != 'turn.completed'
                         and not (isinstance(event.get('item'), dict) and event['item'].get('type') == 'agent_message'),
                         'outcome_unknown', 'Response evidence needs inspection')
+            failure = rate_limit_state(inference, saved)
+            if failure and failure['code'] == 'provider_usage_limited':
+                return held('provider_usage_limited')
             prepare_retry(inference, 'Automatic recovery of confirmed stopped inference', check_only=True)
         else:
             require(isinstance(saved.get('receipt'), dict) and 'output' in saved['receipt'],

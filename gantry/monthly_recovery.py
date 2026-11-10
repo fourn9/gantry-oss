@@ -1,4 +1,4 @@
-"""Explicit, journaled recovery of answer-free Codex rate limits and stopped timeouts."""
+"""Journaled recovery of answer-free Codex limits and stopped timeouts."""
 import json
 import os
 import re
@@ -24,7 +24,11 @@ def rate_limit_state(root, state):
     """Recognize terminal provider events, never text from an agent response."""
     root = Path(root)
     if state.get('phase') == 'failed' and state.get('code') == 'provider_rate_limited': return state
-    if state.get('phase') != 'started': return None
+    cached_usage = state.get('phase') == 'failed' and state.get('code') == 'provider_usage_limited'
+    if state.get('phase') != 'started' and not cached_usage: return None
+    if cached_usage:
+        require(type(state.get('pid')) is int and state['pid'] > 0, 'outcome_unknown',
+                'Subscription-limit recovery needs the original process identity')
     ensure_stopped(state)
     if (root/'answer.json').exists() and (root/'answer.json').stat().st_size: return None
     events = root/'events.jsonl'
@@ -40,6 +44,16 @@ def rate_limit_state(root, state):
     if not last or last.get('type') != 'turn.failed': return None
     error = last.get('error', {})
     if not isinstance(error, dict): return None
+    # Official CLI subscription exhaustion need not contain HTTP 429. Only a
+    # terminal provider error is eligible, never quoted agent output or stderr.
+    if str(error.get('message', '')).startswith("You've hit your usage limit."):
+        if cached_usage: return state
+        state = {**state, 'phase': 'failed', 'code': 'provider_usage_limited',
+                 'failures': state.get('failures', 0) + 1, 'failed_at': time.time()}
+        # Locale-dependent reset prose is not a trustworthy scheduler timestamp.
+        state.pop('retry_at', None)
+        persist(root/'inference.json', state)
+        return state
     if not (error.get('status') == 429 or error.get('code') == 429 or
             re.search(r'\b(?:HTTP\s+|status(?:\s+code)?\s*[:=]?\s*)429\b|\b429\s+Too Many Requests\b',
                       str(error.get('message', '')), re.IGNORECASE)): return None
@@ -53,6 +67,10 @@ def rate_limit_state(root, state):
 
 
 def rate_limit_fault(state):
+    if state['code'] == 'provider_usage_limited':
+        return Fault('provider_usage_limited',
+                     'Codex subscription allowance is exhausted; task is held. Confirm restored allowance before explicit recovery.',
+                     {'failures': state['failures'], 'automatic_retry': False})
     return Fault('provider_rate_limited', 'Codex returned 429; task is held. Explicit recovery is required.',
                  {'retry_at': state['retry_at'], 'failures': state['failures'],
                   'cooldown_source': 'local backoff; provider reset time is unknown'})
@@ -89,7 +107,7 @@ def prepare_retry(root, reason, check_only=False):
     state = json.loads(marker.read_text()); ensure_stopped(state)
     if state.get('phase') in {'completed', 'retry_ready'}: return
     failure = rate_limit_state(root, state) or timeout_state(root, state)
-    require(failure is not None, 'outcome_unknown', 'Only a confirmed answer-free Codex 429 or stopped timeout can be retried here')
+    require(failure is not None, 'outcome_unknown', 'Only a confirmed answer-free Codex limit or stopped timeout can be retried here')
     if failure['code'] == 'provider_rate_limited' and time.time() < failure['retry_at']: raise rate_limit_fault(failure)
     if check_only: return
     archive = root/'recoveries'/uid('retry'); archive.mkdir(parents=True, mode=0o700)

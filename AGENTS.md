@@ -22,3 +22,9 @@ Crew is the service as a whole, not a decision-making dispatcher. Bots reason an
 delegate within customer authority. Core records their decisions and enforces
 identity/version/access integrity; it does not choose engineering solutions.
 Mentor remains a separate optional review service.
+
+Additional design references: [Astryx](https://github.com/meta/astryx) for Studio
+design-system conventions and [Codex](https://github.com/openai/codex) for agent
+harness lifecycle, tool execution and recovery. Check the actual source and
+compatibility before adopting components; these references do not imply a UI
+framework migration or permission to bypass Gantry's recorded execution paths.
