@@ -172,6 +172,11 @@ report from overwriting a task's own saved edits.
   cooldown. A timeout with a saved adapter receipt confirming process termination
   and no answer can also be explicitly retried. An old `started` journal or a dead
   PID alone is insufficient: keep it held for separate outcome reconciliation.
+  A terminal, answer-free subscription usage-limit response is separately
+  reported as `provider_usage_limited`. Confirm the monthly allowance is restored
+  before using the same explicit retry command; automatic recovery never retries
+  this condition. Gantry does not purchase credits, infer a reset timestamp from
+  provider prose, or switch to a paid API.
   Only the pending planning/action inference is armed; completed actions
   and exact inputs are preserved. The previous worker must be stopped. Unknown
   outcomes, missing process identity and known active provider processes

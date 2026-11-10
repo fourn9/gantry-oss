@@ -56,6 +56,46 @@ class BotAutoRecoveryTests(unittest.TestCase):
         self.assertEqual(timing['recovery']['failed'], 0)
         self.assertTrue(self.c.owner.call('replay')['matched'])
 
+    def test_subscription_exhaustion_never_auto_retries_or_consumes_allowance(self):
+        from test_monthly_usage_limit import quota_journal
+        self.enable(); self.c.task('designer'); calls=[]
+        def infer(ctx, schema, directory):
+            calls.append(ctx)
+            quota_journal(directory, context=ctx, schema=schema)
+            raise Fault('provider_usage_limited', 'Synthetic terminal subscription limit')
+        with self.c.worker('designer', infer) as worker:
+            self.assertEqual(worker.tick()[0]['reason'], 'provider_usage_limited')
+            self.assertEqual(worker.tick()[0]['reason'], 'provider_usage_limited')
+        with patch('time.time', return_value=10**10):
+            with self.c.worker('designer', infer) as worker:
+                self.assertEqual(worker.tick()[0]['reason'], 'provider_usage_limited')
+                self.assertFalse(worker.restart.is_set())
+                saved=json.loads(next(worker.root.rglob('auto-recovery.json')).read_text())
+                self.assertEqual(saved['attempts'], 0)
+        self.assertEqual(len(calls), 1)
+
+    def test_explicit_quota_recovery_keeps_completed_read_and_original_pending_input(self):
+        from test_monthly_usage_limit import quota_journal
+        self.enable(); task=self.c.task('designer'); calls=[]
+        def infer(ctx, schema, directory):
+            calls.append(ctx)
+            if ctx['round']==0:return self.c.action('read', {'path':'mechanical.txt'})
+            marker=Path(directory)/'inference.json'
+            if not marker.exists():quota_journal(directory,context=ctx,schema=schema)
+            if json.loads(marker.read_text())['phase']!='retry_ready':
+                raise Fault('provider_usage_limited','Synthetic subscription limit')
+            return self.c.action('finish', self.c.answer())
+        with self.c.worker('designer', infer) as worker:
+            self.assertEqual(worker.tick()[0]['reason'],'provider_usage_limited')
+        with self.c.worker('designer', infer) as worker:
+            result=worker.recover(task['id'],'Operator confirmed restored monthly allowance',retry_inference=True)
+        self.assertEqual(result['task']['status'],'completed')
+        self.assertEqual(len(calls),3)
+        self.assertEqual(calls[1],calls[2])
+        view=self.c.owner.call('get_bot_task',{'task_id':task['id']})
+        self.assertEqual(len([a for a in view['actions'] if a['kind']=='read']),1)
+        self.assertTrue(self.c.owner.call('replay')['matched'])
+
     def test_policy_is_bound_to_owner_approved_environment(self):
         original = environment_manifest(self.c.configs['designer'])
         self.c.configs['designer']['recovery_policy'] = {'max_attempts': 1, 'cooldown_seconds': 10}

@@ -82,6 +82,17 @@ per-task-attempt counters cap automatic recovery at the configured 1–3 attempt
 The cap limits infrastructure retries, not engineering trials or normal model turns.
 Already completed read/tool actions are not replayed by this path.
 
+Subscription allowance exhaustion is different from a transient HTTP 429.
+The monthly CLI's terminal, answer-free usage-limit response is reported as
+`provider_usage_limited`. Automatic recovery leaves it held without consuming
+retry allowance or requesting a worker restart. It does not buy credits or use
+an API-key fallback. Reset dates in provider prose are not parsed as scheduling
+authority. After confirming the allowance is restored and the old processes
+have stopped, use the explicit `--recover-job`, `--confirm-stopped` and
+`--retry-inference` path in [Bot development](BOT_DEVELOPMENT.md).
+It archives the original invocation and preserves completed actions and inputs.
+Late answers, live or missing process identities and unknown effects remain held.
+
 Same-fence recovery requests a supervisor restart. A renewed worker still passes
 Core's current authority, requirements and dependency checks. Live processes,
 unknown local tool/edit effects, changed authority or malformed journals remain
