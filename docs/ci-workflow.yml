@@ -1,12 +1,14 @@
 name: CI
-on: [push, pull_request]
+on: [push, pull_request, workflow_dispatch]
 permissions:
   contents: read
 jobs:
   test:
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
     strategy:
       matrix:
+        os: [ubuntu-22.04, macos-14]
         python: ['3.11', '3.12']
     steps:
       - uses: actions/checkout@v4
@@ -27,4 +29,15 @@ jobs:
         with:
           node-version: '22'
           check-latest: true
-      - run: node --test tests/test_review_web.mjs
+      - run: node --test tests/test_*.mjs
+      - run: node --test website/tests/*.mjs
+  required:
+    name: ci-required
+    runs-on: ubuntu-22.04
+    needs: test
+    if: always()
+    steps:
+      - name: Require every matrix job
+        env:
+          RESULT: ${{ needs.test.result }}
+        run: test "$RESULT" = success

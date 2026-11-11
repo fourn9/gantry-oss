@@ -61,7 +61,7 @@ class UnlimitedConnectionTests(unittest.TestCase):
         self.assertTrue(self.owner.call('replay')['matched'])
 
     def test_thirteen_real_sandboxed_tests_and_retry(self):
-        if not backend(): self.skipTest('Supported command sandbox unavailable')
+        if backend() == 'unavailable': self.skipTest('Supported command sandbox unavailable')
         (self.root/'control.py').write_text('def clamp(x):\n    return max(0, min(x, 10))\n')
         self.attach()
         for index in range(13):
