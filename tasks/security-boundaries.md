@@ -16,3 +16,12 @@ external acquisition. The storage codec now writes version 2 with explicit manif
 paths and verifies logical round-trip equality before insertion. Existing version 1
 records remain readable. Already damaged historical data is not rewritten or claimed
 repaired; restore such data only from a verified backup after incident assessment.
+
+Independent review: no actionable findings across correctness, authorization,
+storage compatibility and performance. Anonymous mixed v1/v2 history passed
+capture, cached response retrieval, verify, replay and restore, preserving old
+event bytes. Product JS 71/71 and website JS 32/32 passed. The dated local runtime
+baseline passed; pip-audit found no known dependency vulnerabilities (the local
+Gantry distribution itself is source-reviewed, not a PyPI advisory match).
+Final cross-platform suite results are attached to PR #31; these tests do not
+claim inspection or repair of any live customer ledger.
