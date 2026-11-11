@@ -236,7 +236,7 @@ class Service(BotIssuesMixin, CrewSetupJobsMixin, CrewSetupMixin, MembershipMixi
                 return json.loads(canonical(result))
             if command in {'claim_analysis','claim_crew_setup_job'} and not effects:
                 # Polls with no claim are observations, not development events.
-                con.execute("INSERT INTO requests VALUES (?,?,?,?)", (actor['id'], key, fp, canonical(manifest_store.pack(con,result))))
+                con.execute("INSERT INTO requests VALUES (?,?,?,?)", (actor['id'], key, fp, canonical(manifest_store.pack(con,result, [()] if command == 'capture_artifact' else []))))
                 con.commit()
                 return result
             intent = args.get("intent", {"type": "declared", "text": command})
@@ -247,7 +247,7 @@ class Service(BotIssuesMixin, CrewSetupJobsMixin, CrewSetupMixin, MembershipMixi
             result = self.store.append(con, s, actor, command, effects, result,
                                        args.get("basis", {"seq": s["seq"]}), intent, notices,
                                        request={"key": key, "fingerprint": fp})
-            con.execute("INSERT INTO requests VALUES (?,?,?,?)", (actor["id"], key, fp, canonical(manifest_store.pack(con,result))))
+            con.execute("INSERT INTO requests VALUES (?,?,?,?)", (actor["id"], key, fp, canonical(manifest_store.pack(con,result, [()] if command == 'capture_artifact' else []))))
             con.commit()
             return result
 

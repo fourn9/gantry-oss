@@ -1,0 +1,80 @@
+name: CI
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+permissions:
+  contents: read
+jobs:
+  test:
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-22.04, macos-15]
+        python: ['3.11.17', '3.12.15']
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Install Linux sandbox backend
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends bubblewrap
+      - uses: astral-sh/setup-uv@94527f2e458b27549849d47d273a16bec83a01e9 # v7
+        with:
+          version: '0.13.5'
+          enable-cache: false
+      - name: Isolate project dependencies from hosted runner packages
+        run: |
+          uv python install '${{ matrix.python }}'
+          uv venv --python '${{ matrix.python }}' --managed-python --seed .ci-venv
+          echo "$PWD/.ci-venv/bin" >> "$GITHUB_PATH"
+      - run: |
+          python -m pip install 'pip @ https://files.pythonhosted.org/packages/3f/06/3e4420302363fbb71be3c7f35ce042f54bfca330e3e66b3a2e3c4cca579f/pip-26.2.2-py3-none-any.whl#sha256=fd7f4dfa8190e014013b9f08f3e973f4e4c26ffd179a204895533a7254813a70'
+      - run: |
+          python -m pip install --upgrade --only-binary=:all: 'pip>=26.2.2' 'setuptools>=78.1.1' 'PyNaCl>=1.6.2,<2' pip-audit
+      - run: |
+          python -m pip install '.[feedback]'
+      - run: |
+          python -m gantry.security_check
+      - run: |
+          python -m pip_audit --skip-editable
+      - name: Verify real sandbox before the full suite
+        run: |
+          python - <<'PYTHON'
+          import sys, tempfile
+          from gantry.project_sandbox import backend, execute, runtime_roots
+          with tempfile.TemporaryDirectory() as scratch:
+              result = execute({'argv': [sys.executable, '-c', 'print("sandbox-ready")'],
+                                'timeout_seconds': 10}, scratch, runtime_roots(), backend(), lambda: None)
+              assert result['exit_code'] == 0, result
+          PYTHON
+      - run: |
+          python -m unittest discover -s tests -p 'test_*.py' -q
+      - run: |
+          python examples/development_loop.py
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          check-latest: true
+      - run: |
+          node --test tests/test_*.mjs
+      - run: |
+          node --test website/tests/*.mjs
+  required:
+    name: ci-required
+    runs-on: ubuntu-22.04
+    needs: test
+    if: always()
+    steps:
+      - name: Require every matrix job
+        env:
+          RESULT: ${{ needs.test.result }}
+        run: test "$RESULT" = success

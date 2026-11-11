@@ -13,9 +13,10 @@ PACKAGE_FLOORS = {'pip': '26.2.2', 'certifi': '2026.10.19', 'uv': '0.13.4',
 
 def release(value):
     # Unknown/vendor/prerelease versions require operator review, not a green check.
-    if not re.fullmatch(r'\d+\.\d+\.\d+', value):
+    if not re.fullmatch(r'\d+\.\d+(?:\.\d+)?', value):
         return None
-    return tuple(map(int, value.split('.')))
+    parts = tuple(map(int, value.split('.')))
+    return parts + (0,) * (3 - len(parts))
 
 
 def assess(python_version, packages, implementation='CPython'):
