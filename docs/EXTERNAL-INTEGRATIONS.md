@@ -294,3 +294,18 @@ Planned updates cover only the operations explicitly listed in the catalog.
 - [Graph drive items](https://learn.microsoft.com/en-us/graph/api/driveitem-get?view=graph-rest-1.0), [Excel ranges](https://learn.microsoft.com/en-us/graph/api/range-get?view=graph-rest-1.0).
 - [Onshape OAuth](https://onshape-public.github.io/docs/auth/oauth/), [Part Studio API](https://github.com/onshape-public/go-client/blob/master/onshape/api_part_studio.go).
 - [Slack history](https://docs.slack.dev/reference/methods/conversations.history/).
+
+### Cloud workspace credential migration
+
+Cloud workspace credentials now use `GANTRY_CONNECTOR_WS_<HEX>__<NAME>`, where
+`HEX` is the uppercase hexadecimal encoding of the exact ASCII workspace slug.
+For example, `team` uses `GANTRY_CONNECTOR_WS_7465616D__GITHUB`. The double
+underscore separates the encoded workspace from the operator's credential name.
+Single-workspace local connectors keep the `GANTRY_CONNECTOR_*` convention.
+
+After upgrading a cloud host, provision the credential under the new environment
+name and update each integration's `credential_ref` through `configure_integration`
+(with its current version). Restart the host to load operator environment changes.
+Old cloud references are not silently migrated or used: their configured indicator
+is false and synchronization is denied until the operator updates them. Existing
+history remains unchanged. Never put token values in commands, ledger data or logs.

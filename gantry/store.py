@@ -63,7 +63,7 @@ class Store:
     def append(self, con, state, actor, command, effects, result, basis, intent, notices=None, request=None):
         last = con.execute("SELECT body FROM events ORDER BY seq DESC LIMIT 1").fetchone()
         previous = json.loads(last[0]) if last else None
-        if previous and previous.get('_gantry_storage')==1: previous=previous['value']
+        if previous and previous.get('_gantry_storage') in {1, 2}: previous=previous['value']
         event = {"schema_version": 1, "event_id": uid("evt"), "ledger_id": state["ledger_id"],
                  "seq": state["seq"] + 1, "event_type": "bootstrap" if previous is None else "command",
                  "actor_id": actor["id"], "actor_kind": actor["kind"],
@@ -74,7 +74,14 @@ class Store:
         if request is not None:
             event["payload"]["request"] = request
         event["hash"] = digest(event)
-        con.execute("INSERT INTO events VALUES (?,?)", (event["seq"], canonical(manifest_store.pack(con,event))))
+        paths = [('payload', 'effects', i, 'value') for i, effect in enumerate(effects)
+                 if effect.get('table') in {'entries', 'revisions'}]
+        if command == 'capture_artifact':
+            paths.append(('payload', 'result'))
+        packed = manifest_store.pack(con, event, paths)
+        require(digest(manifest_store.unpack(con, packed)) == digest(event),
+                'integrity_error', 'Event encoding is not lossless')
+        con.execute("INSERT INTO events VALUES (?,?)", (event["seq"], canonical(packed)))
         project(state, event)
         row = con.execute('SELECT body FROM projection WHERE id=1').fetchone()
         if not row or json.loads(row[0]).get('_indexed') != 2:
