@@ -22,6 +22,11 @@ jobs:
       - uses: actions/checkout@v4
         with:
           persist-credentials: false
+      - name: Install Linux sandbox backend
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends bubblewrap
       - uses: astral-sh/setup-uv@94527f2e458b27549849d47d273a16bec83a01e9 # v7
         with:
           version: '0.13.5'
@@ -41,6 +46,16 @@ jobs:
           python -m gantry.security_check
       - run: |
           python -m pip_audit --skip-editable
+      - name: Verify real sandbox before the full suite
+        run: |
+          python - <<'PYTHON'
+          import sys, tempfile
+          from gantry.project_sandbox import backend, execute, runtime_roots
+          with tempfile.TemporaryDirectory() as scratch:
+              result = execute({'argv': [sys.executable, '-c', 'print("sandbox-ready")'],
+                                'timeout_seconds': 10}, scratch, runtime_roots(), backend(), lambda: None)
+              assert result['exit_code'] == 0, result
+          PYTHON
       - run: |
           python -m unittest discover -s tests -p 'test_*.py' -q
       - run: |
