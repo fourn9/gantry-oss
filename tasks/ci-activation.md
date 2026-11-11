@@ -12,6 +12,7 @@ Acceptance:
 
 Changes:
 - `docs/ci-workflow.yml` moved to `.github/workflows/ci.yml`. Ubuntu runs Python 3.11, 3.12 and 3.13; macOS runs 3.13. JavaScript steps use the documented globs.
+- The template was not valid YAML: the step with `--only-binary=:all: ` held a colon and a space in a plain scalar, so GitHub rejected the file. The step is now a block scalar. The first push of this branch showed the rejection; a YAML parser confirms the template on `main` has the same error.
 - `tests/test_unlimited_connection.py`: the guard `if not backend()` never skipped, because `backend()` returns the string `'unavailable'`. It now compares with that value.
 - `tests/test_crew_integration.py`: the three tests that execute a sandboxed tool skip when no sandbox is available. `test_dirty_workspace_refused` still runs there.
 - `CONTRIBUTING.md` and `docs/README.md` point to the active workflow.
