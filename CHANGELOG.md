@@ -9,7 +9,18 @@
 This file records changes after v3.3.0. Earlier release notes remain in the
 [GitHub releases](https://github.com/fourn9/gantry-oss/releases).
 
-## Unreleased
+## 3.4.1 — Storage integrity, workspace isolation and CI
+
+- Preserve caller metadata through explicit, lossless storage encoding; retain
+  read compatibility with existing event history.
+- Isolate cloud connector credentials by exact encoded workspace namespace and
+  recheck ownership before use. See the cloud credential migration in
+  `docs/EXTERNAL-INTEGRATIONS.md` before upgrading a cloud deployment.
+- Activate full Python and JavaScript CI across Linux/macOS and Python 3.11/3.12.
+  Fix unavailable-sandbox handling and stable two-component package versions.
+- Keep Studio message order deterministic when comments share a timestamp.
+
+Previously unreleased changes included in this release:
 
 - Published website/demo source and regression tests under `website/`. In the
   browser-only demo, requests open their selected evidence and pinned comparison;

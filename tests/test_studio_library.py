@@ -167,6 +167,7 @@ class LibraryTests(unittest.TestCase):
 
     def test_long_thread_starts_with_newest_page_after_submission(self):
         p, st, work = self.setup_work()
+        self.service.clock = lambda: 123456789  # Concurrent comments can share a millisecond.
         args={'project_id':p['id'],'state_id':st['id'],'anchor':{'kind':'project'}}
         for i in range(52):
             message=self.call('studio_comment',{**args,'body':f'Message {i}','mentions':[]})
