@@ -20,9 +20,9 @@ Contributions are submitted under the project's MIT license. Provide only work y
 
 Keep a single guide authoritative for each workflow; link to it rather than duplicating its instructions. Keep dated test evidence separate from current setup instructions.
 
-## CI setup
+## CI
 
-`docs/ci-workflow.yml` is a GitHub Actions template. A repository owner with workflow permissions can copy it to `.github/workflows/ci.yml` to run Python 3.11/3.12 and JavaScript tests on Ubuntu. It is not active merely by being in `docs`.
+`.github/workflows/ci.yml` runs on pull requests and on pushes to `main`. It runs the Python tests on Ubuntu (3.11, 3.12, 3.13) and macOS (3.13), the dependency audit, and the JavaScript tests in `tests/` and `website/tests/`. Tests that need an OS command sandbox run on macOS and skip where no supported sandbox is available. Requiring these checks and a review before merge is a repository setting (branch protection); the workflow file does not enable it.
 
 ## Refresh the API reference
 

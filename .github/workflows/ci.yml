@@ -1,13 +1,25 @@
 name: CI
-on: [push, pull_request]
+on:
+  push:
+    branches: [main]
+  pull_request:
 permissions:
   contents: read
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 jobs:
   test:
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.os }}
     strategy:
+      fail-fast: false
       matrix:
-        python: ['3.11', '3.12']
+        os: [ubuntu-latest]
+        python: ['3.11', '3.12', '3.13']
+        include:
+          # The macOS job is the one that runs the Seatbelt sandbox tests for real.
+          - os: macos-latest
+            python: '3.13'
     steps:
       - uses: actions/checkout@v4
         with:
@@ -27,4 +39,5 @@ jobs:
         with:
           node-version: '22'
           check-latest: true
-      - run: node --test tests/test_review_web.mjs
+      - run: node --test tests/test_*.mjs
+      - run: node --test website/tests/*.test.mjs

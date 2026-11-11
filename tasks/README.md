@@ -14,6 +14,7 @@ Use [documentation](../docs/README.md) for current operation and [verification r
 - [Paired Bot experience evaluation](bot-learning-evaluation.md)
 - [Personal Bot continuity](bot-personal-continuity.md)
 - [CAD and physical evidence integration](cad-physical-evidence.md)
+- [Active CI workflow](ci-activation.md)
 - [Connected workspace: import → capture → share → continue](connected-workspace.md)
 - [Design change → evidence → next change](design-change-loop.md)
 - [Engineering workflow, outside Bot development](engineering-workflow.md)
