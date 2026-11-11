@@ -24,11 +24,12 @@ def validate_repository(value):
     return value
 
 
-def credential(reference):
+def credential(reference, prefix='GANTRY_CONNECTOR_'):
     if not reference:
         return ''
     require(re.fullmatch(r'GANTRY_CONNECTOR_[A-Z0-9_]+', reference), 'invalid_input',
             'Credential references must start with GANTRY_CONNECTOR_')
+    require(reference.startswith(prefix), 'unauthorized', 'Credential reference must belong to this workspace')
     token = os.environ.get(reference, '')
     require(bool(token), 'credential_missing', 'The operator has not configured this credential reference')
     require('\n' not in token and '\r' not in token, 'credential_missing', 'Invalid credential configuration')
@@ -37,7 +38,7 @@ def credential(reference):
 
 def fetch_repository(config):
     repo = validate_repository(config['repository'])
-    token = credential(config.get('credential_ref'))
+    token = credential(config.get('credential_ref'), config.get('_credential_prefix', 'GANTRY_CONNECTOR_'))
     opener = build_opener(NoRedirect())
     requests = 0
     deadline = time.monotonic() + 25

@@ -72,7 +72,7 @@ class CloudServer(Server):
         with self.services_lock:
             if name not in self.services:
                 self.services[name] = Service(folder)
-                self.services[name].credential_prefix = 'GANTRY_CONNECTOR_' + name.upper().replace('-', '_') + '_'
+                self.services[name].credential_prefix = 'GANTRY_CONNECTOR_WS_' + name.encode('ascii').hex().upper() + '__'
             return self.services[name], suffix
 
 

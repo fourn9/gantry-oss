@@ -86,20 +86,47 @@ class Tree:
         return root
 
 
-def pack(con,value):
-    tree=Tree(con)
-    def visit(x):
-        if isinstance(x,list):return [visit(v) for v in x]
-        if not isinstance(x,dict):return x
-        if x.get('type')=='artifact_snapshot' and isinstance(x.get('data',{}).get('files'),dict):
-            y=copy.deepcopy(x);root=tree.manifest(y['data']['files'])
-            y['data']['files']={'_manifest_root':root};return y
-        return {k:visit(v) for k,v in x.items()}
-    return {'_gantry_storage':1,'value':visit(value)}
+def pack(con, value, snapshot_paths=()):
+    """Only encode explicitly identified artifact entries, never caller metadata.
+
+    References are out-of-band paths, so a literal _manifest_root remains data.
+    Version 1 is read-only for compatibility with existing immutable history.
+    """
+    stored = copy.deepcopy(value)
+    paths = []
+    tree = Tree(con)
+    for path in snapshot_paths:
+        entry = stored
+        for key in path:
+            entry = entry[key]
+        if not isinstance(entry, dict) or entry.get('type') != 'artifact_snapshot':
+            continue
+        data = entry.get('data')
+        if not isinstance(data, dict) or not isinstance(data.get('files'), dict):
+            continue
+        files = data['files']
+        # Null is the treap deletion sentinel; leave non-manifests verbatim.
+        if any(not isinstance(info, dict) for info in files.values()):
+            continue
+        root = tree.manifest(files)
+        require(dict(tree.items(root)) == files, 'integrity_error', 'Manifest encoding is not lossless')
+        data['files'] = root
+        paths.append(list(path) + ['data', 'files'])
+    return {'_gantry_storage': 2, 'value': stored, 'manifest_paths': paths}
 
 
 def unpack(con,value):
     if '_gantry_storage' not in value:return value
+    if value['_gantry_storage'] == 2:
+        require(set(value) == {'_gantry_storage', 'value', 'manifest_paths'}, 'unsupported_schema', 'Unknown physical record encoding')
+        result = copy.deepcopy(value['value'])
+        tree = Tree(con)
+        for path in value['manifest_paths']:
+            parent = result
+            for key in path[:-1]:
+                parent = parent[key]
+            parent[path[-1]] = dict(tree.items(parent[path[-1]]))
+        return result
     require(value['_gantry_storage']==1 and set(value)=={'_gantry_storage','value'},'unsupported_schema','Unknown physical record encoding')
     tree=Tree(con)
     def visit(x):

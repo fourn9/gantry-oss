@@ -69,7 +69,7 @@ def schema(con):
 
 def put(con, table, key, value, canonical):
     con.execute('INSERT OR REPLACE INTO records VALUES (?,?,?,?,?,?,?,?)',
-        (table, key, canonical(manifests.pack(con,value)), value.get('session_id'), value.get('state_id'),
+        (table, key, canonical(manifests.pack(con,value, [()] if table in {'entries', 'revisions'} else [])), value.get('session_id'), value.get('state_id'),
          value.get('subject_id'), value.get('profile') if isinstance(value.get('profile'), str) else None, value.get('created_seq')))
     if table == 'principals':
         con.execute('DELETE FROM credentials WHERE actor=?', (key,))

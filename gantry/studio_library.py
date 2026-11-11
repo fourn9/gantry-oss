@@ -126,16 +126,16 @@ class StudioLibraryMixin(StudioTargetsMixin):
         threads=[t for t in s.get('studio_threads',{}).values() if not t.get('work_id')
             and t.get('project_id')==a['project_id'] and t['state_id']==state['id'] and t['anchor']==a['anchor']]
         messages={t['id']:[] for t in threads}; cursor=a.get('message_after')
-        ids=list(messages); rows=[]; at=''; mid=''
+        ids=list(messages); rows=[]; at=''; seq=0; mid=''
         if cursor:
             m=s.get('studio_messages',{}).get(cursor)
             require(m and m['thread_id'] in ids,'invalid_input','Invalid message cursor')
-            at=m['at'];mid=m['id']
+            at=m['at'];seq=m.get('created_seq',0);mid=m['id']
         if ids:
             timestamp="COALESCE(json_extract(body,'$.value.at'),json_extract(body,'$.at'))"
             rows=con.execute("SELECT id FROM records WHERE collection='studio_messages' AND subject_id IN ("+
-                ','.join('?' for _ in ids)+")"+(" AND ("+timestamp+",id)<(?,?)" if cursor else "")+" ORDER BY "+timestamp+" DESC,id DESC LIMIT ?",
-                (*ids,*([at,mid] if cursor else []),a.get('limit',50)+1)).fetchall()
+                ','.join('?' for _ in ids)+")"+(" AND ("+timestamp+",COALESCE(created_seq,0),id)<(?,?,?)" if cursor else "")+" ORDER BY "+timestamp+" DESC,COALESCE(created_seq,0) DESC,id DESC LIMIT ?",
+                (*ids,*([at,seq,mid] if cursor else []),a.get('limit',50)+1)).fetchall()
         for row in rows[:a.get('limit',50)]:
             m=s['studio_messages'][row[0]]; messages[m['thread_id']].append(m)
         message_next=rows[a.get('limit',50)-1][0] if len(rows)>a.get('limit',50) else None
@@ -144,7 +144,7 @@ class StudioLibraryMixin(StudioTargetsMixin):
             'participants':self._studio_participants(s,actor,session,state),'session_version':session['version'],'write_scope':session['write_scope'],'message_next':message_next,
             'bot_requests':self._studio_bot_requests(s,None,state['id'],actor,a['project_id'],a['anchor']),
             'can_assign_bot':actor['kind']=='human' and actor['id']==session['owner'] and state['id']==session.get('active_state') and permitted('studio_request_bot') and ('admin' in actor['permissions'] or {'work','record'}<=set(actor['permissions'])),
-            'threads':[{**t,'messages':sorted(messages[t['id']],key=lambda m:(m['at'],m['id']))} for t in threads],
+            'threads':[{**t,'messages':sorted(messages[t['id']],key=lambda m:(m['at'],m.get('created_seq',0),m['id']))} for t in threads],
             'can_comment':permitted('studio_comment') and bool({'admin','record'}&set(actor['permissions'])),
             'can_ask_bot':actor['kind']=='human' and permitted('studio_request_bot') and ('admin' in actor['permissions'] or {'work','record'}<=set(actor['permissions']))}
 

@@ -17,7 +17,7 @@ class StudioDiscussionMixin:
         for m in s.get('studio_messages',{}).values():
             if m['subject_id'] in messages: messages[m['subject_id']].append(m)
         for t in threads:
-            t['messages']=sorted(messages[t['id']],key=lambda m:(m['at'],m['id']))
+            t['messages']=sorted(messages[t['id']],key=lambda m:(m['at'],m.get('created_seq',0),m['id']))
         return sorted(threads,key=lambda t:(t['at'],t['id']))
 
     def _studio_discussion_index(self,s,actor,change):
@@ -25,7 +25,7 @@ class StudioDiscussionMixin:
         result=[]
         messages={}
         for m in s.get('studio_messages',{}).values():
-            messages.setdefault(m['thread_id'],[]).append((m['at'],m['id']))
+            messages.setdefault(m['thread_id'],[]).append((m['at'],m.get('created_seq',0),m['id']))
         for t in s.get('studio_threads',{}).values():
             if t['work_id']!=change['id']: continue
             sid=t['state_id']
@@ -35,7 +35,7 @@ class StudioDiscussionMixin:
             if not allowed[sid]: continue
             ids=sorted(messages.get(t['id'],[]))
             result.append({'id':t['id'],'state_id':sid,'anchor':t['anchor'],
-                'message_count':len(ids),'last_message_id':ids[-1][1] if ids else None})
+                'message_count':len(ids),'last_message_id':ids[-1][-1] if ids else None})
         return sorted(result,key=lambda t:t['id'])
 
     def cmd_studio_comment(self,s,actor,a,fx,n,con):
@@ -61,7 +61,7 @@ class StudioDiscussionMixin:
                     anchor=anchor,at=self.clock(),author=actor['id'])
                 self._dev_save(s,fx,'studio_threads',t)
         m=dict(id=uid('message'),session_id=d['id'],subject_id=t['id'],thread_id=t['id'],body=a['body'],
-            mentions=sorted(recipients),author=actor['id'],at=self.clock(),state_id=state['id'])
+            mentions=sorted(recipients),author=actor['id'],at=self.clock(),created_seq=s['seq']+1,state_id=state['id'])
         self._dev_save(s,fx,'studio_messages',m)
         for recipient in recipients:
             item=dict(id=uid('mention'),session_id=d['id'],subject_id=recipient,work_id=wid,project_id=t.get('project_id'),state_id=state['id'],

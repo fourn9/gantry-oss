@@ -9,7 +9,18 @@
 This file records changes after v3.3.0. Earlier release notes remain in the
 [GitHub releases](https://github.com/fourn9/gantry-oss/releases).
 
-## Unreleased
+## 3.4.1 — Storage integrity, workspace isolation and CI
+
+- Preserve caller metadata through explicit, lossless storage encoding; retain
+  read compatibility with existing event history.
+- Isolate cloud connector credentials by exact encoded workspace namespace and
+  recheck ownership before use. See the cloud credential migration in
+  `docs/EXTERNAL-INTEGRATIONS.md` before upgrading a cloud deployment.
+- Activate full Python and JavaScript CI across Linux/macOS and Python 3.11/3.12.
+  Fix unavailable-sandbox handling and stable two-component package versions.
+- Keep Studio message order deterministic when comments share a timestamp.
+
+Previously unreleased changes included in this release:
 
 - Published website/demo source and regression tests under `website/`. In the
   browser-only demo, requests open their selected evidence and pinned comparison;
@@ -30,9 +41,6 @@ This file records changes after v3.3.0. Earlier release notes remain in the
 - Studio Team and version-bound **Ask a Bot / Assign work**. Answers return to the
   original selection and Inbox; edits return as separate shared candidates.
   Existing customer runtimes execute the work; ordinary comments do not dispatch.
-- `python -m gantry.security_check` compares a final release that has two
-  components (`pip 26.3`) with its floor. Before this change it reported every
-  such version as below the minimum.
 - Acknowledged Bot handoffs preserve saved changes, unfinished context and
   successor dependencies. Read-only Ask also blocks unrelated direct API writes;
   runtime replacement cannot silently reset an active executor.

@@ -22,7 +22,7 @@ Keep a single guide authoritative for each workflow; link to it rather than dupl
 
 ## CI
 
-`.github/workflows/ci.yml` runs on pull requests and on pushes to `main`. It runs the Python tests on Ubuntu (3.11, 3.12, 3.13) and macOS (3.13), the dependency audit, and the JavaScript tests in `tests/` and `website/tests/`. Tests that need an OS command sandbox run on macOS and skip where no supported sandbox is available. Requiring these checks and a review before merge is a repository setting (branch protection); the workflow file does not enable it.
+`.github/workflows/ci.yml` runs on pull requests, on pushes to `main` and on manual dispatch. It runs the Python tests with Python 3.11.17 and 3.12.15 on Ubuntu 22.04 and macOS 15, the dependency audit, and the JavaScript tests in `tests/` and `website/tests/`. The Linux jobs install bubblewrap, and each job checks the OS command sandbox before the suite, so sandbox tests run in CI. They skip only on a host with no supported sandbox. The `ci-required` job succeeds only when every matrix job succeeds. `docs/ci-workflow.yml` is kept as an identical copy. Requiring `ci-required` and a review before merge is a repository setting (branch protection); the workflow file does not enable it.
 
 ## Refresh the API reference
 

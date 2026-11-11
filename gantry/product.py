@@ -28,7 +28,9 @@ class ProductMixin:
         return item
 
     def _integration_view(self, item):
-        return {**item, 'credential_configured': bool(os.environ.get(item.get('credential_ref', ''))),
+        reference = item.get('credential_ref', '')
+        permitted = not reference or reference.startswith(getattr(self, 'credential_prefix', 'GANTRY_CONNECTOR_'))
+        return {**item, 'credential_configured': bool(permitted and reference and os.environ.get(reference)),
                 'authentication': 'server_credential' if item.get('credential_ref') else 'public_read_only'}
 
     def cmd_save_project(self, s, actor, a, fx, n, con):
@@ -94,10 +96,13 @@ class ProductMixin:
                 require(cached['fingerprint'] == digest({'command': 'sync_integration', 'args': args}),
                         'idempotency_mismatch', 'Key reused with different input')
                 return manifest_store.unpack(con,json.loads(cached['response']))
+            reference = item.get('credential_ref', '')
+            prefix = getattr(self, 'credential_prefix', 'GANTRY_CONNECTOR_')
+            require(not reference or reference.startswith(prefix), 'unauthorized', 'Credential reference must belong to this workspace')
             require(item['enabled'] and item['provider'] == 'github', 'mode_disabled', 'GitHub connection is disabled')
             require(self.clock() - item.get('last_attempt', 0) >= 10000, 'rate_limited', 'Wait 10 seconds before synchronizing again')
         try:
-            data = fetch_repository(item)
+            data = fetch_repository({**item, '_credential_prefix': prefix})
         except Fault as exc:
             data = {'error': exc.as_dict()}
         return self.call(token, 'sync_integration', args, key,

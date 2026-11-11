@@ -13,8 +13,7 @@ PACKAGE_FLOORS = {'pip': '26.2.2', 'certifi': '2026.10.19', 'uv': '0.13.4',
 
 def release(value):
     # Unknown/vendor/prerelease versions require operator review, not a green check.
-    # A final release may omit its last component: 26.3 is 26.3.0.
-    if not re.fullmatch(r'\d+\.\d+(\.\d+)?', value):
+    if not re.fullmatch(r'\d+\.\d+(?:\.\d+)?', value):
         return None
     parts = tuple(map(int, value.split('.')))
     return parts + (0,) * (3 - len(parts))

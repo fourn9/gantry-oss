@@ -8,7 +8,7 @@ Keep working in your CAD tools, editor and simulator. Use Gantry to share unfini
 
 The [website and demo source](website/README.md) includes local preview and test instructions.
 
-The demo uses invented, browser-only data. Local operation is the supported starting point. The latest packaged release is [v3.4.0](https://github.com/fourn9/gantry-oss/releases/tag/v3.4.0); `main` also includes guided project onboarding and contextual Studio Bot work.
+The demo uses invented, browser-only data. Local operation is the supported starting point. The latest packaged release is [v3.4.1](https://github.com/fourn9/gantry-oss/releases/tag/v3.4.1), including guided project onboarding and contextual Studio Bot work.
 
 ## How it works
 
