@@ -40,3 +40,15 @@ export function commentCount(detail,stateId,path,line){
 export const libraryURL=(project,node,section,state,anchor,thread,notification)=>'studio/'+encodeURIComponent(project)+'/'+encodeURIComponent(node||'~')+'/'+section+(state?'/'+encodeURIComponent(state):'')+(anchor?'/'+encodeURIComponent(JSON.stringify(anchor)):'')+(thread?'/'+encodeURIComponent(thread):'')+(notification?'/'+encodeURIComponent(notification):'');
 export const participantName=(participants,id)=>participants?.find(p=>p.id===id||p.bot_ids?.includes(id))?.name||id;
 export const anchorLabel=a=>a.kind==='work'?'Work conversation':a.kind==='project'?'Project conversation':a.kind==='component'?a.component_id:a.kind==='requirement'?a.requirement_id:a.kind==='code'?`${a.path}:${a.line}`:a.path||a.part;
+
+// Match explicit saved mappings only; a folder mapping must end in a slash.
+export function componentForFile(project,path){
+ if(!project||!path)return;
+ const matches=p=>path===p||(p.endsWith('/')&&path.startsWith(p));
+ const specificity=n=>Math.max(...n.paths.filter(matches).map(p=>p.length));
+ return (project.hierarchy||[]).filter(n=>n.paths?.some(matches)).sort((a,b)=>specificity(b)-specificity(a)||Number(project.hierarchy.some(n=>n.parent===a.id))-Number(project.hierarchy.some(n=>n.parent===b.id)))[0];
+}
+export function componentWork(project,works,id,preferred){
+ const choices=relatedWorks(works,project.id,id,project.hierarchy);
+ return choices.find(w=>w.id===preferred)||choices.find(w=>w.components?.[0]?.id===id)||choices[0];
+}

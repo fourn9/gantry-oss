@@ -27,32 +27,34 @@ def seed(root):
         args={'proposal_id':p['id'],'version':p['version']};call('submit',args);call('endorse',{**args,'reason':'Isolated demo setup'});call('review_adoption',{**args,'reason':'Isolated demo setup','verdict':'approve'});call('commit',args)
         path=root/(aid+'.token');path.write_text(own);path.chmod(0o600)
     def mesh(body):return 'solid demo\n'+body+'endsolid demo\n'
-    files={'cad/base.stl':mesh(box(-60,-40,0,120,80,6)+box(-50,-30,6,8,60,40)+box(42,-30,6,8,60,40)),
-           'cad/carriage.stl':mesh(box(-36,-22,20,72,44,8)+box(-30,-16,28,60,32,18)),
-           'cad/sensor-bracket.stl':mesh(box(26,-30,28,8,60,5)+box(26,25,28,8,5,26)),
+    files={'cad/base.stl':mesh(box(-40,-35,0,80,70,8)+box(-15,-15,8,30,30,18)),
+           'cad/carriage.stl':mesh(box(-12,-12,26,24,24,65)+box(-16,-16,80,32,32,22)+box(0,-10,88,70,20,18)+box(60,-14,84,24,28,26)),
+           'cad/sensor-bracket.stl':mesh(box(64,-23,86,14,8,5)+box(64,-23,86,5,8,23)),
+           'cad/gripper.stl':mesh(box(84,-15,89,15,30,16)+box(99,-15,89,25,6,16)+box(99,9,89,25,6,16)),
            'control/motion.py':'# Demo control interface — not robot-tested\nSETTLE_TIME = 0.15\n\ndef move_axis(axis, target):\n    axis.move_to(target)\n    axis.wait(SETTLE_TIME)\n    return axis.position()\n',
            'README.md':'# Isolated Studio sample\nInvented robot, geometry, people and results. No actual product or inference run.\n'}
-    def capture(values):return call('capture_artifact',{'files':{p:base64.b64encode(v.encode()).decode() for p,v in values.items()},'source':{'type':'explicit_demo','repository':'example/bench-robot','commit':'sample-only'},'capture_scope':'generated sample files'})['revision_id']
+    def capture(values):return call('capture_artifact',{'files':{p:base64.b64encode(v.encode()).decode() for p,v in values.items()},'source':{'type':'explicit_demo','repository':'example/desktop-robot-arm','commit':'sample-only'},'capture_scope':'generated sample files'})['revision_id']
     snapshot=capture(files)
-    d=call('connect_development',{'title':'Demo bench robot development','snapshot':snapshot,'capture':{'scope':'Sample saved artifacts','missing':['native CAD model','physical tests','live tools']},'unverified':['all physical behavior'],
+    d=call('connect_development',{'title':'Demo desktop robot arm development','snapshot':snapshot,'capture':{'scope':'Sample saved artifacts','missing':['native CAD model','physical tests','live tools']},'unverified':['all physical behavior'],
         'mode':'record','actors':['designer','controls-agent','mechanical-reviewer'],'write_scope':['cad/','control/'],'recipes':{},'max_executions':0,'timeout_seconds':30,'max_parallel':1})
-    hierarchy=[{'id':'robot','title':'Bench robot','kind':'robot','paths':['cad/','control/'],'editable':True},
-        {'id':'wrist','parent':'robot','title':'Wrist assembly','kind':'assembly','paths':['cad/','control/'],'editable':True},
-        {'id':'structure','parent':'wrist','title':'Frame','kind':'mechanical','paths':['cad/base.stl'],'editable':True},
-        {'id':'carriage','parent':'wrist','title':'Carriage','kind':'mechanical','paths':['cad/carriage.stl'],'editable':True},
+    hierarchy=[{'id':'robot','title':'Desktop robot arm','kind':'robot','paths':['cad/','control/'],'editable':True},
+        {'id':'wrist','parent':'robot','title':'Arm & joints','kind':'assembly','paths':['cad/carriage.stl'],'editable':True},
+        {'id':'structure','parent':'robot','title':'Base','kind':'mechanical','paths':['cad/base.stl'],'editable':True},
+        {'id':'carriage','parent':'wrist','title':'Forearm','kind':'mechanical','paths':['cad/carriage.stl'],'editable':True},
+        {'id':'gripper','parent':'robot','title':'Gripper','kind':'mechanical','paths':['cad/gripper.stl'],'editable':True},
         {'id':'sensor','parent':'wrist','title':'Sensor bracket','kind':'mechanical','paths':['cad/sensor-bracket.stl'],'editable':True},
-        {'id':'control','parent':'wrist','title':'Motion control','kind':'software','paths':['control/'],'editable':True}]
+        {'id':'control','parent':'robot','title':'Motion control','kind':'software','paths':['control/'],'editable':True}]
     state=call('initialize_continuity',{'session_id':d['id'],'version':d['version'],'hierarchy':hierarchy,
         'context':{'requirements':[],'constraints':[],'decisions':[],'open_questions':['Physical performance not tested'],'environment':{'studio_demo':True}},'summary':'Demo baseline'})
-    project=call('save_project',{'name':'Demo · Bench robot','description':'Explicit sample workspace. Not actual engineering evidence.','baseline_state':state['id']})
+    project=call('save_project',{'name':'Desktop robot arm','description':'Explicit sample workspace. Not actual engineering evidence.','baseline_state':state['id']})
     call('link_product_session',{'session_id':d['id'],'project_id':project['id']})
     first=call('begin_change',{'state_id':state['id'],'title':'Refine the sensor bracket','purpose':'Share an unfinished clearance idea','assignee':'designer','write_scope':['cad/sensor-bracket.stl','control/motion.py'],'dependencies':['cad/base.stl']})
-    new=dict(files);new['cad/sensor-bracket.stl']=mesh(box(24,-30,28,8,60,5)+box(24,25,28,8,5,26));new['control/motion.py']=new['control/motion.py'].replace('0.15','0.25')
+    new=dict(files);new['cad/sensor-bracket.stl']=mesh(box(62,-23,86,14,8,5)+box(62,-23,86,5,8,23));new['control/motion.py']=new['control/motion.py'].replace('0.15','0.25')
     cp=call('checkpoint_change',{'change_id':first['id'],'version':first['version'],'snapshot':capture(new),'summary':'Bracket moved inward; checks pending','rationale':'Sample hypothesis','unfinished':['Physical clearance'],'work_status':'working','capture':{'scope':'saved sample files','missing':['native model','tool history']}})
     shared=call('studio_share_update',{'work_id':first['id'],'version':cp['change']['version'],'state_id':cp['state']['id'],'note':'Sample intermediate update. Motion review still needed.'})
     call('studio_comment',{'work_id':first['id'],'state_id':cp['state']['id'],'anchor':{'kind':'cad','path':'cad/sensor-bracket.stl','part':'cad/sensor-bracket.stl','hash':hashlib.sha256(new['cad/sensor-bracket.stl'].encode()).hexdigest()},'body':'@designer Can we check this bracket through the full range of motion?','mentions':['designer']})
     second=call('begin_change',{'state_id':state['id'],'title':'Adjust the settling interval','purpose':'Coordinate the controller with the assembly','assignee':'controls-agent','write_scope':['control/'],'dependencies':[]})
-    call('begin_change',{'state_id':state['id'],'title':'Review service access','purpose':'Check access before detailing fasteners','assignee':'mechanical-reviewer','write_scope':['cad/'],'dependencies':[]})
+    call('begin_change',{'state_id':state['id'],'title':'Review service access','purpose':'Check access before detailing fasteners','assignee':'mechanical-reviewer','write_scope':['cad/base.stl'],'dependencies':[]})
     (root/'motion.py').write_text(new['control/motion.py'].replace('0.25','0.30'))
     (root/'fixture.json').write_text(json.dumps({'project':project['id'],'work':first['id'],'state':cp['state']['id'],'other_work':second['id']}))
     return service

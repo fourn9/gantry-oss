@@ -5,12 +5,12 @@ import {readFile} from 'node:fs/promises';
 // Rendering/geometry are covered separately and in the authenticated browser scenario.
 const uri=s=>'data:text/javascript;base64,'+Buffer.from(s).toString('base64');
 const ui=uri(`export const $=s=>document.querySelector(s);export const esc=s=>s;export const short=s=>s;export const icon=()=>'';export const download=()=>{};`);
-const views=uri(`export const action=()=>'';export const hint=x=>x;export const sidebar=()=>({nav:'',projects:'',recent:''});export const projectHeader=()=>'';export const workDetail=d=>d.work.id;export const conversation=(d,s,draft)=>JSON.stringify({work:d.work.id,selection:s,draft});export const workURL=x=>'studio-work/'+x;`);
+const views=uri(`export const action=()=>'';export const hint=x=>x;export const sidebar=()=>({nav:'',projects:'',recent:''});export const projectHeader=()=>'';export const workDetail=d=>d.work.id;export const conversation=(d,s,draft)=>JSON.stringify({work:d.work.id,selection:s,draft});export const workURL=x=>'studio-work/'+x;export const projectURL=(p,n,t)=>'studio/'+p+'/'+n+'/'+t;export const workList=()=> 'work-list';`);
 const model=uri(await readFile(new URL('../gantry/web/studio_model.js',import.meta.url),'utf8'));
 const activity=uri(await readFile(new URL('../gantry/web/studio_activity.js',import.meta.url),'utf8'));
 const mesh=uri(`export const parseMesh=()=>[];export const mountMesh=()=>({destroy(){}});`);
 let code=await readFile(new URL('../gantry/web/studio.js',import.meta.url),'utf8');
-for(const [name,module] of [['studio_library_ui',uri('export const createLibraryUI=()=>({active:false,leave(){},reset(){}});')],['studio_layout',uri('export const createStudioLayout=()=>({leave(){},mount(){}});')],['studio_bot_ui',uri('export const createBotUI=()=>({handlers:{}});')],['ui',ui],['studio_views',views],['studio_model',model],['studio_mesh',mesh],['studio_activity',activity]])code=code.replace(`'./${name}.js'`,JSON.stringify(module));
+for(const [name,module] of [['studio_library_views',uri('export const related=()=>"Recorded links";')],['studio_library_ui',uri('export const createLibraryUI=()=>({active:false,leave(){},reset(){},render(p,n,parts){document.querySelector("#main").innerHTML=JSON.stringify({library:true,component:n?.id,section:parts[3],state:parts[4]});}});')],['studio_layout',uri('export const createStudioLayout=()=>({leave(){},mount(){}});')],['studio_bot_ui',uri('export const createBotUI=()=>({handlers:{}});')],['ui',ui],['studio_views',views],['studio_model',model],['studio_mesh',mesh],['studio_activity',activity]])code=code.replace(`'./${name}.js'`,JSON.stringify(module));
 const {createStudio}=await import(uri(code+'\n//# sourceURL=studio_controller_test.js'));
 const deferred=()=>{let resolve;const promise=new Promise(r=>resolve=r);return {promise,resolve};};
 function setup(){
@@ -59,4 +59,35 @@ test('an activity refresh cannot restore a discussion closed while its reply is 
  await h.click('close-conversation');h.node('#studio-conversation').innerHTML='closed';wait.resolve(h.data('A'));await loading;
  assert.equal(h.node('#studio-conversation').innerHTML,'closed');await h.click('conversation');
  assert.equal(JSON.parse(h.node('#studio-conversation').innerHTML).draft,'Keep for later');
+});
+
+const componentOverview=()=>({projects:[{id:'p',hierarchy:[{id:'sensor',title:'Sensor',paths:['sensor.stl']},{id:'empty',title:'Empty',paths:['empty.stl']}]}],works:[{id:'A',title:'Sensor work',project_id:'p',components:[{id:'sensor'}]}]});
+test('component and legacy Structure links open the matching work directly',async()=>{
+ const h=setup();h.hook(name=>name==='studio_overview'?componentOverview():undefined);
+ for(const section of ['work','structure']){location.hash='#studio/p/sensor/'+section;await h.studio.render();assert.ok(h.node('#main').innerHTML.endsWith('A'));}
+});
+test('a component without work opens Files with the explicit saved state retained',async()=>{
+ const h=setup();h.hook(name=>name==='studio_overview'?componentOverview():undefined);
+ location.hash='#studio/p/empty/structure/saved';await h.studio.render();assert.deepEqual(JSON.parse(h.node('#main').innerHTML),{library:true,component:'empty',section:'files',state:'saved'});
+});
+test('multiple matching work items render one picker and honor the selected work',async()=>{
+ const h=setup();const overview=componentOverview();overview.works.push({...overview.works[0],id:'B',title:'Other work'});h.hook(name=>name==='studio_overview'?overview:undefined);
+ location.hash='#studio/p/sensor/work/~/B';await h.studio.render();assert.match(h.node('#main').innerHTML,/studio-work-choice/);assert.match(h.node('#main').innerHTML,/Other work/);assert.ok(h.node('#main').innerHTML.endsWith('B'));
+});
+test('changing to Work cannot silently replace an unrelated saved state with its head',async()=>{
+ const h=setup();h.hook(name=>name==='studio_overview'?componentOverview():undefined);
+ location.hash='#studio/p/sensor/work/unrelated';await h.studio.render();assert.match(h.node('#main').innerHTML,/includes the selected saved state/);
+});
+test('historical component Work links resolve the requested hierarchy before latest project mappings',async()=>{
+ const h=setup();const historical=[{id:'removed-sensor',title:'Original sensor',paths:['sensor.stl']}];
+ h.hook((name,args)=>{
+  if(name==='studio_overview')return {projects:[{id:'p',hierarchy:[{id:'replacement',title:'New sensor',paths:['new.stl']}]}],works:[{id:'A',project_id:'p',components:[{id:'replacement'}]}]};
+  if(name==='get_development_state')return {state:{id:'A0',hierarchy:historical}};
+  if(name==='studio_related')return {works:[{id:'A',project_id:'p',components:[{id:'replacement'}]}]};
+  if(name==='studio_work'){const d=h.data('A');if(args.state_id)d.selected.state={id:args.state_id,hierarchy:historical};return d;}
+ });
+ location.hash='#studio/p/removed-sensor/work/A0';await h.studio.render();
+ assert.ok(h.node('#main').innerHTML.endsWith('A'));
+ assert.ok(h.calls.some(c=>c.name==='studio_work'&&c.args.state_id==='A0'));
+ assert.equal(h.calls.find(c=>c.name==='studio_related').args.anchor.component_id,'removed-sensor');
 });

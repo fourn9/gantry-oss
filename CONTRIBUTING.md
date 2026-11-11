@@ -22,7 +22,7 @@ Keep a single guide authoritative for each workflow; link to it rather than dupl
 
 ## CI setup
 
-`docs/ci-workflow.yml` is a GitHub Actions template. A repository owner with workflow permissions can copy it to `.github/workflows/ci.yml` to run Python 3.11/3.12 and JavaScript tests on Ubuntu. It is not active merely by being in `docs`.
+[CI](.github/workflows/ci.yml) runs the Python suite on Ubuntu and macOS with Python 3.11/3.12, plus product and website JavaScript tests. It verifies a real OS sandbox before running the suite. `docs/ci-workflow.yml` is a matching reference copy. The protected `main` branch requires the `ci-required` check and an independent review.
 
 ## Refresh the API reference
 

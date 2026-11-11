@@ -59,7 +59,7 @@ gantry-crew --url GANTRY_URL --token-file AGENT_TOKEN bot-worker --config /priva
   function acknowledge(id){const {detail,epoch}=getContext(),r=detail.bot_requests.find(r=>r.id===id),h=r.handoff;
     modal('Confirm executor stopped',`<p>Only continue after the external process has stopped. The receiving Bot resumes from the latest checkpoint saved in Gantry.</p><label>How did you confirm it stopped?<textarea name="stopped" required></textarea></label><label>Handoff summary<textarea name="summary" required></textarea></label><label>Unfinished work or unsaved edits (one per line)<textarea name="unfinished"></textarea></label>`,async form=>{await api('acknowledge_bot_handoff',{handoff_id:h.id,version:h.version,confirm_stopped:form.stopped.value,summary:form.summary.value,unfinished:lines(form.unfinished.value)});toast('Handoff ready · recipient will accept on reconnect');if(getContext().epoch===epoch)await refresh();},'Confirm stopped');
   }
-  return {handlers:{team:showTeam,'ask-bot':()=>request('ask'),'assign-bot':()=>request('assign'),
+  return {handlers:{reply:()=>document.querySelector('#studio-draft')?.focus(),team:showTeam,'ask-bot':()=>request('ask'),'assign-bot':()=>request('assign'),
     'crew-setup':sid=>{document.querySelector('#dialog').close();location.hash='#studio-crew/'+encodeURIComponent(sid);},
     'team-add':editTeam,'team-edit':editTeam,'team-execution':execution,'agent-connect':connect,'bot-runtime':runtime,
     'handoff-bot':handoff,'ack-handoff':acknowledge}};

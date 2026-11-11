@@ -1,5 +1,17 @@
 # Changelog
 
+## Unreleased — component-first Studio
+
+- Open related work directly from the component tree, or saved Files when no work
+  exists; use compact Work / Files / Requirements and CAD / Code / Checks pickers.
+- Preserve saved-state and conversation anchors while selecting CAD parts or code,
+  with contextual Related / Discuss panels and bounded, keyboard-accessible cameras.
+- Keep anonymous sample geometry separate from real projects and support narrow
+  screens without overlapping artifact and conversation panels.
+- Complete unavailable-sandbox test guards and correct active CI documentation.
+- Document the optional CAD stack's blocked VTK security update separately from
+  verified adapter functionality.
+
 ## Studio structure navigation — 2026-11-06
 
 - Pan product structure by dragging or scrolling, and pinch to zoom around the cursor.

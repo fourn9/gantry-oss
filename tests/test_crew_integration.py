@@ -27,7 +27,8 @@ class IntegrationTests(unittest.TestCase):
             with self.c.worker(role) as w:w.tick()
         view=self.c.owner.call('get_bot_task',{'task_id':self.parent['id']})
         self.refs=[{'id':x['change']['id'],'version':x['change']['version']} for x in view['candidate_changes']]
-    def config(self,role):
+    def config(self,role,runs_tool=True):
+        if runs_tool and backend()=='unavailable': self.skipTest('OS sandbox unavailable')
         c=self.c.configs[role]
         c.update(agent_loop=True,local_tools={'verify':{'argv':[str(Path(sys.executable).resolve()),'-B','-c',CHECK],'timeout_seconds':20}},tool_runtime=runtime_roots(),sandbox=backend())
         self.c.owner.call('configure_bot_runtime',{'bot_id':role,'version':1,'principal_id':role,'enabled':True,'environment':environment_manifest(c)})
@@ -119,7 +120,7 @@ class IntegrationTests(unittest.TestCase):
                 'changes':[{'id':shared['id'],'version':shared['version']}],'summary':'Explicitly select changed premises separately'})
             self.assertTrue(integrated['integrated'])
     def test_dirty_workspace_refused(self):
-        self.config('lead')
+        self.config('lead',runs_tool=False)
         def infer(ctx,*_):
             Path(ctx['workspace'],'mechanical.txt').write_text('unsaved private edit')
             return action('integrate',{'state_id':self.c.base['id'],'changes':self.refs,'summary':'Must not overwrite unsaved edit'})

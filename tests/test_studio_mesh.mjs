@@ -18,3 +18,10 @@ test('ordinary scrolling does not zoom or trap the page; Alt scroll does',()=>{
  c.onwheel({deltaY:200,preventDefault:()=>prevented++});assert.equal(prevented,0);assert.equal(m.camera().zoom,1);
  c.onwheel({altKey:true,deltaY:200,preventDefault:()=>prevented++});assert.equal(prevented,1);assert.ok(m.camera().zoom<1);m.destroy();
 });
+test('orbit and zoom stay bounded and corrupt saved cameras cannot lose the model',()=>{
+ const c=canvas(),m=mountMesh(c,meshes,()=>{},{yaw:Infinity,pitch:NaN,zoom:Infinity});
+ assert.ok(Object.values(m.camera()).every(Number.isFinite));
+ m.zoom(1e10);assert.ok(m.camera().zoom<=2);m.zoom(1e-10);assert.ok(m.camera().zoom>=.5);
+ c.onpointerdown({clientX:0,clientY:0,pointerId:1});c.onpointermove({clientX:1e6,clientY:1e6});
+ assert.ok(Math.abs(m.camera().pitch)<=Math.PI/2);assert.ok(Math.abs(m.camera().yaw)<=Math.PI*2);m.destroy();
+});

@@ -1,5 +1,22 @@
 # Hardware adapter verification
 
+## Current dependency caveat — 2026-11-12
+
+The optional CAD constraints still require VTK 9.6.2 through CadQuery/OCP.
+[VTK 9.7.1](https://discourse.vtk.org/t/vtk-9-7-1-release/16542) fixes GLTF
+parser vulnerabilities, including bounds checks missing from upstream 9.6.2.
+A clean advisory scan below is historical evidence, not proof those fixes are present.
+The current Gantry adapter reads STEP, not GLTF; no GLTF reader path was identified
+in Gantry. Customer scripts using VTK directly are outside that guarantee.
+
+Do not parse untrusted GLTF with this optional environment or override OCP's exact
+VTK constraint to force an unsupported update. A supported patched dependency
+combination is tracked in [PR #17](https://github.com/fourn9/gantry-oss/pull/17).
+Current released CadQuery 2.8.0 and OCP pins do not support VTK 9.7.2. Upgrade
+acceptance requires dependency resolution, real STEP roundtrips and screening tests.
+
+## Earlier verification
+
 Verified 2026-11-02, CPython 3.12.15 / macOS arm64 / CadQuery 2.8.0.
 
 - Full Python regression run: 582 cases, no failures, one skip, 172.615 seconds.
