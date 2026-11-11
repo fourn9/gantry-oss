@@ -30,6 +30,9 @@ This file records changes after v3.3.0. Earlier release notes remain in the
 - Studio Team and version-bound **Ask a Bot / Assign work**. Answers return to the
   original selection and Inbox; edits return as separate shared candidates.
   Existing customer runtimes execute the work; ordinary comments do not dispatch.
+- `python -m gantry.security_check` compares a final release that has two
+  components (`pip 26.3`) with its floor. Before this change it reported every
+  such version as below the minimum.
 - Acknowledged Bot handoffs preserve saved changes, unfinished context and
   successor dependencies. Read-only Ask also blocks unrelated direct API writes;
   runtime replacement cannot silently reset an active executor.

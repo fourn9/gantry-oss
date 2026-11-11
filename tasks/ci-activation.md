@@ -13,6 +13,7 @@ Acceptance:
 Changes:
 - `docs/ci-workflow.yml` moved to `.github/workflows/ci.yml`. Ubuntu runs Python 3.11, 3.12 and 3.13; macOS runs 3.13. JavaScript steps use the documented globs.
 - The template was not valid YAML: the step with `--only-binary=:all: ` held a colon and a space in a plain scalar, so GitHub rejected the file. The step is now a block scalar. The first push of this branch showed the rejection; a YAML parser confirms the template on `main` has the same error.
+- `gantry/security_check.py`: the first hosted run failed in all four jobs at `python -m gantry.security_check`. The workflow upgrades pip, the current release is `26.3`, and `release()` accepted only three components, so `26.3` was reported as below the `26.2.2` floor. A final release with two components is now padded (`26.3` is `26.3.0`). Prereleases, post releases, one component and four components still need review. `tests/test_security_check.py` has the regression test; it failed before the change.
 - `tests/test_unlimited_connection.py`: the guard `if not backend()` never skipped, because `backend()` returns the string `'unavailable'`. It now compares with that value.
 - `tests/test_crew_integration.py`: the three tests that execute a sandboxed tool skip when no sandbox is available. `test_dirty_workspace_refused` still runs there.
 - `CONTRIBUTING.md` and `docs/README.md` point to the active workflow.

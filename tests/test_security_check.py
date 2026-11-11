@@ -29,3 +29,11 @@ class SecurityCheckTests(unittest.TestCase):
 
     def test_unparseable_package_version_is_not_reported_as_patched(self):
         self.assertTrue(assess('3.12.15', {'pip': '26.2.2rc1'})['findings'])
+
+    def test_final_release_without_a_patch_component_is_compared(self):
+        # pip 26.3 is 26.3.0, which is newer than the 26.2.2 floor.
+        self.assertFalse(assess('3.12.15', {'pip': '26.3'})['findings'])
+        self.assertTrue(assess('3.12.15', {'pip': '26.2'})['findings'])
+        for unreviewed in ('26', '26.3.0.1', '26.3.post1'):
+            with self.subTest(version=unreviewed):
+                self.assertTrue(assess('3.12.15', {'pip': unreviewed})['findings'])
