@@ -8,3 +8,5 @@ Implemented locally: active matrix workflow, complete JS coverage, aggregate ci-
 Publication blocked: GitHub rejected workflow creation because the current OAuth credential lacks workflow scope. Do not bypass this with another credential. Main protection is still disabled; required checks, independent review and release remain pending successful publication and remote CI. Issue 29 must remain open.
 
 Issue 22 inspection confirms Structure still exists in studio.js and studio_views.js. Its proposed removal changes the previously agreed UX, so confirmation was requested before applying that redesign.
+
+Full local Python suite: 1,908 tests, 1,894 passed, 14 existing skips, 206.114 seconds. Remote Linux/macOS matrix remains unverified because publication was rejected.
