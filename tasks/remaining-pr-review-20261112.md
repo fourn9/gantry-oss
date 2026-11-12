@@ -25,8 +25,10 @@ Primary metadata: https://pypi.org/pypi/cadquery/2.8.0/json and https://pypi.org
 
 ## Combined validation
 - Full Python suite: 1,914 tests, 1,913 passed / 1 skipped, 237.018 seconds.
-- Product JavaScript: 86 passed. Website JavaScript: 32 passed.
+- Product JavaScript: 87 passed. Website JavaScript: 32 passed.
 - Independent code review found two state/navigation regressions; both were reproduced and fixed with regression tests, then independently re-reviewed with no remaining actionable finding.
 - Isolated real HTTP Studio sample, actual browser at desktop and 320px: component opens work, no-work Gripper opens Files; CAD/Code/Checks switching; base/shared comparison; exact CAD and code-line conversations; draft close/reopen; self-mention through Inbox back to original line/state; Work→Files→Work preserves saved state; no-evaluation stays Not tested/unadopted; narrow panel stacks and Escape closes it; mobile navigation opens/selects/closes. At 320px document scrollWidth equals clientWidth.
 - Geometry, people, comments and results in the runtime sample are explicitly anonymous fixtures. No live agents/vendor tools or private project state were used. Browser checks cover interaction, not physical correctness.
 
+
+Additional browser check: saved a new unshared checkpoint through Import changes, inspected its exact changed file and before/after hashes, then shared it separately. A default-selection jump to an unrelated Base part was found and fixed with a failing-then-passing controller regression.

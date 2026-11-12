@@ -123,7 +123,11 @@ export function createStudio({api,modal,toast,fail}){
     const old=compare?await api('get_development_state',{state_id:compareState}):null;if(current!==artifactEpoch)return;
     const match=tab==='cad'?cadFile:codeFile;const paths=[...new Set([...Object.keys(v.manifest),...(old?Object.keys(old.manifest):[])])].filter(match).sort();
     if(!paths.length){target.innerHTML=view.hint(tab==='cad'?'No shared CAD files':'No shared code files','Import saved files or connect your local adapter to this work.')+a('import-help','Connection instructions');return;}
-    if(!paths.includes(file)){const changed=new Set(v.diffs.map(d=>d.path));file=paths.find(p=>changed.has(p)&&(tab!=='cad'||meshFile(p)))||paths.find(meshFile)||paths[0];}
+    if(!paths.includes(file)){
+      const changed=new Set(v.diffs.map(d=>d.path)),scoped=node?paths.filter(p=>componentForFile(project,p)?.id===node.id):[];
+      const preferred=choices=>choices.find(p=>changed.has(p)&&(tab!=='cad'||meshFile(p)))||choices.find(meshFile)||choices[0];
+      file=preferred(scoped)||preferred(paths);
+    }
     const mapped=componentForFile(project,file);if(mapped&&mapped.id!==node?.id){node=mapped;sidebar();if($('#studio-work-switcher'))$('#studio-work-switcher').innerHTML=workSwitcher();$('#breadcrumb').innerHTML=view.projectHeader(project,node,'work',v.state.id);}
     target.innerHTML=`<div class="studio-filebar"><select id="studio-file" aria-label="Artifact file">${options(paths,file)}</select><span class="studio-small">${e(short((v.manifest[file]||old?.manifest[file])?.hash))}</span></div><div id="studio-file-content" aria-live="polite">${view.hint('Loading saved version…')}</div>`;
     const body=$('#studio-file-content');

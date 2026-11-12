@@ -91,3 +91,13 @@ test('historical component Work links resolve the requested hierarchy before lat
  assert.ok(h.calls.some(c=>c.name==='studio_work'&&c.args.state_id==='A0'));
  assert.equal(h.calls.find(c=>c.name==='studio_related').args.anchor.component_id,'removed-sensor');
 });
+test('opening an imported checkpoint with only code changes keeps the work component CAD selection',async()=>{
+ const h=setup();const hierarchy=[{id:'base',title:'Base',paths:['cad/base.step']},{id:'sensor',title:'Sensor bracket',paths:['cad/sensor.step']},{id:'motion',title:'Motion',paths:['control/']}];
+ h.hook(name=>{
+  if(name==='studio_overview')return {projects:[{id:'p',hierarchy}],works:[]};
+  if(name==='studio_work'){const d=h.data('A');d.work.components=[{id:'sensor'}];d.selected.state.hierarchy=hierarchy;d.selected.manifest={'cad/base.step':{hash:'base'},'cad/sensor.step':{hash:'sensor'},'control/motion.py':{hash:'motion'}};d.selected.diffs=[{path:'control/motion.py'}];return d;}
+ });
+ location.hash='#studio-work/A/A1';await h.studio.render();
+ assert.match(h.node('#studio-artifact').innerHTML,/<option value="cad\/sensor.step" selected>/);
+ assert.doesNotMatch(h.node('#studio-artifact').innerHTML,/<option value="cad\/base.step" selected>/);
+});

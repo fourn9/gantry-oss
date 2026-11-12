@@ -38,3 +38,6 @@ Independent review also caught component resolution against the latest project h
 
 ## Parent runtime and regression confirmation
 Isolated sample HTTP server and real browser checked at 1280px and 320px: component→work/no-work→Files; CAD/Code/Checks; comparison; exact part/line conversations; draft retention; mention→Inbox→same line/state; Work/Files roundtrip retains state; narrow panel/navigation and Escape. No horizontal overflow at 320px. Full Python suite 1,914 tests (1 skip) and website JS 32 pass. Final product JS 86 pass. Independent re-review confirmed pagination and historical routing fixes. Sample-only, no live inference or physical validation.
+
+## Browser follow-up: imported checkpoint selection
+Reproduced a code-only imported checkpoint resetting an unset CAD file to Base despite Sensor bracket being the work component. Artifact fallback now first chooses among paths mapped to the current component (retaining changed-file and mesh preferences there), then uses the existing global fallback only when that component has no files in the content view. The new controller regression failed before the fix and passes afterward. Full Node suite: 87 tests passed; diff check passed.
