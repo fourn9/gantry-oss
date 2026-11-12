@@ -25,7 +25,7 @@ function setup(){
  const click=async(name,value='',side)=>events.click({target:{closest:()=>({dataset:{studio:name,value,side}})},preventDefault(){}});
  const type=value=>events.input({target:{id:'studio-draft',value}});
  const submit=()=>events.submit({target:{id:'studio-comment-form'},submitter:{},preventDefault(){}});
- return {studio,calls,node,click,type,submit,data,hook:f=>hook=f};
+ return {studio,calls,node,click,type,submit,data,change:(id,value)=>events.change({target:{id,value}}),hook:f=>hook=f};
 }
 test('sending on A then navigating and typing on B cannot erase B draft or open A',async()=>{
  const h=setup();await h.studio.render();await h.click('conversation');h.type('A comment');const wait=deferred();h.hook(name=>name==='studio_comment'?wait.promise:undefined);const sent=h.submit();
@@ -92,12 +92,15 @@ test('historical component Work links resolve the requested hierarchy before lat
  assert.equal(h.calls.find(c=>c.name==='studio_related').args.anchor.component_id,'removed-sensor');
 });
 test('opening an imported checkpoint with only code changes keeps the work component CAD selection',async()=>{
- const h=setup();const hierarchy=[{id:'base',title:'Base',paths:['cad/base.step']},{id:'sensor',title:'Sensor bracket',paths:['cad/sensor.step']},{id:'motion',title:'Motion',paths:['control/']}];
+ const h=setup();const hierarchy=[{id:'robot',title:'Robot',paths:['cad/','control/']},{id:'base',parent:'robot',title:'Base',paths:['cad/base.step']},{id:'wrist',parent:'robot',title:'Arm',paths:['cad/']},{id:'sensor',parent:'wrist',title:'Sensor bracket',paths:['cad/sensor.step']},{id:'control',parent:'robot',title:'Motion',paths:['control/']}];
  h.hook(name=>{
   if(name==='studio_overview')return {projects:[{id:'p',hierarchy}],works:[]};
-  if(name==='studio_work'){const d=h.data('A');d.work.components=[{id:'sensor'}];d.selected.state.hierarchy=hierarchy;d.selected.manifest={'cad/base.step':{hash:'base'},'cad/sensor.step':{hash:'sensor'},'control/motion.py':{hash:'motion'}};d.selected.diffs=[{path:'control/motion.py'}];return d;}
+  if(name==='studio_work'){const d=h.data('A');d.work.components=[{id:'robot',parent:null},{id:'sensor',parent:'wrist'},{id:'control',parent:'robot'}];d.work.write_scope=['cad/sensor.step','control/'];d.selected.state.hierarchy=hierarchy;d.selected.manifest={'cad/base.step':{hash:'base'},'cad/sensor.step':{hash:'sensor'},'control/motion.py':{hash:'motion'}};d.selected.diffs=[{path:'control/motion.py'}];return d;}
  });
  location.hash='#studio-work/A/A1';await h.studio.render();
  assert.match(h.node('#studio-artifact').innerHTML,/<option value="cad\/sensor.step" selected>/);
  assert.doesNotMatch(h.node('#studio-artifact').innerHTML,/<option value="cad\/base.step" selected>/);
+ // An explicit user selection survives clearing the file for a version/import navigation in this work.
+ h.change('studio-file','cad/base.step');h.change('studio-version','A1');await h.studio.render();
+ assert.match(h.node('#studio-artifact').innerHTML,/<option value="cad\/base.step" selected>/);
 });

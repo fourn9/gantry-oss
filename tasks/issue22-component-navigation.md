@@ -41,3 +41,6 @@ Isolated sample HTTP server and real browser checked at 1280px and 320px: compon
 
 ## Browser follow-up: imported checkpoint selection
 Reproduced a code-only imported checkpoint resetting an unset CAD file to Base despite Sensor bracket being the work component. Artifact fallback now first chooses among paths mapped to the current component (retaining changed-file and mesh preferences there), then uses the existing global fallback only when that component has no files in the content view. The new controller regression failed before the fix and passes afterward. Full Node suite: 87 tests passed; diff check passed.
+
+### Imported checkpoint correction with actual API shape
+The first import regression fixture omitted ancestor entries in `work.components` and was insufficient: the live API returns Robot before Sensor/Control. Updated the fixture to that actual shape and reproduced the remaining failure. Selection now falls back through current-component paths, actual `work.write_scope` (exact paths or trailing-slash prefixes, matching server semantics), then all artifacts. Prior component selection is retained for the same work/project across version/import navigation. The regression also checks explicit selection of another assembly part survives version navigation. Full Node suite remains 87/87 passing; runtime recheck belongs to the parent browser session.

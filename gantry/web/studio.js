@@ -25,6 +25,7 @@ export function createStudio({api,modal,toast,fail}){
   function selectConversation(value){remember();conversation=value;const saved=drafts.get(JSON.stringify([detail.work.id,value]));draft=saved?.draft||'';mentions=saved?.mentions||[];}
   function sidebar(){const side=view.sidebar({...overview,projects:overview.projects.map(p=>p.id===project?.id?project:p)},recent,{project:project?.id,component:node?.id});$('#nav').innerHTML=side.nav;$('#sidebar-projects').innerHTML=side.projects;$('#recent-sessions').innerHTML=side.recent;}
   async function render(){
+    const priorSelection={work:detail?.work.id,project:project?.id,component:node?.id};
     library.leave();layout.leave();
     onboarding?.leave();crewSetup?.leave();remember();activity.clear();const current=++viewEpoch,parts=route(),kind=parts[0]||'studio';artifactEpoch++;disposeMesh();
     document.body.classList.add('studio-mode');$('#main').className='studio-main';
@@ -67,7 +68,7 @@ export function createStudio({api,modal,toast,fail}){
       if(kind==='studio-work'&&parts[3]){const thread=value.threads.find(t=>t.id===parts[3]);threadDetail=null;if(thread){tab=thread.anchor.kind==='code'||codeFile(thread.anchor.path||'')?'code':'cad';file=thread.anchor.path||'';selectedPart=thread.anchor.part||'';selectConversation({anchor:thread.anchor,state_id:thread.state_id,thread_id:thread.id});}}
       if(conversation&&conversation.state_id!==value.selected.state.id&&!(kind==='studio-work'&&parts[3])){selectConversation(null);threadDetail=null;}
       if(directNode){const scoped=Object.keys(value.selected.manifest).find(path=>componentForFile(project,path)?.id===directNode.id);if(scoped){file=scoped;selectedPart=scoped;tab=codeFile(scoped)?'code':'cad';}}
-      node=node||componentForFile(project,file)||project?.hierarchy.find(n=>n.id===value.work.components?.[0]?.id);
+      node=node||componentForFile(project,file)||(priorSelection.work===value.work.id&&priorSelection.project===project?.id?project.hierarchy.find(n=>n.id===priorSelection.component):null)||project?.hierarchy.find(n=>n.id===value.work.components?.[0]?.id);
       sidebar();$('#breadcrumb').innerHTML=project?view.projectHeader(project,node,'work',value.selected.state.id):'Work';
       await drawWork();if(current!==viewEpoch)return;if(kind==='studio-work'&&parts[3])focusConversation();
       if(kind==='studio-work'&&parts[4]&&detail.can_comment)api('studio_acknowledge',{notification_id:parts[4]}).catch(fail);
@@ -126,7 +127,8 @@ export function createStudio({api,modal,toast,fail}){
     if(!paths.includes(file)){
       const changed=new Set(v.diffs.map(d=>d.path)),scoped=node?paths.filter(p=>componentForFile(project,p)?.id===node.id):[];
       const preferred=choices=>choices.find(p=>changed.has(p)&&(tab!=='cad'||meshFile(p)))||choices.find(meshFile)||choices[0];
-      file=preferred(scoped)||preferred(paths);
+      const workPaths=paths.filter(p=>(detail.work.write_scope||[]).some(scope=>p===scope||(scope.endsWith('/')&&p.startsWith(scope))));
+      file=preferred(scoped)||preferred(workPaths)||preferred(paths);
     }
     const mapped=componentForFile(project,file);if(mapped&&mapped.id!==node?.id){node=mapped;sidebar();if($('#studio-work-switcher'))$('#studio-work-switcher').innerHTML=workSwitcher();$('#breadcrumb').innerHTML=view.projectHeader(project,node,'work',v.state.id);}
     target.innerHTML=`<div class="studio-filebar"><select id="studio-file" aria-label="Artifact file">${options(paths,file)}</select><span class="studio-small">${e(short((v.manifest[file]||old?.manifest[file])?.hash))}</span></div><div id="studio-file-content" aria-live="polite">${view.hint('Loading saved version…')}</div>`;
