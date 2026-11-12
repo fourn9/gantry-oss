@@ -1,29 +1,31 @@
+import {related as relatedView} from './studio_library_views.js';
 import {createLibraryUI} from './studio_library_ui.js';
 import {createStudioLayout} from './studio_layout.js';
 import {createBotUI} from './studio_bot_ui.js';
 import {$,esc as e,short,icon,download} from './ui.js';
 import * as view from './studio_views.js';
-import {cadFile,meshFile,codeFile,versionLabel,fileChanges,lineDiff,linesOf,relatedWorks,commentCount,libraryURL,participantName} from './studio_model.js';
+import {cadFile,meshFile,codeFile,versionLabel,fileChanges,lineDiff,linesOf,relatedWorks,commentCount,libraryURL,participantName,componentForFile,componentWork} from './studio_model.js';
 import {parseMesh,mountMesh} from './studio_mesh.js';
 import {createActivityMonitor} from './studio_activity.js';
 
 export function createStudio({api,modal,toast,fail}){
   const layout=createStudioLayout();
   let onboarding,crewSetup;
-  const library=createLibraryUI({api,modal,toast,fail,bytes,layout});
-  let overview,detail,project,node,viewEpoch=0,artifactEpoch=0,mesh,tab='cad',compare=false,compareState='',file='',selectedPart='',conversation=null,lastWork='',draft='',mentions=[],threadDetail;
+  const library=createLibraryUI({api,modal,toast,fail,bytes,layout,onSelection:(p,n)=>{project=p;node=n;sidebar();}});
+  let overview,detail,project,node,viewEpoch=0,artifactEpoch=0,mesh,tab='cad',compare=false,compareState='',file='',selectedPart='',conversation=null,lastWork='',draft='',mentions=[],threadDetail,relatedPanel=false;
   let downloadState=null,recent=[],cache=new Map(),drafts=new Map(),cameras=new Map(),meshKey='';
   const route=()=>location.hash.slice(1).split('/').map(x=>decodeURIComponent(x));
   const handles=()=>['studio','studio-work','studio-inbox','studio-recent','studio-start','studio-crew'].includes(route()[0]||'studio');
   const a=view.action;
   const activity=createActivityMonitor({api,notice:text=>{const el=$('#studio-live-notice');if(el){el.hidden=!text;el.querySelector('span').textContent=text;}}});
-  function reset(){library.reset();layout.leave();onboarding?.leave();crewSetup?.leave();activity.clear();viewEpoch++;artifactEpoch++;disposeMesh();cache.clear();drafts.clear();cameras.clear();overview=detail=undefined;recent=[];lastWork='';conversation=null;threadDetail=null;draft='';mentions=[];}
+  function reset(){library.reset();layout.leave();onboarding?.leave();crewSetup?.leave();activity.clear();viewEpoch++;artifactEpoch++;disposeMesh();cache.clear();drafts.clear();cameras.clear();overview=detail=undefined;recent=[];lastWork='';relatedPanel=false;conversation=null;threadDetail=null;draft='';mentions=[];}
   function disposeMesh(){if(mesh){if(mesh.camera)cameras.set(meshKey,mesh.camera());mesh.destroy();mesh=null;while(cameras.size>50)cameras.delete(cameras.keys().next().value);}}
-  function chooseFile(path){file=path;selectedPart=path;selectConversation(null);threadDetail=null;drawWork();}
+  function chooseFile(path){node=componentForFile(project,path)||node;sidebar();$('#breadcrumb').innerHTML=view.projectHeader(project,node,'work',detail.selected.state.id);file=path;selectedPart=path;selectConversation(null);threadDetail=null;drawWork();}
   function remember(){if(conversation)drafts.set(JSON.stringify([detail.work.id,conversation]),{draft,mentions:[...mentions]});}
   function selectConversation(value){remember();conversation=value;const saved=drafts.get(JSON.stringify([detail.work.id,value]));draft=saved?.draft||'';mentions=saved?.mentions||[];}
-  function sidebar(){const side=view.sidebar(overview,recent,{project:project?.id});$('#nav').innerHTML=side.nav;$('#sidebar-projects').innerHTML=side.projects;$('#recent-sessions').innerHTML=side.recent;}
+  function sidebar(){const side=view.sidebar({...overview,projects:overview.projects.map(p=>p.id===project?.id?project:p)},recent,{project:project?.id,component:node?.id});$('#nav').innerHTML=side.nav;$('#sidebar-projects').innerHTML=side.projects;$('#recent-sessions').innerHTML=side.recent;}
   async function render(){
+    const priorSelection={work:detail?.work.id,project:project?.id,component:node?.id};
     library.leave();layout.leave();
     onboarding?.leave();crewSetup?.leave();remember();activity.clear();const current=++viewEpoch,parts=route(),kind=parts[0]||'studio';artifactEpoch++;disposeMesh();
     document.body.classList.add('studio-mode');$('#main').className='studio-main';
@@ -38,40 +40,74 @@ export function createStudio({api,modal,toast,fail}){
       sidebar();if(!crewSetup){const {createCrewSetup}=await import('./crew_setup.js');crewSetup=createCrewSetup({api,toast,fail});}
       if(current!==viewEpoch)return;await crewSetup.render(parts[1],parts[2]);return;
     }
-    if(kind==='studio-work'){
-      const value=await api('studio_work',{work_id:parts[1],...(parts[2]?{state_id:parts[2]}:{})});if(current!==viewEpoch||!handles())return;
-      if(lastWork!==value.work.id){conversation=null;threadDetail=null;draft='';mentions=[];tab='cad';compare=false;file='';selectedPart='';lastWork=value.work.id;}
-      detail=value;activity.set('studio_work',{work_id:value.work.id,activity_only:true},value);project=overview.projects.find(p=>p.id===detail.work.project_id);node=null;
+    project=overview.projects.find(p=>p.id===parts[1])||overview.projects[0];
+    if(kind==='studio'&&project&&parts[4]&&parts[4]!=='~'){
+      const saved=await api('get_development_state',{state_id:parts[4]});if(current!==viewEpoch||!handles())return;
+      if(saved.state?.hierarchy)project={...project,hierarchy:saved.state.hierarchy};
+    }
+    node=project?.hierarchy.find(n=>n.id===parts[2]);
+    const directNode=kind==='studio'&&node&&!['files','requirements'].includes(parts[3])?node:null;
+    if(directNode){while(overview.next){const page=await api('studio_overview',{after:overview.next});if(current!==viewEpoch)return;overview.works.push(...page.works);overview.next=page.next;}}
+    let candidates=overview.works;
+    if(directNode&&parts[4]&&parts[4]!=='~'){
+      const linked=[];let after;
+      do{const page=await api('studio_related',{project_id:project.id,state_id:parts[4],anchor:{kind:'component',component_id:directNode.id},...(after?{after}:{})});if(current!==viewEpoch)return;linked.push(...(page.works||[]));after=page.next;}while(after);
+      candidates=linked;
+      if(!candidates.length&&relatedWorks(overview.works,project.id,node.id,project.hierarchy).length){sidebar();$('#breadcrumb').innerHTML=view.projectHeader(project,node,'work',parts[4]);$('#main').innerHTML=view.hint('No work includes the selected saved state','Open a latest work version below, or return to Files to retain this saved state.')+view.workList(relatedWorks(overview.works,project.id,node.id,project.hierarchy));return;}
+    }
+    const directWork=directNode&&(parts[4]&&parts[4]!=='~'?(candidates.find(w=>w.id===parts[5])||candidates[0]):componentWork(project,candidates,directNode.id,parts[5]));
+    if(kind==='studio-work'||directWork){
+      let value=await api('studio_work',{work_id:directWork?.id||parts[1],...(!directWork&&parts[2]?{state_id:parts[2]}:{})});if(current!==viewEpoch||!handles())return;
+      if(directWork&&parts[4]&&parts[4]!=='~'){
+        if(!value.versions.some(v=>v.id===parts[4])){sidebar();$('#breadcrumb').innerHTML=view.projectHeader(project,node,'work',parts[4]);$('#main').innerHTML=view.hint('This work does not include the selected saved state','Open its latest version below, or return to Files to keep inspecting this saved state.')+view.workList(relatedWorks(overview.works,project.id,node.id,project.hierarchy));return;}
+        if(value.selected.state.id!==parts[4])value=await api('studio_work',{work_id:value.work.id,state_id:parts[4]});if(current!==viewEpoch||!handles())return;
+      }
+      if(lastWork!==value.work.id){conversation=null;threadDetail=null;draft='';mentions=[];tab='cad';compare=false;file='';selectedPart='';lastWork=value.work.id;relatedPanel=false;}
+      detail=value;activity.set('studio_work',{work_id:value.work.id,activity_only:true},value);project=overview.projects.find(p=>p.id===detail.work.project_id);node=directNode||null;if(value.selected.state.hierarchy)project={...project,hierarchy:value.selected.state.hierarchy};
       recent=[detail.work,...recent.filter(w=>w.id!==detail.work.id)].slice(0,30);
-      if(parts[3]){const thread=value.threads.find(t=>t.id===parts[3]);threadDetail=null;if(thread){tab=thread.anchor.kind==='code'?'code':'cad';file=thread.anchor.path||'';selectedPart=thread.anchor.part||'';selectConversation({anchor:thread.anchor,state_id:thread.state_id,thread_id:thread.id});}}
-      if(conversation&&conversation.state_id!==value.selected.state.id&&!parts[3]){selectConversation(null);threadDetail=null;}
-      sidebar();$('#breadcrumb').innerHTML=project?view.projectHeader(project,null,'work'):'Work';
-      await drawWork();if(current!==viewEpoch)return;if(parts[3])focusConversation();
-      if(parts[4]&&detail.can_comment)api('studio_acknowledge',{notification_id:parts[4]}).catch(fail);
+      if(kind==='studio-work'&&parts[3]){const thread=value.threads.find(t=>t.id===parts[3]);threadDetail=null;if(thread){tab=thread.anchor.kind==='code'||codeFile(thread.anchor.path||'')?'code':'cad';file=thread.anchor.path||'';selectedPart=thread.anchor.part||'';selectConversation({anchor:thread.anchor,state_id:thread.state_id,thread_id:thread.id});}}
+      if(conversation&&conversation.state_id!==value.selected.state.id&&!(kind==='studio-work'&&parts[3])){selectConversation(null);threadDetail=null;}
+      if(directNode){const scoped=Object.keys(value.selected.manifest).find(path=>componentForFile(project,path)?.id===directNode.id);if(scoped){file=scoped;selectedPart=scoped;tab=codeFile(scoped)?'code':'cad';}}
+      node=node||componentForFile(project,file)||(priorSelection.work===value.work.id&&priorSelection.project===project?.id?project.hierarchy.find(n=>n.id===priorSelection.component):null)||project?.hierarchy.find(n=>n.id===value.work.components?.[0]?.id);
+      sidebar();$('#breadcrumb').innerHTML=project?view.projectHeader(project,node,'work',value.selected.state.id):'Work';
+      await drawWork();if(current!==viewEpoch)return;if(kind==='studio-work'&&parts[3])focusConversation();
+      if(kind==='studio-work'&&parts[4]&&detail.can_comment)api('studio_acknowledge',{notification_id:parts[4]}).catch(fail);
       return;
     }
-    project=overview.projects.find(p=>p.id===parts[1])||overview.projects[0];node=project?.hierarchy.find(n=>n.id===parts[2]);sidebar();
+    sidebar();
     if(kind==='studio-inbox'){
       const inbox=await api('studio_inbox');if(current!==viewEpoch)return;activity.set('studio_inbox',{},inbox);$('#breadcrumb').textContent='Inbox';$('#main').innerHTML=view.inbox(inbox.items)+(inbox.next?a('more-inbox','Load more',inbox.next,'class="studio-more"'):'');return;
     }
     if(kind==='studio-recent'){$('#breadcrumb').textContent='Recent';$('#main').innerHTML='<div class="studio-page-title"><h1>Recent</h1><span class="studio-small">Work opened in this tab</span></div>'+view.workList(recent,'No recently opened work.');return;}
     if(!project){$('#breadcrumb').textContent='Projects';$('#main').innerHTML=view.hint('Start a shared project','Create a project, import saved files, then start work.')+(overview.can_import?'<div class="studio-empty">'+a('import-project','Import project')+'</div>':'');return;}
     if(['files','requirements'].includes(parts[3])){$('#breadcrumb').innerHTML=view.projectHeader(project,node,parts[3]);await library.render(project,node,parts);return;}
-    const projectTab=parts[3]==='work'?'work':'structure';$('#breadcrumb').innerHTML=view.projectHeader(project,node,projectTab);
-    $('#main').innerHTML=(projectTab==='structure'?view.structure(project,node,overview.works):
-      '<div class="studio-list-tools">'+a('new-work','New work')+'</div>'+view.workList(relatedWorks(overview.works,project.id,node?.id,project.hierarchy)))+
-      (overview.next?a('more-work','Load more work',overview.next,'class="studio-more"'):'');
+    if(directNode){const fileParts=[...parts];fileParts[3]='files';$('#breadcrumb').innerHTML=view.projectHeader(project,node,'files',parts[4]);await library.render(project,node,fileParts);return;}
+    $('#breadcrumb').innerHTML=view.projectHeader(project,node,'work',parts[4]);
+    $('#main').innerHTML='<div class="studio-list-tools">'+a('new-work','New work')+'</div>'+view.workList(relatedWorks(overview.works,project.id,node?.id,project.hierarchy))+(overview.next?a('more-work','Load more work',overview.next,'class="studio-more"'):'');
     layout.mount();
+  }
+  function workSwitcher(){
+    const choices=node?relatedWorks(overview.works,project.id,node.id,project.hierarchy):[];
+    return choices.length>1?`<label class="studio-work-switch">Work <select id="studio-work-choice">${choices.map(w=>`<option value="${e(view.projectURL(project.id,node.id,'work')+'/~/'+encodeURIComponent(w.id))}" ${w.id===detail.work.id?'selected':''}>${e(w.title)}</option>`).join('')}</select></label>`:'';
   }
   function drawWork(){
     disposeMesh();
     const versions=detail.versions,index=versions.findIndex(v=>v.id===detail.selected.state.id);
     if(!versions.some(v=>v.id===compareState&&v.id!==detail.selected.state.id))compareState=versions[Math.max(0,index-1)]?.id;
     if(index===0)compare=false;
-    $('#main').innerHTML=view.workDetail(detail,{tab,compare,compareState,conversation});
-    drawConversation();layout.mount();const epoch=viewEpoch;const load=loadArtifact();const request=artifactEpoch;return load.catch(error=>{if(epoch===viewEpoch&&request===artifactEpoch&&$('#studio-artifact'))$('#studio-artifact').innerHTML=view.hint('Unable to load artifact',error.message);});
+    $('#main').innerHTML='<div id="studio-work-switcher">'+workSwitcher()+'</div>'+view.workDetail(detail,{tab,compare,compareState,conversation,related:relatedPanel});
+    if(!relatedPanel)drawConversation();layout.mount();const epoch=viewEpoch;const load=loadArtifact().then(()=>{if(epoch===viewEpoch&&relatedPanel)return drawRelated();});const request=artifactEpoch;return load.catch(error=>{if(epoch===viewEpoch&&request===artifactEpoch&&$('#studio-artifact'))$('#studio-artifact').innerHTML=view.hint('Unable to load artifact',error.message);});
   }
-  function drawConversation(){if(conversation&&$('#studio-conversation')){$('#studio-conversation').innerHTML=view.conversation(threadDetail||detail,conversation,draft,mentions);layout.mount();}}
+  function drawConversation(){if(relatedPanel){drawRelated().catch(fail);return;}if(conversation&&$('#studio-conversation')){$('#studio-conversation').innerHTML=view.conversation(threadDetail||detail,conversation,draft,mentions);layout.mount();}}
+  async function drawRelated(){
+    const epoch=viewEpoch,revision=detail.selected.state.id,path=file,workId=detail.work.id;
+    const panel=$('#studio-conversation');if(!panel)return;
+    panel.innerHTML=a('close-conversation','Close ×')+view.hint('Loading recorded links…');
+    const anchor=tab!=='checks'&&detail.selected.manifest[path]?{kind:'file',path,hash:detail.selected.manifest[path].hash}:node?{kind:'component',component_id:node.id}:{kind:'project'};
+    const data=await api('studio_related',{project_id:project.id,state_id:revision,anchor});
+    if(epoch!==viewEpoch||!relatedPanel||file!==path||detail.work.id!==workId||detail.selected.state.id!==revision)return;
+    panel.innerHTML=a('close-conversation','Close ×')+relatedView({...data,next:null},project.id)+(data.next?view.link(libraryURL(project.id,node?.id,'files',revision,anchor,'related'),'Browse all recorded links →'):'');
+  }
   async function bytes(state,path,max=16*1024*1024){
     const info=state.manifest[path];if(!info)throw new Error('File not present in this version.');if(info.size>max)throw new Error('Preview size limit reached. Restore the saved file with the local adapter.');
     if(cache.has(info.hash))return cache.get(info.hash);
@@ -88,7 +124,13 @@ export function createStudio({api,modal,toast,fail}){
     const old=compare?await api('get_development_state',{state_id:compareState}):null;if(current!==artifactEpoch)return;
     const match=tab==='cad'?cadFile:codeFile;const paths=[...new Set([...Object.keys(v.manifest),...(old?Object.keys(old.manifest):[])])].filter(match).sort();
     if(!paths.length){target.innerHTML=view.hint(tab==='cad'?'No shared CAD files':'No shared code files','Import saved files or connect your local adapter to this work.')+a('import-help','Connection instructions');return;}
-    if(!paths.includes(file)){const changed=new Set(v.diffs.map(d=>d.path));file=paths.find(p=>changed.has(p)&&(tab!=='cad'||meshFile(p)))||paths.find(meshFile)||paths[0];}
+    if(!paths.includes(file)){
+      const changed=new Set(v.diffs.map(d=>d.path)),scoped=node?paths.filter(p=>componentForFile(project,p)?.id===node.id):[];
+      const preferred=choices=>choices.find(p=>changed.has(p)&&(tab!=='cad'||meshFile(p)))||choices.find(meshFile)||choices[0];
+      const workPaths=paths.filter(p=>(detail.work.write_scope||[]).some(scope=>p===scope||(scope.endsWith('/')&&p.startsWith(scope))));
+      file=preferred(scoped)||preferred(workPaths)||preferred(paths);
+    }
+    const mapped=componentForFile(project,file);if(mapped&&mapped.id!==node?.id){node=mapped;sidebar();if($('#studio-work-switcher'))$('#studio-work-switcher').innerHTML=workSwitcher();$('#breadcrumb').innerHTML=view.projectHeader(project,node,'work',v.state.id);}
     target.innerHTML=`<div class="studio-filebar"><select id="studio-file" aria-label="Artifact file">${options(paths,file)}</select><span class="studio-small">${e(short((v.manifest[file]||old?.manifest[file])?.hash))}</span></div><div id="studio-file-content" aria-live="polite">${view.hint('Loading saved version…')}</div>`;
     const body=$('#studio-file-content');
     downloadState=v.manifest[file]?v:old;
@@ -115,12 +157,12 @@ export function createStudio({api,modal,toast,fail}){
     const epoch=viewEpoch,artifact=artifactEpoch,wid=detail.work.id;
     const older=stateId===detail.selected.state.id?null:await api('studio_work',{work_id:wid,state_id:stateId});
     if(epoch!==viewEpoch||artifact!==artifactEpoch||detail.work.id!==wid||!handles())return;
-    threadDetail=older;const source=threadDetail||detail;
+    relatedPanel=false;threadDetail=older;const source=threadDetail||detail;
     const t=source.threads.find(t=>JSON.stringify(Object.entries(t.anchor).sort())===JSON.stringify(Object.entries(anchor).sort()));
     selectConversation({anchor,state_id:stateId,...(t?{thread_id:t.id}:{})});await drawWork();if(epoch!==viewEpoch)return;focusConversation();
   }
   function focusConversation(){const panel=$('#studio-conversation');if(!panel)return;if(globalThis.innerWidth<=1024)panel.scrollIntoView({block:'start'});panel.focus({preventScroll:true});}
-  async function closeConversation(){selectConversation(null);threadDetail=null;const epoch=viewEpoch;await drawWork();if(epoch!==viewEpoch)return;const target=$('#studio-canvas')||$('#studio-artifact');if(globalThis.innerWidth<=1024)target?.scrollIntoView({block:'start'});target?.focus({preventScroll:true});}
+  async function closeConversation(){relatedPanel=false;selectConversation(null);threadDetail=null;const epoch=viewEpoch;await drawWork();if(epoch!==viewEpoch)return;const target=$('#studio-canvas')||$('#studio-artifact');if(globalThis.innerWidth<=1024)target?.scrollIntoView({block:'start'});target?.focus({preventScroll:true});}
   async function loadUpdates(){
     if(route()[0]!=='studio-work')return render();
     const epoch=viewEpoch,artifact=artifactEpoch,wid=detail.work.id,sid=detail.selected.state.id;
@@ -159,6 +201,8 @@ export function createStudio({api,modal,toast,fail}){
     orientation:value=>mesh?.view(value),
     zoom:value=>mesh?.zoom(Number(value)),
     conversation:()=>openConversation({kind:'work'}),
+    'selection-discussion':()=>openConversation(tab!=='checks'&&detail.selected.manifest[file]?{kind:meshFile(file)?'cad':'file',path:file,...(meshFile(file)?{part:file}:{}),hash:detail.selected.manifest[file].hash}:{kind:'work'}),
+    related:async()=>{remember();relatedPanel=true;await drawWork();focusConversation();},
     'part-conversation':()=>{if(!selectedPart||!detail.selected.manifest[selectedPart])throw new Error('Select a current saved mesh part.');return openConversation({kind:'cad',path:selectedPart,part:selectedPart,hash:detail.selected.manifest[selectedPart].hash});},
     line:async(value,el)=>{const epoch=viewEpoch,artifact=artifactEpoch,path=file,stateId=el.dataset.side==='before'?compareState:detail.selected.state.id;const state=stateId===detail.selected.state.id?detail.selected:await api('get_development_state',{state_id:stateId});if(epoch!==viewEpoch||artifact!==artifactEpoch)return;return openConversation({kind:'code',path,hash:state.manifest[path].hash,line:Number(value)},stateId);},
     'close-conversation':closeConversation,
@@ -173,16 +217,16 @@ export function createStudio({api,modal,toast,fail}){
     'download-file':async path=>download(path.split('/').pop(),await bytes(downloadState,path,32*1024*1024),'application/octet-stream'),
     'import-help':()=>modal('Connect / continue',view.connectionInstructions(detail,location.origin+location.pathname.replace(/\/$/,'')),null),
     details:()=>modal('Saved version',`<dl class="context-list"><dt>State</dt><dd>${e(detail.selected.state.id)}</dd><dt>Checkpoint note</dt><dd>${e(detail.selected.state.summary)}</dd><dt>Shared update notes</dt><dd>${e((detail.versions.find(v=>v.id===detail.selected.state.id)?.notes||[]).join(' · ')||'No note')}</dd><dt>Snapshot</dt><dd>${e(detail.selected.state.snapshot)}</dd><dt>Work</dt><dd>${e(detail.selected.status.work)}</dd><dt>Sharing</dt><dd>${e(detail.selected.status.sharing)}</dd><dt>Verification</dt><dd>${e(detail.selected.status.verification)}</dd><dt>Adoption</dt><dd>${e(detail.selected.status.adoption)}</dd><dt>Not captured</dt><dd>${e(detail.capture.missing.join(', ')||'No omissions declared')}</dd></dl><p>Restore this saved version into a new directory:</p><pre>gantry restore-development-state ${e(detail.selected.state.id)} --destination ./continued-work --key resume-unique-key</pre>${view.workspaceContext(detail.selected)}${view.link('session/'+detail.work.session_id,'Open execution and review tools')}`,null),
-    component:value=>{const n=project.hierarchy.find(n=>n.id===value);if(!n)return;const works=relatedWorks(overview.works,project.id,value,project.hierarchy);document.querySelectorAll('.structure-card').forEach(el=>{el.classList.toggle('selected',el.dataset.value===value);el.setAttribute('aria-pressed',String(el.dataset.value===value));});const panel=document.querySelector('.structure-inspector');panel.hidden=false;document.querySelector('.structure-workspace').classList.add('with-inspector');$('#studio-component-detail').innerHTML=`<div class="studio-row"><strong>${e(n.title)}</strong>${view.link(view.projectURL(project.id,value,'work'),'View work →')} ${view.link(libraryURL(project.id,value,'files',project.structure_state),'Files')} ${view.link(libraryURL(project.id,value,'requirements',project.structure_state),'Requirements')} ${view.link(libraryURL(project.id,value,'files',project.structure_state,{kind:'component',component_id:value},'selection'),'Discuss')}</div><div class="studio-small">${e((n.paths||[]).join(' · ')||'No saved files mapped')}</div>${view.workList(works)}`;layout.mount();},
-    'close-component':()=>{document.querySelector('.structure-inspector').hidden=true;document.querySelector('.structure-workspace').classList.remove('with-inspector');document.querySelectorAll('.structure-card').forEach(el=>{el.classList.remove('selected');el.setAttribute('aria-pressed','false');});layout.mount();},
     'more-work':async cursor=>{const epoch=viewEpoch;const next=await api('studio_overview',{after:cursor});if(epoch!==viewEpoch)return;overview.works.push(...next.works);overview.next=next.next;const list=$('.studio-worklist');if(list)list.outerHTML=view.workList(relatedWorks(overview.works,project.id,node?.id,project.hierarchy));document.querySelector('[data-studio=more-work]')?.remove();if(next.next)$('#main').insertAdjacentHTML('beforeend',a('more-work','Load more work',next.next,'class="studio-more"'));},
     'more-inbox':async cursor=>{const epoch=viewEpoch;const next=await api('studio_inbox',{after:cursor});if(epoch!==viewEpoch)return;const wrapper=document.createElement('div');wrapper.innerHTML=view.inbox(next.items);$('.studio-worklist').insertAdjacentHTML('beforeend',wrapper.querySelector('.studio-worklist').innerHTML);document.querySelector('[data-studio=more-inbox]')?.remove();if(next.next)$('#main').insertAdjacentHTML('beforeend',a('more-inbox','Load more',next.next,'class="studio-more"'));},
     'new-work':async()=>{const epoch=viewEpoch,targetProject=project,targetNode=node;if(!targetProject.structure_state)throw new Error('Import a project state first from Projects & uploads.');const state=await api('get_development_state',{state_id:targetProject.structure_state});if(epoch!==viewEpoch)return;const session=await api('session_details',{session_id:state.state.session_id});if(epoch!==viewEpoch)return;modal('New work',`<label>Title<input name="title" required maxlength="240"></label><label>Purpose<textarea name="purpose" required></textarea></label><label>Assignee<select name="assignee">${[...new Set([session.session.owner,...session.session.actors])].map(id=>`<option>${e(id)}</option>`).join('')}</select></label><label>Target paths (one per line)<textarea name="scope" required>${e((targetNode?.paths||state.state.hierarchy.flatMap(n=>n.paths)).join('\n'))}</textarea></label>`,async form=>{const result=await api('begin_change',{state_id:state.state.id,title:form.title.value,purpose:form.purpose.value,assignee:form.assignee.value,write_scope:form.scope.value.split('\n').map(x=>x.trim()).filter(Boolean),dependencies:[]});location.hash=view.workURL(result.id);},'Start work');}
   };
   document.addEventListener('click',async event=>{const el=event.target.closest('[data-studio]');if(!el||!handles()||el.disabled||library.active)return;const fn=handlers[el.dataset.studio];if(!fn)return;event.preventDefault();el.disabled=true;try{await fn(el.dataset.value,el);}catch(err){fail(err);}finally{el.disabled=false;}});
-  document.addEventListener('keydown',event=>{if(event.target.matches('.studio-node')&&['Enter',' '].includes(event.key)){event.preventDefault();handlers.component(event.target.dataset.value);}});
+  document.addEventListener('keydown',event=>{if(event.key==='Escape'&&!library.active&&(conversation||relatedPanel)){event.preventDefault();closeConversation();}});
   document.addEventListener('input',event=>{if(library.active)return;if(event.target.id==='studio-draft'){draft=event.target.value;remember();}});
-  document.addEventListener('change',event=>{if(library.active)return;const el=event.target;const run=async()=>{
+  document.addEventListener('change',event=>{if(event.target.id==='studio-view'){location.hash=event.target.value;return;}if(library.active)return;const el=event.target;const run=async()=>{
+    if(el.id==='studio-content-choice')return handlers.tab(el.value);
+    if(el.id==='studio-work-choice'){location.hash=el.value;return;}
     if(el.id==='studio-version'){selectConversation(null);threadDetail=null;file='';location.hash=view.workURL(detail.work.id,el.value);}
     if(el.id==='studio-compare-version'){compareState=el.value;drawWork();}
     if(el.id==='studio-file')chooseFile(el.value);

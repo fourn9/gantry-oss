@@ -48,11 +48,13 @@ export function mountMesh(canvas,meshes,onSelect,initial='iso',comments={}){
   const schedule=()=>{cancelAnimationFrame(frame);frame=requestAnimationFrame(draw);};
   const selectAt=(x,y)=>{for(const f of [...faces].reverse()){if(f.mesh.previous)continue;const [a,b,c]=f.p;const sign=(p,q)=>(x-q[0])*(p[1]-q[1])-(p[0]-q[0])*(y-q[1]);const signs=[sign(a,b),sign(b,c),sign(c,a)];if(signs.every(v=>v>=0)||signs.every(v=>v<=0)){selected=f.mesh.path;schedule();onSelect(selected);break;}}};
   canvas.onpointerdown=e=>{pressed={x:e.clientX,y:e.clientY,ox:e.clientX,oy:e.clientY};canvas.setPointerCapture(e.pointerId);};
-  canvas.onpointermove=e=>{if(!pressed)return;yaw+=(e.clientX-pressed.x)*.008;pitch+=(e.clientY-pressed.y)*.008;pressed.x=e.clientX;pressed.y=e.clientY;schedule();};
+  canvas.onpointermove=e=>{if(!pressed)return;yaw=(yaw+(e.clientX-pressed.x)*.008)%(Math.PI*2);pitch=Math.max(-Math.PI/2,Math.min(Math.PI/2,pitch+(e.clientY-pressed.y)*.008));pressed.x=e.clientX;pressed.y=e.clientY;schedule();};
   canvas.onpointerup=e=>{if(pressed&&Math.hypot(e.clientX-pressed.ox,e.clientY-pressed.oy)<4){const r=canvas.getBoundingClientRect();selectAt(e.clientX-r.left,e.clientY-r.top);}pressed=null;};
-  const magnify=factor=>{zoom=Math.max(.3,Math.min(4,zoom*factor));schedule();};
+  const magnify=factor=>{if(!Number.isFinite(factor)||factor<=0)return;zoom=Math.max(.5,Math.min(2,zoom*factor));schedule();};
   canvas.onwheel=e=>{if(!e.altKey)return;e.preventDefault();magnify(Math.exp(-e.deltaY*.001));};
+  canvas.onpointercancel=canvas.onlostpointercapture=()=>{pressed=null;};
+  canvas.onkeydown=e=>{const angles={ArrowLeft:[-.15,0],ArrowRight:[.15,0],ArrowUp:[0,-.15],ArrowDown:[0,.15]}[e.key];if(angles){e.preventDefault();yaw=(yaw+angles[0])%(Math.PI*2);pitch=Math.max(-Math.PI/2,Math.min(Math.PI/2,pitch+angles[1]));schedule();}else if(['+','=','-','0'].includes(e.key)){e.preventDefault();if(e.key==='0'){zoom=1;view('iso');}else magnify(e.key==='-'?.8:1.25);}};
   const observer=new ResizeObserver(schedule);observer.observe(canvas);
-  const view=name=>{[yaw,pitch]=name==='top'?[0,Math.PI/2]:name==='front'?[0,0]:[-.65,.75];schedule();};if(typeof initial==='object'&&initial){yaw=initial.yaw;pitch=initial.pitch;zoom=initial.zoom;schedule();}else view(initial);
-  return {view,zoom:magnify,camera:()=>({yaw,pitch,zoom}),select:path=>{selected=path;schedule();},destroy:()=>{closed=true;observer.disconnect();cancelAnimationFrame(frame);canvas.onpointerdown=canvas.onpointermove=canvas.onpointerup=canvas.onwheel=null;}};
+  const view=name=>{[yaw,pitch]=name==='top'?[0,Math.PI/2]:name==='front'?[0,0]:[-.65,.75];schedule();};if(typeof initial==='object'&&initial){yaw=Number.isFinite(initial.yaw)?initial.yaw%(Math.PI*2):-.65;pitch=Number.isFinite(initial.pitch)?Math.max(-Math.PI/2,Math.min(Math.PI/2,initial.pitch)):.75;zoom=Number.isFinite(initial.zoom)?Math.max(.5,Math.min(2,initial.zoom)):1;schedule();}else view(initial);
+  return {view,zoom:magnify,camera:()=>({yaw,pitch,zoom}),select:path=>{selected=path;schedule();},destroy:()=>{closed=true;observer.disconnect();cancelAnimationFrame(frame);canvas.onpointerdown=canvas.onpointermove=canvas.onpointerup=canvas.onwheel=canvas.onkeydown=canvas.onpointercancel=canvas.onlostpointercapture=null;}};
 }
