@@ -106,20 +106,14 @@ class ReviewContextMixin:
 _CAD_SCRIPT = r'''
 import json,sys
 try:
- import cadquery as cq
- from OCP.StlAPI import StlAPI_Reader
- from OCP.TopoDS import TopoDS_Shape
+ from gantry import cad_kernel as kernel
 except ImportError:
- print(json.dumps({'status':'unsupported','reason':'CadQuery/OCP not installed'}));sys.exit(0)
+ print(json.dumps({'status':'unsupported','reason':'Install Gantry [cad] in a fresh no-VTK environment'}));sys.exit(0)
 try:
  p=sys.argv[1]
- if p.lower().endswith(('.step','.stp')): shape=cq.importers.importStep(p).val()
- else:
-  raw=TopoDS_Shape()
-  if not StlAPI_Reader().Read(raw,p): raise ValueError('STL parser failed')
-  shape=cq.Shape.cast(raw)
+ shape=kernel.import_step(p) if p.lower().endswith(('.step','.stp')) else kernel.import_stl(p)
  box=shape.BoundingBox();solids=shape.Solids()
- print(json.dumps({'status':'measured','backend':'CadQuery '+cq.__version__,
+ print(json.dumps({'status':'measured','backend':kernel.BACKEND,
   'topology_valid':shape.isValid(),'solids':len(solids),'faces':len(shape.Faces()),
   'volume':sum(x.Volume() for x in solids) if solids else None,
   'bounds':{'min':[box.xmin,box.ymin,box.zmin],'max':[box.xmax,box.ymax,box.zmax]},

@@ -114,19 +114,19 @@ import unittest
 from gantry.hardware import screen_report
 
 class NativeCADHandoffTests(HardwareTraceTests):
-    @unittest.skipUnless(importlib.util.find_spec('cadquery'),'Optional CAD runtime unavailable')
+    @unittest.skipUnless(importlib.util.find_spec('OCP'),'Optional CAD runtime unavailable')
     def test_native_cad_measurement_publish_requirement_context(self):
-        import cadquery as cq
+        from gantry import cad_kernel as cq
         ref=self.requirement(); root=self.root/'native';root.mkdir()
         for name,x in [('a',0),('b',4)]:
-            cq.exporters.export(cq.Workplane('XY').box(1,1,1).translate((x,0,0)),str(root/(name+'.step')))
+            cq.export_step(cq.box(1,1,1).translate((x,0,0)),str(root/(name+'.step')))
         parts=[{'id':name,'path':name+'.step','sha256':hashlib.sha256((root/(name+'.step')).read_bytes()).hexdigest()} for name in ['a','b']]
         request={'parts':parts,'pairs':[['a','b']],'clearance':.1,'overlap_tolerance':1e-6,'unit':'mm','frame':'assembly'}
         check={'id':'travel','scope':'placement','components':['assembly'],'required':True,
             'inputs':['a.step','b.step'],'report':'clearance.json','requirement_refs':[ref],
             'conditions':{'unit':'mm','frame':'assembly','clearance':.1,'overlap_tolerance':1e-6,'pairs':[['a','b']],
                           'parts':{'a':'a.step','b':'b.step'}},
-            'evaluator':{'name':'gantry.cad-screen','version':'1'},'environment':{'cadquery':cq.__version__},
+            'evaluator':{'name':'gantry.cad-screen','version':'1'},'environment':{'cad_backend':cq.BACKEND},
             'criteria':[{'metric':'violating_pairs','unit':'count','max':0}]}
         plan={'version':1,'components':[{'id':'assembly','role':'motion','assembly':'robot','paths':['a.step','b.step']}],'checks':[check]}
         (root/'physical-plan.json').write_text(json.dumps(plan));(root/'input.txt').write_text('initial')

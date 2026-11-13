@@ -41,7 +41,19 @@ jobs:
       - run: |
           python -m pip install --upgrade --only-binary=:all: 'pip>=26.2.2' 'setuptools>=78.1.1' 'PyNaCl>=1.6.2,<2' pip-audit
       - run: |
-          python -m pip install '.[feedback]'
+          python -m pip install '.[cad,feedback]'
+      - name: Verify headless CAD dependency boundary
+        run: |
+          python - <<'PYTHON'
+          from importlib import metadata
+          import importlib.util
+          from gantry.cad_kernel import BACKEND, box
+          assert 'no-VTK' in BACKEND
+          assert abs(box(2, 3, 4).Volume() - 24) < 1e-8
+          names = {d.metadata['Name'].lower().replace('_', '-') for d in metadata.distributions()}
+          assert not names & {'vtk', 'cadquery', 'cadquery-ocp'}, names
+          assert importlib.util.find_spec('vtkmodules') is None
+          PYTHON
       - run: |
           python -m gantry.security_check
       - run: |

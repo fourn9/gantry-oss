@@ -20,13 +20,13 @@ def run(output):
     started=time.monotonic()
     try:
         source=output/'source';source.mkdir();(source/'control').mkdir();(source/'mechanical').mkdir()
-        import cadquery as cq
-        cq.exporters.export(cq.Workplane('XY').box(20,30,4),str(source/'mechanical'/'bracket.step'))
+        from gantry import cad_kernel as cq
+        cq.export_step(cq.box(20,30,4),str(source/'mechanical'/'bracket.step'))
         (source/'control'/'main.py').write_text('offset_mm = 0\n')
         mapping={'name':'Bench assembly','description':'Anonymous local acceptance fixture','paths':['control/','mechanical/'],
           'hierarchy':[{'id':'bench','title':'Bench','kind':'robot','paths':['control/','mechanical/'],'editable':True}],
           'context':{'requirements':['Keep shared mechanical baseline'],'constraints':['No physical operation'],
-                     'decisions':[],'open_questions':['Dynamic motion not tested'],'environment':{'cadquery':cq.__version__}},
+                     'decisions':[],'open_questions':['Dynamic motion not tested'],'environment':{'cad_backend':cq.BACKEND}},
           'title':'Adjust controller','purpose':'Continue shared development','write_scope':['control/'],
           'dependencies':['mechanical/bracket.step'],'actors':[],'missing':['Earlier tool history']}
         imported=import_workspace(owner,source,mapping,True);w=Workspace(owner,source)
@@ -41,7 +41,7 @@ def run(output):
         continued=continue_workspace(teammate,imported['work_id'],captured['state_id'],output/'continuation','Control follow-up')
         restored=Path(continued['workspace'])
         assert (restored/'control'/'main.py').read_text()=='offset_mm = 2\n'
-        shape=cq.importers.importStep(str(restored/'mechanical'/'bracket.step')).val()
+        shape=cq.import_step(str(restored/'mechanical'/'bracket.step'))
         assert abs(shape.Volume()-2400)<0.01
         new=Workspace(teammate,restored);(restored/'control'/'main.py').write_text('offset_mm = 3\n');new.sync();new.share()
         next_view=teammate.call('studio_work',{'work_id':continued['work_id']})

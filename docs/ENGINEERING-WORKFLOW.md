@@ -10,7 +10,7 @@ use the existing authenticated commands and permissions. No paid model is invoke
 | Path | Evidence |
 |---|---|
 | Saved files → immutable checkpoint → recovery/restore | Real Core integration tests |
-| CadQuery STEP edit → actual static clearance calculation → result capture | Real CadQuery 2.8 smoke test |
+| Headless OCP STEP edit → actual static clearance calculation → result capture | Real OCCT geometry tests; see HARDWARE-VERIFICATION.md |
 | MCAD → harness → control dependency applicability | Explicit, version-bound declarations; contract tests |
 | Results and downstream gaps → Mentor → correction request | Authenticated Core tests with synthetic review output |
 | External solver launch and collection | Real local Python processes; synthetic physics fixtures |
@@ -43,7 +43,7 @@ state and server, without a token. Subsequent commands use this file instead of
 asking the user to copy new state IDs after every checkpoint.
 
 Edit files using customer tools. `edit --root ... --request edit.json --output NEW_DIR`
-also exposes the existing fixed CadQuery operations. It writes a new output directory;
+also exposes the existing fixed OCCT operations. It writes a new output directory;
 the operator chooses which generated files to bring into their candidate. It never
 silently replaces the source CAD. Native desktop writes still use the prepare/apply/
 readback workflow in `gantry-native`, with their original permission boundaries.

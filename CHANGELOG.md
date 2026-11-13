@@ -1,6 +1,17 @@
 # Changelog
 
-## Unreleased — component-first Studio
+## v3.4.2 — 2026-11-13
+
+### Headless CAD security
+
+- Remove the built-in CAD runtime's VTK/CadQuery dependency using the official
+  same-kernel OCP no-VTK distribution; preserve bounded STEP editing, screening
+  and isolated STEP/STL inspection with real analytic geometry tests.
+- Reject mixed OCP distributions, flag old VTK left in existing environments,
+  record actual backend provenance, and document fresh-environment migration.
+- Install and verify the CAD extra in CI so native tests cannot silently skip.
+
+### Component-first Studio
 
 - Open related work directly from the component tree, or saved Files when no work
   exists; use compact Work / Files / Requirements and CAD / Code / Checks pickers.

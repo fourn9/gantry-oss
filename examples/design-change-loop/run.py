@@ -60,12 +60,12 @@ def main():
         for name,data in {'design.json':{'carrier_x_mm':5},'control.json':{'target_mm':5},'calibration.json':{'offset_mm':0}}.items():
             (project/name).write_text(json.dumps(data))
         inputs=['design.json','control.json','calibration.json','verify.py','fixed.step','carrier.step']
-        import cadquery as cq
+        from gantry import cad_kernel as cq
         plan={'version':1,'components':[{'id':'carrier','role':'moving carrier','assembly':'assembly','paths':['design.json','carrier.step']},
             {'id':'control','role':'position command','assembly':'assembly','paths':['control.json','calibration.json']}],
             'checks':[{'id':'interface','scope':'placement','components':['carrier','control'],'required':True,
                 'inputs':inputs,'report':'report.json','conditions':{'unit':'mm','frame':'assembly'},
-                'evaluator':{'name':'anonymous-cad-interface','version':'1'},'environment':{'cadquery':cq.__version__},
+                'evaluator':{'name':'anonymous-cad-interface','version':'1'},'environment':{'cad_backend':cq.BACKEND},
                 'requirement_refs':refs,'criteria':[{'metric':'overlap','unit':'mm3','max':0.001},
                     {'metric':'clearance','unit':'mm','min':1},{'metric':'carrier_x','unit':'mm','min':11,'max':20},
                     {'metric':'control_error','unit':'mm','max':0.01}]}]}
@@ -86,7 +86,7 @@ def main():
             'context':{'requirements':['Static clearance and command alignment'],'requirement_refs':refs,
                 'constraints':['Preserve acceptance and verifier; do not fabricate reports'],
                 'decisions':[],'open_questions':['Dynamics/strength/tolerances not tested'],
-                'environment':{'cadquery':cq.__version__}},'summary':'Import an existing failed design'})
+                'environment':{'cad_backend':cq.BACKEND}},'summary':'Import an existing failed design'})
         change=owner.call('begin_change',{'state_id':state['id'],'title':'Capture baseline evidence','purpose':'Known failed static check',
             'write_scope':scope,'dependencies':[],'assignee':'admin'})
         # Use only captured public inputs, excluding sandbox temp files.
@@ -146,7 +146,7 @@ def main():
                 evidence['dependency_change']=owner.call('get_design_assessment',{'baseline_state_id':sid,'state_id':current['id']})
                 require(evidence['dependency_change']['requirements']['items'][0]['status']=='unverified','example_failed','Stale pass reused')
         evidence['replay']=owner.call('replay');evidence['calls']=calls
-        evidence['native_environment']={'cadquery':cq.__version__,'python':sys.version,'sandbox':backend()}
+        evidence['native_environment']={'cad_backend':cq.BACKEND,'python':sys.version,'sandbox':backend()}
         persist(root/'result.json',evidence)
         print(json.dumps({'result':str(root/'result.json'),'tasks':len(evidence['runs']),'model_calls':len(calls),'replay':evidence['replay']['matched']}))
     finally:server.shutdown();server.server_close();thread.join()

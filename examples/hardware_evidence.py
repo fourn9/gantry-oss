@@ -10,7 +10,7 @@ import shutil
 import sys
 import secrets
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]))
-import cadquery as cq
+from gantry import cad_kernel as cq
 from gantry.service import Service
 from gantry.continuity_adapter import capture_workspace
 from gantry.cad_io import edit
@@ -24,12 +24,12 @@ def main(destination):
     class Client:
         def call(self,op,args=None,key=None):return service.call(token,op,args or {},key or secrets.token_hex(16))
     client=Client()
-    for name,x in [('a',0),('b',5)]:cq.exporters.export(cq.Workplane().box(10,10,10).translate((x,0,0)),str(root/(name+'.step')))
+    for name,x in [('a',0),('b',5)]:cq.export_step(cq.box(10,10,10).translate((x,0,0)),str(root/(name+'.step')))
     conditions={'unit':'mm','frame':'assembly','clearance':1,'overlap_tolerance':0.001,
                 'pairs':[['a','b']],'parts':{'a':'a.step','b':'b.step'}}
     check={'id':'clearance','scope':'placement','components':['assembly'],'required':True,
         'inputs':['a.step','b.step'],'report':'collision.json','conditions':conditions,
-        'evaluator':{'name':'gantry.cad-screen','version':'1'},'environment':{'cadquery':cq.__version__},
+        'evaluator':{'name':'gantry.cad-screen','version':'1'},'environment':{'cad_backend':cq.BACKEND},
         'criteria':[{'metric':'violating_pairs','unit':'count','max':0}]}
     strength={**check,'id':'strength','scope':'structural','report':'strength.json',
         'conditions':{'load_N':100,'fixture':'not_yet_validated'},'evaluator':{'name':'external-FEA','version':'to-be-selected'},
@@ -67,7 +67,7 @@ def main(destination):
     assert statuses==[{'clearance':'fail','strength':'unknown'},{'clearance':'pass','strength':'unknown'}],statuses
     assert views[-1]['status']['adoption']=='unadopted'
     assert service.call(token,'replay',{},'replay')['matched']
-    summary={'cadquery':cq.__version__,'checks':statuses,'states':[v['state']['id'] for v in views],
+    summary={'cad_backend':cq.BACKEND,'checks':statuses,'states':[v['state']['id'] for v in views],
              'remaining_gaps':views[-1]['engineering']['review_gaps'],'adoption':views[-1]['status']['adoption'],
              'note':'Real static CAD computation. No FEA or physical prototype test executed.'}
     (out/'summary.json').write_text(json.dumps(summary,indent=2));print(json.dumps(summary,indent=2))

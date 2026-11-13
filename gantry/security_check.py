@@ -5,10 +5,10 @@ import platform
 import re
 import sys
 
-REVIEWED_AT = '2026-10-24'
+REVIEWED_AT = '2026-11-13'
 PYTHON_FLOORS = {(3, 11): 17, (3, 12): 15, (3, 13): 17, (3, 14): 9, (3, 15): 1}
 PACKAGE_FLOORS = {'pip': '26.2.2', 'certifi': '2026.10.19', 'uv': '0.13.4',
-                  'PyNaCl': '1.6.2', 'setuptools': '78.1.1'}
+                  'PyNaCl': '1.6.2', 'setuptools': '78.1.1', 'vtk': '9.7.1'}
 
 
 def release(value):

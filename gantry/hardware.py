@@ -134,7 +134,7 @@ def _physical_checkpoint(client, before, root, zone, plan_path, key, baseline, e
 def screen_report(root, request, check):
     """Run actual static CAD screening and emit the common measurement envelope."""
     import hashlib
-    import cadquery as cq
+    from .cad_kernel import BACKEND
     from .cad_screen import screen
     from .cad_io import source
     root=Path(root).resolve()
@@ -156,7 +156,7 @@ def screen_report(root, request, check):
         'conditions':{'unit':'mm','frame':request['frame'],'clearance':request['clearance'],
             'overlap_tolerance':request['overlap_tolerance'],'pairs':request['pairs'],
             'parts':{p['id']:p['path'] for p in request['parts']}},
-        'evaluator':{'name':'gantry.cad-screen','version':'1'},'environment':{'cadquery':cq.__version__},
+        'evaluator':{'name':'gantry.cad-screen','version':'1'},'environment':{'cad_backend':BACKEND},
         'measurements':{'violating_pairs':{'value':sum(not p['clearance_satisfied'] for p in raw['pairs']),'unit':'count'}},
         'limitations':raw['limitations'],'raw':raw}
 

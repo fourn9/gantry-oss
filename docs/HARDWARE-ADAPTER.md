@@ -9,8 +9,8 @@ Gantry's existing authenticated API to publish checkpoints.
 
 | Operation | Support |
 | --- | --- |
-| CAD read/write | CadQuery 2.8: STEP import, box/cylinder, translation, cut/fuse, STEP export. Declarative JSON, no arbitrary Python execution. |
-| Interference | Real static CadQuery solid intersection/distance on explicit pairs in one common frame, millimeters. |
+| CAD read/write | Headless OCP 7.9.3.1.1: STEP import, box/cylinder, translation, cut/fuse, STEP export. Declarative JSON, no arbitrary Python execution. |
+| Interference | Real static OCCT solid intersection/distance on explicit pairs in one common frame, millimeters. |
 | Strength, tolerance, physical tests | Import external numeric observations, compare against frozen bounds and units, retain raw report and declared conditions. No built-in FEA solver, GD&T solver or test-bench driver. |
 | Review | Derived checks in development-state and PR-review context; existing required-check gate refuses Mentor OK when evidence is missing, failed or stale. |
 | Adoption | No automatic adoption, fabrication, device commands or physical safety certification. |
@@ -20,16 +20,28 @@ STEP preserves exchange geometry, not the original feature history. Preserve nat
 CAD/project files alongside STEP. Solid validity and positive volume do not prove
 intended wall thickness, strength, machinability or fit.
 
+See [CAD runtime migration](CAD-RUNTIME-SECURITY.md) for removal of the VTK dependency
+and the required fresh-environment migration.
+
 ## Installation and runnable example
 
 Use the patched Python/installers in [security maintenance](SECURITY-UPDATES.md).
 Install optional wheels in a dedicated customer runner environment:
 
 ```sh
-python -m pip install --only-binary=:all: -c docs/hardware-runtime-constraints.txt 'cadquery>=2.8,<2.9'
-python -m pip install .
+python -m venv .venv-cad
+. .venv-cad/bin/activate  # Windows: .venv-cad\Scripts\activate
+python -m pip install --only-binary=:all: -c docs/hardware-runtime-constraints.txt cadquery-ocp-novtk
+python -m pip install '.[cad]'
 python examples/hardware_evidence.py /path/to/new-demo-directory
 ```
+
+Use a **fresh** environment. An in-place upgrade leaves old CadQuery/VTK packages
+installed. Do not co-install full `cadquery-ocp` and `cadquery-ocp-novtk`: their
+module paths overlap, so Gantry refuses this ambiguous runtime. External CadQuery
+scripts may run in a separate environment; this change does not patch those environments.
+For `GANTRY_CAD_PYTHON`, install Gantry `[cad]` in that interpreter too: isolated
+inspection imports the installed trusted adapter, never code from the CAD workspace.
 
 The example creates two synthetic solids, records a real collision, imports and
 moves one solid, exports it, rechecks clearance and saves both trials into a real
@@ -115,7 +127,7 @@ explicit `pairs`, `unit: mm`, `frame`, `clearance`, `overlap_tolerance` (mm³).
 The emitted measurement is `violating_pairs` in `count`. Plan conditions must match
 unit/frame/clearance/overlap_tolerance/pairs and the part-ID-to-path map exactly.
 Evaluator is `{name: gantry.cad-screen, version: "1"}` and environment is
-`{cadquery: "2.8.0"}` for the tested runtime. The raw geometric report is embedded.
+`{cad_backend: "OCP no-VTK 7.9.3.1.1"}` for the tested runtime. The raw geometric report is embedded.
 Outputs must be new files. This covers only the declared pose and pairs; it does
 not evaluate continuous motion, flexible hoses or strength.
 
