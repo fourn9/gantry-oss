@@ -108,7 +108,7 @@ Gantry preserves original captured data. It does not infer complete cross-tool d
 | --- | --- | --- |
 | Saved files and Git | Versioned capture, restoration, explicit sync and sharing | Only captured scope; unsaved edits are not included |
 | GitHub and external records | Issue, PR and CI ingestion; bounded readers and saved exports | Authentication and capture coverage depend on the connector |
-| CadQuery / STEP | Optional local read, edit, write and static interference checks | Not a universal CAD editor or physical-validity guarantee |
+| Headless OCP / STEP | Optional local read, edit, write and static interference checks | Not a universal CAD editor or physical-validity guarantee |
 | Strength, tolerance and prototype results | Evidence capture against a frozen acceptance plan | Requires an actual evaluator or measured input |
 | Commercial CAD / ECAD | Experimental desktop operations and generated editor scripts | No verified live run for the eight listed vendor products; Zuken and Capital SDK implementations remain blocked |
 
@@ -160,7 +160,7 @@ Report issues, propose adapters or contribute tests. Use minimal synthetic examp
 node --test tests/test_*.mjs
 ```
 
-Core tests use the standard library. Optional NumPy and CAD tests skip when dependencies are absent. Use `GANTRY_CAD_PYTHON` to select a separate CadQuery interpreter.
+Core tests use the standard library. Optional NumPy and CAD tests skip when dependencies are absent. Use `GANTRY_CAD_PYTHON` to select a separate interpreter with Gantry `[cad]` installed.
 
 [Contributing guide](CONTRIBUTING.md) · [Synthetic end-to-end example](examples/connected_project.py)
 

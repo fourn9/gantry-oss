@@ -89,8 +89,8 @@ class CADInspectionTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp); before=root/'before'; after=root/'after'; before.mkdir(); after.mkdir()
             subprocess.run([str(interpreter), '-I', '-c',
-                'import cadquery as c,sys; c.exporters.export(c.Workplane().box(2,3,4),sys.argv[1]); '
-                'c.exporters.export(c.Workplane().box(2,3,5),sys.argv[2])',
+                'from gantry import cad_kernel as c; import sys; c.export_step(c.box(2,3,4),sys.argv[1]); '
+                'c.export_step(c.box(2,3,5),sys.argv[2])',
                 str(before/'part.step'), str(after/'part.step')], check=True, capture_output=True)
             report = inspect_cad(after, ['part.step'], before, interpreter)['files'][0]
             self.assertEqual(report['current']['status'], 'measured')

@@ -10,7 +10,7 @@ import sys
 from pathlib import Path
 REPO=Path(__file__).resolve().parents[1]
 sys.path.insert(0,str(REPO))
-import cadquery as cq
+from gantry import cad_kernel as cq
 from gantry.service import Service
 from gantry.model import digest
 from gantry.cad_io import edit
@@ -35,7 +35,7 @@ def main(destination):
     out=Path(destination).resolve(); out.mkdir(parents=True,exist_ok=False)
     source=out/'source'; source.mkdir()
     for name,x in [('a',0),('b',5)]:
-        cq.exporters.export(cq.Workplane().box(10,10,10).translate((x,0,0)),str(source/(name+'.step')))
+        cq.export_step(cq.box(10,10,10).translate((x,0,0)),str(source/(name+'.step')))
     (source/'evaluator.py').write_text(EVALUATOR)
     (source/'wire.json').write_text('{"clearance_model":"initial"}')
     (source/'control.py').write_text('LIMIT_MM = 5\n')
@@ -43,7 +43,7 @@ def main(destination):
         'inputs':['a.step','b.step','evaluator.py'],'report':'collision.json',
         'conditions':{'unit':'mm','frame':'assembly','clearance':1,'overlap_tolerance':.001,
                       'pairs':[['a','b']],'parts':{'a':'a.step','b':'b.step'}},
-        'evaluator':{'name':'gantry.cad-screen','version':'1'},'environment':{'cadquery':cq.__version__},
+        'evaluator':{'name':'gantry.cad-screen','version':'1'},'environment':{'cad_backend':cq.BACKEND},
         'criteria':[{'metric':'violating_pairs','unit':'count','max':0}]}
     components=[{'id':i,'role':i,'assembly':'robot','paths':paths} for i,paths in
                 [('assembly',['a.step','b.step']),('wire',['wire.json']),('control',['control.py'])]]
@@ -104,7 +104,7 @@ def main(destination):
     assert (out/'restored/workspace/b.step').read_bytes()==(root/'b.step').read_bytes()
     assert reopened['development']['status']['adoption']=='unadopted'
     assert client.call('replay')['matched']
-    summary={'runtime':{'python':sys.version.split()[0],'cadquery':cq.__version__},
+    summary={'runtime':{'python':sys.version.split()[0],'cad_backend':cq.BACKEND},
         'static_cad_results':[first['evaluation']['status'],second['evaluation']['status']],
         'downstream_reassessment':reopened['development']['engineering']['dependency_impact']['affected_components'],
         'lost_ack_recovered':True,'restored_bytes_match':True,'replay_matches':True,'adoption':'unadopted',

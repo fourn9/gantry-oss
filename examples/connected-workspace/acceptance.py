@@ -1,5 +1,5 @@
 """Real HTTP + saved native CAD + independent identity continuation. Anonymous fixture.
-Run with an installed optional CadQuery runtime; no LLM, vendor CAD or physical test.
+Run with an installed optional Gantry [cad] runtime; no LLM, vendor CAD or physical test.
 """
 import argparse
 import copy
@@ -8,7 +8,7 @@ import json
 from pathlib import Path
 import secrets
 import threading
-import cadquery as cq
+from gantry import cad_kernel as cq
 from gantry.service import Service, token_hash
 from gantry.server import Server
 from gantry.client import Client
@@ -26,16 +26,16 @@ def run(output,port=0,keep=False):
     source=output/'source'
     for folder in ['cad','control','checks']:(source/folder).mkdir(parents=True,exist_ok=True)
     for name,offset in [('base',0),('carriage',5)]:
-        shape=cq.Workplane().box(10,10,10).translate((offset,0,0))
-        cq.exporters.export(shape,str(source/('cad/'+name+'.step')))
-        cq.exporters.export(shape,str(source/('cad/'+name+'.stl')))
+        shape=cq.box(10,10,10).translate((offset,0,0))
+        cq.export_step(shape,str(source/('cad/'+name+'.step')))
+        cq.export_stl(shape,str(source/('cad/'+name+'.stl')))
     (source/'control/motion.py').write_text('OFFSET_MM = 5\n')
     (source/'checks/README.md').write_text('Static clearance only. No strength or dynamic claims.\n')
     hashes=lambda names:{name:hashlib.sha256((source/name).read_bytes()).hexdigest() for name in names}
     inputs=hashes(['cad/base.step','cad/carriage.step','control/motion.py'])
     context={'requirements':['At least 1 mm static separation'], 'constraints':['No physical operations'],
         'decisions':[],'open_questions':['Dynamic behavior and structural strength'],
-        'environment':{'cadquery':cq.__version__,'unit':'mm','frame':'assembly',
+        'environment':{'cad_backend':cq.BACKEND,'unit':'mm','frame':'assembly',
             'engineering':{'version':1,'components':[{'id':'head','role':'carriage and matching control',
                 'assembly':'bench','inputs':inputs}], 'checks':[{'id':'clearance','scope':'placement',
                 'required':True,'status':'unverified','components':['head'],'inputs':inputs}]}}}
@@ -62,7 +62,7 @@ def run(output,port=0,keep=False):
         {'id':'a','op':'import_step','path':'cad/carriage.step','sha256':inputs['cad/carriage.step']},
         {'id':'moved','op':'translate','source':'a','vector':[10,0,0]}],'export':['moved']},output/'cad-edit')
     (source/'cad/carriage.step').write_bytes((output/'cad-edit/moved.step').read_bytes())
-    cq.exporters.export(cq.importers.importStep(str(source/'cad/carriage.step')),str(source/'cad/carriage.stl'))
+    cq.export_stl(cq.import_step(str(source/'cad/carriage.step')),str(source/'cad/carriage.stl'))
     cp=w.sync('Carriage moved 10 mm','Real STEP translation; controller still pending',['Align controller; retest'])
     w.share('Unfinished CAD ready for controls')
     other=Client(client.url,teammate)
@@ -88,7 +88,7 @@ def run(output,port=0,keep=False):
     assert changed['selected']['engineering']['checks'][0]['effective_status']=='unknown'
     assert changed['selected']['status']['adoption']=='unadopted'
     assert client.call('replay')['matched']
-    results={'transport':'real loopback HTTP','native_runtime':'CadQuery '+cq.__version__,
+    results={'transport':'real loopback HTTP','native_runtime':cq.BACKEND,
         'project_id':imported['project_id'],'mechanical_work':imported['work_id'],'controls_work':handoff['work_id'],
         'shared_state':cp['state_id'],'tested_state':tested['state_id'],
         'initial_violating_pairs':before['measurements']['violating_pairs']['value'],

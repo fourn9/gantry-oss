@@ -1,4 +1,4 @@
-"""Bounded, snapshot-local CAD screening; optional CadQuery adapter.
+"""Bounded, snapshot-local CAD screening; optional headless OCP adapter.
 
 No global monkey patch or persistent cache of mutable shapes. Build fresh bounds
 after every geometry/pose change. Native files and exact narrow-phase checks stay
@@ -64,9 +64,9 @@ def screen(root, request):
         sources.append({'id': part['id'], 'path': name.as_posix(), 'sha256': fingerprint})
     require(all(isinstance(pair, list) and len(pair) == 2 and all(isinstance(n, str) and n in paths for n in pair)
                 and pair[0] != pair[1] for pair in pairs), 'invalid_input', 'Pairs must reference two captured parts')
-    import cadquery as cq
+    from . import cad_kernel as kernel
     import_started = time.perf_counter()
-    shapes = {name: cq.importers.importStep(str(path)).val() for name, path in paths.items()}
+    shapes = {name: kernel.import_step(path) for name, path in paths.items()}
     require(all(shape.isValid() and shape.Solids() for shape in shapes.values()),
             'invalid_geometry', 'Screening requires valid solid geometry')
     for source in sources:
@@ -93,7 +93,7 @@ def screen(root, request):
     metrics.update(import_seconds=imported, check_seconds=time.perf_counter() - check_started,
                    total_seconds=time.perf_counter() - started, pairs=len(pairs), bounds_separated=rejected,
                    exact_pairs=exact)
-    return {'adapter': 'gantry.cad-screen.v1', 'backend': 'CadQuery ' + cq.__version__,
+    return {'adapter': 'gantry.cad-screen.v1', 'backend': kernel.BACKEND,
         'request_hash': digest(request), 'sources': sources, 'unit': request['unit'], 'frame': request['frame'],
         'pairs': rows, 'passed_requested_pairs': all(r['clearance_satisfied'] for r in rows), 'metrics': metrics,
         'limitations': ['One declared pose and explicit pairs only', 'Units/frame are submitted declarations',

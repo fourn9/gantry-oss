@@ -28,7 +28,7 @@ def source(root, name, sha256):
 
 
 def edit(root, request, destination):
-    import cadquery as cq
+    from . import cad_kernel as kernel
     root = Path(root).resolve(); destination = Path(destination).absolute()
     require(not destination.exists() and not destination.is_symlink(), 'conflict', 'Use a new output directory')
     require(isinstance(request, dict) and set(request) == {'unit','frame','steps','export'}
@@ -59,14 +59,13 @@ def edit(root, request, destination):
                 raw=source(root,step['path'],step['sha256'])
                 input_file=staging/(name+'.input.step'); input_file.write_bytes(raw)
                 # Freeze imported bytes before native parsing; never parse a mutable source path.
-                values=cq.importers.importStep(str(input_file)).vals()
-                result=cq.Compound.makeCompound(values); input_file.unlink()
+                result=kernel.import_step(input_file); input_file.unlink()
             elif op=='box':
                 size=step['size']
                 require(isinstance(size,list) and len(size)==3,'invalid_input','Three dimensions required')
-                result=cq.Workplane().box(*(number(v,True) for v in size)).val()
+                result=kernel.box(*(number(v,True) for v in size))
             elif op=='cylinder':
-                result=cq.Workplane().circle(number(step['radius'],True)).extrude(number(step['height'],True)).val()
+                result=kernel.cylinder(number(step['radius'],True),number(step['height'],True))
             elif op=='translate':
                 vector=step['vector']
                 require(isinstance(vector,list) and len(vector)==3,'invalid_input','Three offsets required')
@@ -80,9 +79,9 @@ def edit(root, request, destination):
         outputs={}
         for name in exports:
             require(name in shapes,'invalid_input','Unknown export ID')
-            path=staging/(name+'.step'); cq.exporters.export(shapes[name],str(path))
+            path=staging/(name+'.step'); kernel.export_step(shapes[name],path)
             outputs[path.name]=hashlib.sha256(path.read_bytes()).hexdigest()
-        report={'adapter':'gantry.cad-io.v1','backend':'CadQuery '+cq.__version__,
+        report={'adapter':'gantry.cad-io.v1','backend':kernel.BACKEND,
                 'request':request,'request_hash':digest(request),'operations':history,'outputs':outputs,
                 'limitations':['Solid validity is not design intent or physical fitness',
                     'STEP does not preserve the original parametric feature tree',

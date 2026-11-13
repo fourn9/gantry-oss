@@ -16,8 +16,13 @@ def doctor():
     from .native.catalog import catalog
     try: cad=importlib.metadata.version('cadquery')
     except importlib.metadata.PackageNotFoundError: cad=None
-    return {'python':platform.python_version(),'platform':platform.system(),
-        'cadquery':{'installed_version':cad,'ready_for_smoke_test':bool(cad),
+    try:
+        from .cad_kernel import BACKEND
+        backend = {'ready_for_smoke_test':True,'backend':BACKEND,'runtime_verified':False}
+    except ImportError as error:
+        backend = {'ready_for_smoke_test':False,'reason':str(error),'runtime_verified':False}
+    return {'cad_backend':backend,'python':platform.python_version(),'platform':platform.system(),
+        'cadquery':{'installed_version':cad,'ready_for_smoke_test':False,'external_environment_only':True,
                     'runtime_verified':False,'next':'Run examples/engineering_roundtrip.py with this interpreter'},
         'native_products':catalog(),
         'core_connection':'not checked; use status on an authenticated checkout',

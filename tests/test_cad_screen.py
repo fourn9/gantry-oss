@@ -27,15 +27,15 @@ class BoundsTests(unittest.TestCase):
         with self.assertRaises(TypeError): bounds['a'] = updated['a']
 
 
-@unittest.skipUnless(importlib.util.find_spec('cadquery'), 'Optional CAD runtime unavailable')
+@unittest.skipUnless(importlib.util.find_spec('OCP'), 'Optional CAD runtime unavailable')
 class NativeScreenTests(unittest.TestCase):
     def test_hash_pinned_native_screen_and_changed_geometry(self):
-        import cadquery as cq
+        from gantry import cad_kernel as cq
         with tempfile.TemporaryDirectory() as folder:
             root = Path(folder); parts = []
             for name, x in [('a', 0), ('b', .5), ('c', 10)]:
                 path = root / (name + '.step')
-                cq.exporters.export(cq.Workplane('XY').box(1, 1, 1).translate((x, 0, 0)), str(path))
+                cq.export_step(cq.box(1, 1, 1).translate((x, 0, 0)), str(path))
                 parts.append({'id': name, 'path': path.name, 'sha256': hashlib.sha256(path.read_bytes()).hexdigest()})
             request = {'parts': parts, 'pairs': [['a', 'b'], ['a', 'c'], ['b', 'c']],
                        'clearance': .1, 'overlap_tolerance': 1e-6, 'unit': 'mm', 'frame': 'assembly'}

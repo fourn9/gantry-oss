@@ -29,3 +29,11 @@ class SecurityCheckTests(unittest.TestCase):
 
     def test_unparseable_package_version_is_not_reported_as_patched(self):
         self.assertTrue(assess('3.12.15', {'pip': '26.2.2rc1'})['findings'])
+
+
+class VTKBaselineTests(unittest.TestCase):
+    def test_old_vtk_is_reported_even_if_left_after_upgrade(self):
+        from gantry.security_check import assess
+        result=assess('3.12.15',{'vtk':'9.6.2'})
+        self.assertTrue(any(x['component']=='vtk' for x in result['findings']))
+        self.assertFalse(assess('3.12.15',{'vtk':'9.7.2'})['findings'])
