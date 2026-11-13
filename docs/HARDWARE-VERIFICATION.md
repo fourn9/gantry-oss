@@ -1,19 +1,22 @@
 # Hardware adapter verification
 
-## Current dependency caveat — 2026-11-12
+## Headless runtime — 2026-11-13
 
-The optional CAD constraints still require VTK 9.6.2 through CadQuery/OCP.
-[VTK 9.7.1](https://discourse.vtk.org/t/vtk-9-7-1-release/16542) fixes GLTF
-parser vulnerabilities, including bounds checks missing from upstream 9.6.2.
-A clean advisory scan below is historical evidence, not proof those fixes are present.
-The current Gantry adapter reads STEP, not GLTF; no GLTF reader path was identified
-in Gantry. Customer scripts using VTK directly are outside that guarantee.
+The built-in CAD runtime now uses the official OCP no-VTK 7.9.3.1.1 distribution.
+A fresh installation does not contain VTK or CadQuery. This replaces the blocked
+VTK upgrade in PR #17; it does not fix external CadQuery environments in place.
+See [migration, threat model and limits](CAD-RUNTIME-SECURITY.md).
 
-Do not parse untrusted GLTF with this optional environment or override OCP's exact
-VTK constraint to force an unsupported update. A supported patched dependency
-combination is tracked in [PR #17](https://github.com/fourn9/gantry-oss/pull/17).
-Current released CadQuery 2.8.0 and OCP pins do not support VTK 9.7.2. Upgrade
-acceptance requires dependency resolution, real STEP roundtrips and screening tests.
+Local CPython 3.12.15/macOS arm64: 9 real geometry tests passed; full Python suite
+1,919 tests, 1,917 passed and 2 optional NumPy tests skipped. The final single-build
+boolean adjustment was rechecked with all 9 geometry tests. pip check and pip-audit
+passed. Hardware and engineering examples plus real HTTP connected-workspace
+continuation passed using anonymous STEP/STL fixtures. Independent review passed
+following the boolean-constructor fix. Hosted CI separately verifies Linux/macOS.
+
+Historical results below used CadQuery and the old VTK dependency. The old clean
+advisory scan is not evidence of the later GLTF security fixes. Recreate the runtime;
+never force unsupported pins or silently reuse earlier evaluation results.
 
 ## Earlier verification
 
@@ -35,7 +38,8 @@ Verified 2026-11-02, CPython 3.12.15 / macOS arm64 / CadQuery 2.8.0.
   strength unknown; adoption unadopted. Both candidate states remain in the ledger.
 - Built wheel successfully. Installed-wheel module/CLI smoke check succeeded.
 - pip-audit reported no known vulnerabilities for the resolved optional CAD/tooling
-  environment. Exact public package versions are in hardware-runtime-constraints.txt.
+  environment. The historical package pins are preserved in Git history; current constraints
+  describe the headless replacement.
   This is a point-in-time advisory match, not native-code security certification.
 
 No mock geometry was used in the CAD tests/demo. Strength observation unit tests

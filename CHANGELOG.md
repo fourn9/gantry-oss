@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased — headless CAD security
+
+- Remove the built-in CAD runtime's VTK/CadQuery dependency using the official
+  same-kernel OCP no-VTK distribution; preserve bounded STEP editing, screening
+  and isolated STEP/STL inspection with real analytic geometry tests.
+- Reject mixed OCP distributions, flag old VTK left in existing environments,
+  record actual backend provenance, and document fresh-environment migration.
+- Install and verify the CAD extra in CI so native tests cannot silently skip.
+
 ## Unreleased — component-first Studio
 
 - Open related work directly from the component tree, or saved Files when no work

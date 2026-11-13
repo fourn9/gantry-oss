@@ -5,7 +5,7 @@ import unittest
 from pathlib import Path
 from gantry.model import Fault
 
-@unittest.skipUnless(importlib.util.find_spec('OCP'), 'optional CadQuery not installed')
+@unittest.skipUnless(importlib.util.find_spec('OCP'), 'optional OCP runtime not installed')
 class CadIOTests(unittest.TestCase):
     def test_step_read_modify_write_and_original_preserved(self):
         from gantry import cad_kernel as cq

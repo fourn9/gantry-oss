@@ -9,11 +9,11 @@ libraries, or alter users' existing CAD environments. External CadQuery scripts
 remain external and need their own environment. Core data and auth unchanged.
 
 Acceptance / ordered tasks:
-- [ ] Fresh wheel-only environment resolves with no VTK, CadQuery or dependency overrides.
-- [ ] Built-in box/cylinder/translation/boolean/STEP edit and collision/clearance use the same OCCT kernel; real analytic geometry regression tests pass.
-- [ ] Isolated review subprocess measures STEP/STL without VTK and retains timeout/hash checks; hardware evidence declares the actual backend.
-- [ ] Distribution/doctor/docs/CI verify the new optional runtime. Existing environments need recreation (in-place pip upgrades do not remove old packages).
-- [ ] Full regression, dependency audit, independent review and published PR evidence.
+- [x] Fresh wheel-only environment resolves with no VTK, CadQuery or dependency overrides.
+- [x] Built-in box/cylinder/translation/boolean/STEP edit and collision/clearance use the same OCCT kernel; real analytic geometry regression tests pass.
+- [x] Isolated review subprocess measures STEP/STL without VTK and retains timeout/hash checks; hardware evidence declares the actual backend.
+- [x] Distribution/doctor/docs/CI verify the new optional runtime. Existing environments need recreation (in-place pip upgrades do not remove old packages).
+- [x] Full regression, dependency audit, independent review and published PR evidence.
 
 Trust boundary: native files are untrusted inputs, still parsed locally under the
 existing runner/resource limits. Removing VTK avoids its GLTF parsers; this does
@@ -48,3 +48,6 @@ Primary sources:
 - Independent review found a two-shape constructor performing a destructive build
   before the flag and a second build afterwards. Fixed to configure arguments and
   nondestructive mode before one build. Geometry regression and re-review passed.
+
+Full local suite: 1,919 tests in 234.208s; 1,917 passed, 2 optional NumPy tests skipped.
+Final boolean change: all 9 geometry tests passed again. Hosted CI remains the publication gate.

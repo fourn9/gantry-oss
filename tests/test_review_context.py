@@ -83,9 +83,9 @@ class CADInspectionTests(unittest.TestCase):
     def test_actual_cadquery_geometry_and_difference(self):
         import os
         configured = os.getenv('GANTRY_CAD_PYTHON')
-        if not configured: self.skipTest('Set GANTRY_CAD_PYTHON to an optional CadQuery interpreter')
+        if not configured: self.skipTest('Set GANTRY_CAD_PYTHON to an interpreter with Gantry [cad] installed')
         interpreter = Path(configured)
-        if not interpreter.is_file(): self.skipTest('Optional CadQuery interpreter not installed')
+        if not interpreter.is_file(): self.skipTest('Optional CAD interpreter not installed')
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp); before=root/'before'; after=root/'after'; before.mkdir(); after.mkdir()
             subprocess.run([str(interpreter), '-I', '-c',
