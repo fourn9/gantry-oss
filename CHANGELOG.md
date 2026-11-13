@@ -1,6 +1,8 @@
 # Changelog
 
-## Unreleased — headless CAD security
+## v3.4.2 — 2026-11-13
+
+### Headless CAD security
 
 - Remove the built-in CAD runtime's VTK/CadQuery dependency using the official
   same-kernel OCP no-VTK distribution; preserve bounded STEP editing, screening
@@ -9,7 +11,7 @@
   record actual backend provenance, and document fresh-environment migration.
 - Install and verify the CAD extra in CI so native tests cannot silently skip.
 
-## Unreleased — component-first Studio
+### Component-first Studio
 
 - Open related work directly from the component tree, or saved Files when no work
   exists; use compact Work / Files / Requirements and CAD / Code / Checks pickers.
