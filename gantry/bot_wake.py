@@ -63,13 +63,15 @@ class BotWakeMixin:
         policy = dict(copy.deepcopy(a), id=key, subject_id=a['bot_id'], principal_id=b['principal_id'],
             version=a['version']+1, created_seq=s['seq']+1, last_signal=None,
             last_task_id=old.get('last_task_id'))
+        policy['next_due_at'] = (a.get('routine') or {}).get('first_due_at')
         policy['basis'] = self._continuation_basis(s, policy)
         return self._dev_save(s, fx, 'bot_continuations', policy)
 
     def _continuation_signal(self, s, policy, note):
         session = s['dev_sessions'][policy['session_id']]
         manifest = self._manifest(s, s['dev_states'][session['active_state']]['snapshot'])
-        baseline = note['watch_basis']; content = note['content']
+        baseline = note['watch_basis'] if note else {'paths': {}, 'tasks': {}}
+        content = note['content'] if note else {'watch_paths': [], 'watch_tasks': [], 'due_at': None}
         paths = {p:manifest.get(p,{}).get('hash') for p in content['watch_paths']}
         tasks = {tid:task_signal(self._dev_get(s,'bot_tasks',tid)) for tid in content['watch_tasks']}
         due = content['due_at']; reached = due is not None and self.clock()>=due
@@ -82,8 +84,8 @@ class BotWakeMixin:
     def _poll_continuation(self, s, actor, policy, fx, n, con):
         self._continuation_valid(s, actor, policy)
         note = self._working_note(s, policy['session_id'], policy['bot_id'])
-        if not note: return {'status':'idle','continuation_id':policy['id']}
-        require(note['principal_id']==actor['id'], 'unauthorized', 'Working note belongs to a previous executor')
+        if not note and not policy.get('routine'): return {'status':'idle','continuation_id':policy['id']}
+        require(not note or note['principal_id']==actor['id'], 'unauthorized', 'Working note belongs to a previous executor')
         # Do not overlap any existing work for this Bot/project. In particular,
         # held work may have uncertain external effects and must not be replaced.
         rows = con.execute("SELECT id FROM records WHERE collection='bot_tasks' AND subject_id=? AND session_id=? "
@@ -92,11 +94,17 @@ class BotWakeMixin:
         active = rows.fetchone()
         if active: return {'status':'active','continuation_id':policy['id'],'task_id':active[0]}
         reasons, signal, session = self._continuation_signal(s, policy, note)
-        if not reasons or signal==policy.get('last_signal'):
+        if signal == policy.get('last_signal'): reasons = []
+        now = self.clock()
+        scheduled_at = policy.get('next_due_at')
+        routine_due = policy.get('routine') and scheduled_at is not None and now >= scheduled_at
+        if routine_due: reasons.append('routine_due')
+        if not reasons:
             return {'status':'idle','continuation_id':policy['id']}
         # Carry explicit watched work, not every project issue. Ownership and
         # engineering disposition remain the Bot's decision under its scope.
-        issue_ids = list(dict.fromkeys(ident for tid in note['content']['watch_tasks']
+        watched_tasks = note['content']['watch_tasks'] if note else []
+        issue_ids = list(dict.fromkeys(ident for tid in watched_tasks
             for ident in s['bot_tasks'][tid].get('issue_ids', [])))
         issue_ids = [ident for ident in issue_ids if all(in_scope(p, policy['write_scope'])
             for p in s['bot_issues'][ident]['paths'])][:40]
@@ -107,7 +115,11 @@ class BotWakeMixin:
             'dependencies':policy['dependencies'], 'after_tasks':[], 'issue_ids':issue_ids}, fx, n, con, standing=policy)
         stored = self._dev_get(s, 'bot_tasks', task['id'])
         stored.update(continuation_id=policy['id'], continuation_version=policy['version'],
-                      continuation_reason=reasons, working_note_version=note['version'])
+                      continuation_reason=reasons, working_note_version=note['version'] if note else None)
+        if routine_due:
+            stored.update(routine_scheduled_at=scheduled_at, routine_enqueued_at=now)
+            # Coalesce downtime instead of enqueuing every missed interval.
+            policy['next_due_at'] = now + policy['routine']['interval_ms']
         self._dev_save(s, fx, 'bot_tasks', stored)
         policy.update(last_signal=signal, last_task_id=task['id'])
         self._dev_save(s, fx, 'bot_continuations', policy)
