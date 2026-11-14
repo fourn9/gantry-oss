@@ -16,7 +16,9 @@ class BotContinuityMixin:
         note = self._working_note(s, task['session_id'], task['bot_id'])
         require(not note or self._bd_owner(actor, project) or note['principal_id'] == actor['id'],
                 'unauthorized', 'Working context belongs to a previous principal')
+        continuation = s.get('bot_continuations', {}).get(digest([task['session_id'], task['bot_id']]))
         return {'note': copy.deepcopy(note), 'project': copy.deepcopy(project),
+                'continuation': copy.deepcopy(continuation),
                 'active_state_id': session.get('active_state'),
                 'interpretation': 'Bot-authored working hypotheses; canonical project/state requirements prevail'}
 

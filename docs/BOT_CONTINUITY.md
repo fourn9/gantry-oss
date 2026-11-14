@@ -67,8 +67,8 @@ A working note can watch:
 - One optional deadline, `due_at`, in UTC epoch milliseconds. `null` removes it.
 
 These are precise triggers chosen by the Bot. They are not full semantic monitoring
-of every event. Recurring schedules require a Bot to explicitly set the next due
-point. Arbitrary external signals, hidden tool state and unwatched requirement
+of every event. The owner can additionally enable a recurring routine as described
+below. Arbitrary external signals, hidden tool state and unwatched requirement
 changes do not independently wake it. Existing requirement-change gates still
 hold stale execution; changes can be reported through ordinary scoped tasks.
 
@@ -88,6 +88,44 @@ unknown. Reassessment tasks do not silently supersede a failed task or adopt a d
 The backend polls indexed records; it does not keep a model thinking continuously.
 No claim of optimal organization or guaranteed termination of Bot-authored future
 schedules is made. Operators can disable standing delegation or stop the worker.
+
+## Recurring responsibility
+
+The existing owner operation `configure_bot_continuation` accepts an optional:
+
+```json
+"routine": {"interval_ms": 3600000, "first_due_at": 1794614400000}
+```
+
+Both numbers are positive integers in milliseconds; `first_due_at` is a UTC epoch
+time, **not** a delay. Supply a timestamp appropriate for the desired first run.
+An owner can enable this for a manager or specialist Bot. A due routine creates
+an ordinary `plan` task even if the Bot has no previous task or working note.
+The Bot reads its existing role, project state, requirements and available memory,
+then decides whether to act, consult or delegate through the existing organization.
+There is no new central decision-maker and no Mentor dependency.
+
+- `get_bot_working_state` (owner or bound Bot) returns `continuation`, including
+  the policy version, enabled flag, `next_due_at` and `last_task_id`.
+- The task records `routine_scheduled_at`, `routine_enqueued_at` and
+  `continuation_reason: ["routine_due"]` (possibly with watched-change reasons).
+- Successful enqueue advances next due to enqueue time plus interval, in the same
+  ledger transaction. Downtime coalesces into **one** reassessment; missed periods
+  are not replayed. A long-running task may leave one reassessment due after it ends.
+- Pending/running/waiting/**held** work prevents a replacement in the same Bot/project.
+  An uncertain external outcome still requires the existing explicit recovery path.
+- Omit `routine` or pass `null` when reconfiguring to remove recurrence; watched
+  changes and one-shot deadlines remain available. `enabled: false` disables all
+  standing continuation and invalidates its still-running descendant authority.
+- Configuration is a full replacement with optimistic version checks. Reconfiguring
+  resets the first due time and fences old tasks; do so at a deliberate boundary.
+
+The customer worker must be running with `personal_continuity: true`. This is
+poll-based execution, not a guarantee of exact-time scheduling or a cloud daemon
+that opens a closed customer application. No inference runs before a relevant
+trigger, but a due routine can consume customer inference even when it concludes
+that no change is needed. Choose cadence accordingly. Inference remains the
+customer's configured subscription/bridge; no paid API fallback is added.
 
 ## Enable in a customer's environment
 
@@ -127,8 +165,8 @@ bridge. No API-key fallback, paid model or publisher telemetry is added.
    }
    ```
 
-4. Let the Bot update its working note through a fenced task, then start the normal
-   worker or an explicitly installed user service. No worker is installed or started
+4. Let the Bot update its working note through a fenced task, or enable an owner
+   routine to bootstrap the first reassessment. Start the normal worker or an explicitly installed user service. No worker is installed or started
    by upgrading source. Polling without a relevant change uses no model inference.
 5. Inspect `get_bot_task`, `get_bot_working_state`, learning/reflection records and
    private worker journals. `continuations.json` contains the latest wake checks.

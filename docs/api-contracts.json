@@ -2815,6 +2815,27 @@
         "intent": {
           "type": "object"
         },
+        "routine": {
+          "additionalProperties": false,
+          "properties": {
+            "first_due_at": {
+              "minimum": 1,
+              "type": "integer"
+            },
+            "interval_ms": {
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          "required": [
+            "interval_ms",
+            "first_due_at"
+          ],
+          "type": [
+            "object",
+            "null"
+          ]
+        },
         "session_id": {
           "minLength": 1,
           "type": "string"

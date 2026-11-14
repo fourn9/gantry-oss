@@ -19,6 +19,105 @@ class BotContinuityTests(BotLearningTests):
         return self.clients['designer'].call('poll_bot_continuations', {'bot_id': 'designer',
             'runtime_fence': worker.runtime['fence']})
 
+    def test_recurring_routine_bootstraps_and_survives_worker_restart(self):
+        self.enable_continuity()
+        now = [self.service.clock()]
+        self.service.clock = lambda: now[0]
+        self.permit(routine={'interval_ms': 1000, 'first_due_at': now[0] + 1000})
+        calls = []
+        def infer(ctx, schema, directory):
+            calls.append(ctx)
+            return {'output': self.answer(), 'provider': {'kind': 'fixture'}}
+        with self.worker('designer', infer) as worker:
+            self.assertEqual(worker.tick(), [])
+            now[0] += 1000
+            self.assertEqual(worker.tick()[0]['task']['status'], 'completed')
+        with self.worker('designer', infer) as worker:
+            self.assertEqual(worker.tick(), [])
+            now[0] += 10000  # Missed periods coalesce, never replay ten jobs.
+            self.assertEqual(len(worker.tick()), 1)
+            self.assertEqual(worker.tick(), [])
+        self.assertEqual(len(calls), 2)
+        self.assertIsNone(calls[0]['working_state']['note'])
+        self.assertEqual(calls[0]['task']['continuation_reason'], ['routine_due'])
+        self.assertEqual(calls[0]['task']['routine_scheduled_at'], now[0] - 10000)
+        self.assertEqual(calls[0]['task']['routine_enqueued_at'], now[0] - 10000)
+        self.assertEqual(calls[1]['task']['routine_enqueued_at'], now[0])
+        view = self.owner.call('get_bot_working_state', {'session_id': self.sid, 'bot_id': 'designer'})
+        self.assertEqual(view['continuation']['next_due_at'], now[0] + 1000)
+        self.assertEqual(view['continuation']['last_task_id'], calls[-1]['task']['id'])
+        self.assertTrue(self.owner.call('replay')['matched'])
+
+    def test_recurring_routine_does_not_overlap_or_lose_due_time(self):
+        now = self.service.clock()
+        policy = self.permit(routine={'interval_ms': 1000, 'first_due_at': now})
+        task = self.task('designer')
+        with self.worker('designer') as worker:
+            self.assertEqual(self.pump(worker)['items'][0]['status'], 'active')
+            view = self.owner.call('get_bot_working_state', {'session_id': self.sid, 'bot_id': 'designer'})
+            self.assertEqual(view['continuation']['next_due_at'], now)
+            ref = self.claimed(worker, task)
+            self.clients['designer'].call('finish_bot_task', {**ref,
+                'report': {k:v for k,v in self.answer().items() if k!='edits'}})
+            queued = self.pump(worker)['items'][0]
+            self.assertEqual(queued['status'], 'queued')
+            self.assertEqual(self.pump(worker)['items'][0]['status'], 'active')
+            self.permit(version=policy['version'], enabled=False)
+            wake = self.owner.call('get_bot_task', {'task_id': queued['task_id']})['task']
+            self.fault('stale_basis', lambda: self.claimed(worker, wake))
+
+    def test_removing_routine_does_not_schedule_more_inference(self):
+        self.enable_continuity()
+        self.permit(routine={'interval_ms': 1, 'first_due_at': 1})
+        self.permit(version=1, routine=None)
+        def infer(*args):
+            self.fail('Removed routine must not call inference')
+        with self.worker('designer', infer) as worker:
+            self.assertEqual(worker.tick(), [])
+        view = self.owner.call('get_bot_working_state', {'session_id': self.sid, 'bot_id': 'designer'})
+        self.assertIsNone(view['continuation']['next_due_at'])
+        self.assertEqual(view['continuation']['version'], 2)
+
+    def test_routine_lead_delegates_through_existing_organization(self):
+        self.enable_continuity('lead')
+        self.owner.call('configure_bot_continuation', {'session_id': self.sid, 'bot_id': 'lead',
+            'version': 0, 'enabled': True, 'write_scope': self.scope('lead'), 'dependencies': [],
+            'completion': ['Reassess the shared interface and delegate as needed'],
+            'routine': {'interval_ms': 3600000, 'first_due_at': 1}})
+        # These are explicitly fixture decisions; real workers/Core own the handoffs.
+        with self.worker('lead') as lead:
+            root = lead.tick()[0]['task']
+            self.assertEqual(root['status'], 'waiting')
+        with self.worker('mechanical') as manager: manager.tick()
+        with self.worker('designer') as designer: designer.tick()
+        with self.worker('control') as control: control.tick()
+        with self.worker('mechanical') as manager: manager.tick()
+        with self.worker('lead') as lead:
+            result = lead.tick()[0]['task']
+            self.assertEqual(result['id'], root['id'])
+            self.assertEqual(result['status'], 'completed')
+            self.assertEqual(lead.tick(), [])
+        tasks = self.owner.call('list_bot_tasks', {'session_id': self.sid})['items']
+        self.assertEqual({t['bot_id'] for t in tasks}, {'lead', 'mechanical', 'designer', 'control'})
+        self.assertTrue(all(t['continuation_id'] == root['continuation_id'] for t in tasks))
+        self.assertTrue(self.owner.call('replay')['matched'])
+
+    def test_routine_holds_uncertain_work_and_rejects_invalid_cadence(self):
+        for routine in ({'interval_ms': 0, 'first_due_at': 1},
+                        {'interval_ms': 1}, {'interval_ms': True, 'first_due_at': 1}):
+            self.fault('invalid_input', lambda: self.permit(routine=routine))
+        self.permit(routine={'interval_ms': 1, 'first_due_at': 1})
+        with self.worker('designer') as worker:
+            queued = self.pump(worker)['items'][0]
+            task = self.owner.call('get_bot_task', {'task_id': queued['task_id']})['task']
+            ref = self.claimed(worker, task)
+            self.clients['designer'].call('hold_bot_task', {**ref, 'reason': 'External outcome unknown'})
+        with self.worker('designer') as worker:
+            result = self.pump(worker)['items'][0]
+            self.assertEqual(result['status'], 'active')
+            self.assertEqual(result['task_id'], task['id'])
+        self.assertEqual(len(self.owner.call('list_bot_tasks', {'session_id': self.sid})['items']), 1)
+
     def test_working_note_survives_fresh_context_and_blocks_foreign_writer(self):
         task = self.task('designer')
         with self.worker('designer') as worker:
