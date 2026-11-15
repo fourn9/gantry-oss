@@ -336,7 +336,8 @@ def recover_bot_task(client, task_id, root, runtime_fence, infer_fn, reason, loo
     # A locally known running tool/model must not be launched twice. Unknown
     # remote effects still require the caller's explicit stopped assertion.
     from .monthly_recovery import ensure_stopped, prepare_retry
-    for receipt_path in [directory/'model'/'inference.json', directory/'learning'/'inference'/'model'/'inference.json',
+    from .bot_learning_refresh import inference_markers
+    for receipt_path in [directory/'model'/'inference.json', *inference_markers(directory/'learning'),
                          *directory.glob('actions/*/model/inference.json')]:
         if receipt_path.exists():
             receipt = json.loads(receipt_path.read_text())

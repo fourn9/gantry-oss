@@ -244,3 +244,20 @@ previews and then older historical observations are omitted with explicit counts
 and retrieval references. Current task contracts, requirements, unresolved
 messages, issues and known limitations are not shortened to fit. If those still
 exceed the allowance, the task is held explicitly for scope/context review.
+
+
+### Retrieving another Bot's evidence
+
+`inspect` with only `task_id` returns a compact index of available report,
+candidate and result sections, with exact follow-up request arguments. Explicit
+JSON pointers still return bounded pages. Follow `next_request` for subsequent
+pages and nested `request` descriptors for omitted content; do not guess field
+names. Saved peer results are observations, not independent verification.
+
+For evidence older than the recent action window, use `records` with `task_id`,
+`kind` (`actions` or `decisions`) and an optional `after` cursor/`limit`. Follow the
+returned requests using `records`, retaining their page hash for nested reads.
+If concurrent history changes invalidate that hash, reload the source page.
+History pages are not an atomic task snapshot: recheck versions before acting.
+Same-project checks and existing Core permissions/redaction remain in force;
+private learning links and working notes are not made public by this navigation.

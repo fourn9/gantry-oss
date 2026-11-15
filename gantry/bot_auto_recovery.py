@@ -42,6 +42,7 @@ def recover_held(worker, job):
     remains responsible for authority, requirements, dependencies and fences.
     """
     from .bot_inference_recovery import pending_inference
+    from .bot_learning_refresh import inference_markers
     from .monthly_recovery import ensure_stopped, prepare_retry, rate_limit_state
     root = worker.root/'jobs'
     directory = root/'development'/digest(job['id'])/str(job['attempt'])
@@ -75,7 +76,7 @@ def recover_held(worker, job):
         inference = pending_inference(directory, journal, worker.config)
         require(inference is not None, 'outcome_unknown', 'Pending effect requires explicit reconciliation')
         saved = _read(inference/'inference.json', root)
-        for path in [directory/'model'/'inference.json', directory/'learning'/'inference'/'model'/'inference.json',
+        for path in [directory/'model'/'inference.json', *inference_markers(directory/'learning'),
                      *directory.glob('actions/*/model/inference.json')]:
             if path.exists():
                 receipt = _read(path, root)

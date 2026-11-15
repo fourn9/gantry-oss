@@ -30,10 +30,31 @@ def _infer_saved(infer, context, schema, directory):
 
 
 def plan_task(client, ref, context, infer, root, mode='always'):
+    from .bot_learning_refresh import active_directory, advance, refresh_state, REFRESH_REASONS
+    while True:
+        generation = refresh_state(root)['generation']
+        try:
+            return _plan_once(client, ref, context, infer, active_directory(root), mode, generation)
+        except Fault as exc:
+            reason = exc.details.get('replan_reason')
+            if exc.code != 'stale_basis' or reason not in REFRESH_REASONS: raise
+            # Check live authority before advancing a durable pointer. No action
+            # was accepted/executed from this rejected planning response.
+            client.call('check_bot_task', ref)
+            fresh = client.call('get_bot_task', {'task_id': ref['task_id']})
+            advance(root, reason)
+            # Source files are still the same pinned state (checked by Core).
+            # Refresh the live task/team view and use a new working-note packet.
+            context = {**context, **{k:fresh[k] for k in
+                ('task', 'project', 'bot', 'limits', 'team', 'design_assessment')}}
+
+
+def _plan_once(client, ref, context, infer, root, mode, generation):
     root = Path(root); root.mkdir(parents=True, exist_ok=True, mode=0o700)
     marker = root/'plan.json'
     prepare = {**ref, **({'compact': True} if mode == 'selective' else {})}
-    saved = json.loads(marker.read_text()) if marker.exists() else {'prepare': prepare, 'key': 'learning:' + digest(ref)}
+    key = 'learning:' + digest(ref) + (':replan:' + str(generation) if generation else '')
+    saved = json.loads(marker.read_text()) if marker.exists() else {'prepare': prepare, 'key': key}
     persist(marker, saved)
     if 'packet' not in saved:
         try:
@@ -41,7 +62,7 @@ def plan_task(client, ref, context, infer, root, mode='always'):
         except Fault as exc:
             # Only an uncommitted request with an expired task fence can rotate.
             if exc.code != 'stale_basis' or saved['prepare'] == prepare: raise
-            saved.update(prepare=prepare, key='learning:'+digest(ref)); persist(marker, saved)
+            saved.update(prepare=prepare, key=key); persist(marker, saved)
             saved['packet'] = client.call('prepare_bot_learning', prepare, saved['key']+':prepare')
         saved['input'] = {'operation': 'plan_from_experience', 'task': context['task'],
             'project': context['project'], 'bot': context['bot'], 'limits': context['limits'],
