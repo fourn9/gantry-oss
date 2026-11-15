@@ -210,3 +210,18 @@ are schema-validated. They are stored as data, never evaluated as shell/SQL/code
 The existing execution sandbox and scope checks still constrain the acting Bot;
 prompt instructions alone are not a security boundary. An authorized model can
 still draw a wrong conclusion from genuine evidence, which Core cannot disprove.
+
+## Refreshing an in-flight plan
+
+If shared experience or the Bot's working note changes while a planning response
+is in flight, Core identifies that specific stale input. Before any work action,
+the worker rechecks authority, preserves the rejected plan and response, obtains a
+fresh packet and asks the configured model to replan. Numbered `learning/replans`
+generations and a durable pointer survive reconnects; inference recovery targets
+the active generation. Accepted results reconcile through existing idempotency.
+
+At most three such refreshes occur per task attempt. Continued churn holds the
+task instead of silently consuming unlimited inference. This is not a project
+runtime or test-count limit. Revoked access, changed requirements, invalid memory
+application and unknown provider outcomes do not trigger this refresh. Completed
+edits and tools are not replayed by replanning.

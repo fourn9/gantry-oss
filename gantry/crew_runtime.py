@@ -11,6 +11,7 @@ from pathlib import Path
 from .bot_development import BOT_ANSWER
 from .contracts import CONTRACTS, S, validate
 from .crew_json import INSPECT_JSON_SCHEMA, inspect_json, pointer_value
+from .crew_peer import inspect_peer, inspect_records
 from .crew_observe import OBSERVE_SCHEMA, observe
 from .crew_timing import span
 from .connection_policy import safe_path, clean_bytes
@@ -41,8 +42,8 @@ GUIDE = {
     'edit': 'path, content, expected_hash (sha256 from read, or absent). Within task scope only.',
     'replace': 'path, expected_hash (whole-file SHA-256 from read), old_text, new_text. Replace one exact unique nonempty UTF-8 match; new_text may be empty. All other bytes are preserved without re-emitting the file. No fuzzy/regex matching. Reread changed files; missing or ambiguous matches require more exact context. Within write_scope only.',
     'context': 'pointer (JSON pointer into full authorized context), optional offset/limit. At most 30 entries or 6000 string characters per page; follow next_offset. Nested values remain bounded previews; use exact nested pointers for omitted content.',
-    'inspect': 'task_id. Read another task in this project, including its exact candidate and reports; use pointer/offset/limit to fetch a specific part. At most 30 entries or 6000 string characters per page; follow next_offset and exact nested pointers for omitted content.',
-    'records': 'kind (actions/decisions/learning_uses), optional after/limit. Retrieves exact saved task history; paginated.',
+    'inspect': 'task_id alone returns a compact peer result overview with exact section request arguments for reports (/task/reports), own_change, actions and development. Follow those requests with inspect; do not guess aliases. Explicit pointer/offset/limit fetch pages (pointer empty string selects root). At most 30 entries or 6000 string characters, reduced to the encoded delivery budget. Follow next_request for another page and omitted.request for nested content. task_version identifies the observed version; actions may be a history window. Saved results are not independent verification or adoption.',
+    'records': 'kind (actions/decisions/learning_uses), optional after/limit. Defaults to own task. Optional task_id retrieves authorized same-project peer history beyond the inspect recent window. Peer pages are bounded; follow next_request and omitted.request using records, retaining kind/task_id/after/limit. Optional pointer/offset selects nested content within that records page. next_records_request advances the source history page. Follow-up page_hash binds nested reads to the same authorized page; on stale_basis reload that source page. Private learning and working-context protections remain enforced.',
     'publish_physical': 'plan_path: a frozen physical plan already saved in the current state. Imports reports from this workspace through the fenced Bot adapter; never adopts.',
     'tool': 'name from available_tools. No arbitrary argv. Results are observations, not adoption.',
     'ask': 'to_bot_id, question, evidence (state/task/message IDs). Creates a read-only response task. Optional memory_id requests independent evidence-based checking of a shared lesson by a different Bot/principal from you and its author. Then finish waiting.',
@@ -78,6 +79,8 @@ def action_schemas():
         for key in ('task_id', 'fence', 'basis', 'intent'):
             schema['properties'].pop(key, None)
             if key in schema['required']: schema['required'].remove(key)
+        if name == 'records':
+            schema['properties'].update(task_id=S, page_hash=S, pointer={'type':'string'}, offset={'type':'integer','minimum':0})
         if name in {'issue','issues'}:
             schema['properties'].update(pointer={'type':'string'}, offset={'type':'integer','minimum':0})
         schemas[name] = schema
@@ -209,12 +212,21 @@ def _execute(client, context, ref, config, action, args, workspace, step, key):
         validate(args, action_schemas()['inspect'])
         other = client.call('get_bot_task', {'task_id': args['task_id']})
         require(other['task']['session_id'] == context['task']['session_id'], 'scope_denied', 'Inspect this project only')
-        return _context_value(other, {k: v for k, v in args.items() if k != 'task_id'} | {'pointer': args.get('pointer', '')})
+        return inspect_peer(other, args, _context_value)
     if action in {'issue', 'issues'}:
         require('task_id' not in args, 'invalid_input', 'Runtime supplies task identity')
         selected = {k:v for k,v in args.items() if k not in {'pointer','offset'}}
         result = client.call('get_bot_issue' if action == 'issue' else 'list_bot_issues', {**selected, 'task_id': ref['task_id']})
         return _context_value(result, {'pointer':args['pointer'], 'offset':args.get('offset',0)}) if 'pointer' in args else result
+    if action == 'records' and any(k in args for k in ('task_id','pointer','offset','page_hash')):
+        validate(args, action_schemas()['records'])
+        task_id = args['task_id'] if 'task_id' in args else ref['task_id']
+        other = client.call('get_bot_task', {'task_id':task_id})
+        require(other['task']['session_id'] == context['task']['session_id'], 'scope_denied', 'Inspect this project only')
+        request = {k:v for k,v in args.items() if k not in {'pointer','offset','page_hash'}} | {'task_id':task_id}
+        request['limit'] = min(request.get('limit',10),30)
+        records = client.call('get_bot_records', request)
+        return inspect_records(records, other['task'], {**args, **request}, _context_value)
     if action in {'records', 'requirements'}:
         require('task_id' not in args, 'invalid_input', 'Runtime supplies task identity')
         return client.call('get_bot_records' if action == 'records' else 'get_bot_requirements', {**args, 'task_id': ref['task_id']})

@@ -57,10 +57,16 @@ class BotLearningMixin:
         require(packet['status'] == 'pending', 'stale_basis', 'Plan is already immutable')
         require(packet['stamp'] == task['stamp'] and packet['state_id'] == task.get('output_state', task['state_id']),
                 'stale_basis', 'Planning inputs changed')
+        # Revoked source access is not an invitation to silently drop that source
+        # and continue. Only authorized memory/context changes can replan.
+        for memory in packet['recall']['items']:
+            self._learning_source(s, actor, task, memory['id'])
         require(packet.get('working_state') == self._working_note(s, task['session_id'], task['bot_id']),
-                'stale_basis', 'Working commitments changed; prepare a new plan')
+                'stale_basis', 'Working commitments changed; prepare a new plan',
+                replan_reason='working_context_changed')
         current = recall(self, s, actor, task, con, **packet['query'])
-        require(current == packet['recall'], 'stale_basis', 'Experience or source access changed; prepare a new plan')
+        require(current == packet['recall'], 'stale_basis', 'Experience changed; prepare a new plan',
+                replan_reason='experience_changed')
         available = {m['id']: m for m in current['items']}
         seen = set()
         for decision in a['output']['decisions']:
