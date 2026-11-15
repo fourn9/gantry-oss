@@ -56,3 +56,7 @@ Start with **Bot development**, then choose the extra behavior you need. These g
 Supporting configuration: [active CI](../.github/workflows/ci.yml) ([reference copy](ci-workflow.yml)) and [hardware runtime constraints](hardware-runtime-constraints.txt).
 
 - [Persistent Crew issues](CREW_ISSUES.md): responsibility, linked work, verification and state-relative resolution.
+
+- [Selected engineering data](SELECTED_ENGINEERING_DATA.md): source-preserving scalar extraction.
+- [Crew verification plans](CREW_VERIFICATION.md): frozen criteria, explicit questions and actual tool evidence.
+- [Studio engineering evidence](STUDIO_ENGINEERING_EVIDENCE.md): compact impact and provenance views.

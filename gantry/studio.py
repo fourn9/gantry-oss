@@ -83,10 +83,15 @@ class StudioMixin(StudioLibraryMixin, BotHandoffMixin, StudioTeamMixin, StudioBo
         discussions=self._studio_discussion_index(s,actor,c)
         state_ids=set(self._studio_states(s,c))
         requests=self._studio_bot_requests(s,c['id'],actor=actor)
+        task=next((t for t in s.get('bot_tasks',{}).values() if t.get('change_id')==c['id']),None)
         activity=digest({'work':c,'discussions':discussions,'bot_requests':requests,
             'shares':[x for x in s.get('dev_shares',{}).values() if x['change_id']==c['id']],
             'execution_context':{table:[x for x in s.get(table,{}).values() if x.get('session_id')==d['id']]
                 for table in ('dev_executions','dev_evaluations','dev_contracts','bot_tasks')},
+            'task_actions':tuple(con.execute('SELECT COUNT(*),MAX(created_seq) FROM records WHERE collection=? AND subject_id=?',
+                ('bot_actions',task['id'])).fetchone()) if task else None,
+            'evidence':[(ref,tuple(con.execute('SELECT COUNT(*),MAX(created_seq) FROM records WHERE collection=? AND state_id=?',
+                ('evidence_views',ref)).fetchone())) for ref in sorted(state_ids)],
             'adoptions':[e for e in s['entries'].values() if e['type']=='design_document'
                 and e['data'].get('development_state') in state_ids]})
         if a.get('activity_only'): return {'activity_token':activity}
@@ -100,7 +105,6 @@ class StudioMixin(StudioLibraryMixin, BotHandoffMixin, StudioTeamMixin, StudioBo
                 'sharing':'shared' if receipts else 'baseline' if index==0 else 'unshared',
                 'notes':[x['note'] for x in receipts if x.get('note')]})
         participants=self._studio_participants(s,actor,d,state)
-        task=next((t for t in s.get('bot_tasks',{}).values() if t.get('change_id')==c['id']),None)
         source=self._dev_artifact(s,state['snapshot'])['data'].get('source') or {}
         permitted=lambda command: 'allowed_commands' not in actor or command in actor['allowed_commands']
         return {'work':{**self._studio_summary(s,c,project,task),'write_scope':c['write_scope'],'dependencies':c['dependencies']},
@@ -108,6 +112,9 @@ class StudioMixin(StudioLibraryMixin, BotHandoffMixin, StudioTeamMixin, StudioBo
             'activity':[{'id':x['id'],'status':x['status']} for x in s.get('dev_executions',{}).values()
                 if x.get('input_state')==sid and x['status'] in ('running','waiting')],
             'selected':self.cmd_get_development_state(s,actor,{'state_id':sid},fx,n,con),
+            'design_assessment':self.cmd_get_design_assessment(s,actor,
+                {'baseline_state_id':c['base_state'],'state_id':sid},fx,n,con),
+            'verification_plans':self._studio_verification_plans(s,actor,task,con),
             'versions':versions,'participants':participants,
             'threads':self._studio_threads(s,c['id'],sid),
             'discussion_index':discussions,'activity_token':activity,
@@ -117,6 +124,26 @@ class StudioMixin(StudioLibraryMixin, BotHandoffMixin, StudioTeamMixin, StudioBo
             'can_ask_bot':actor['kind']=='human' and permitted('studio_request_bot') and ('admin' in actor['permissions'] or {'work','record'} <= set(actor['permissions'])),
             'can_assign_bot':sid==c['head'] and actor['kind']=='human' and permitted('studio_request_bot') and actor['id'] in {c['assignee'],c['author'],d['owner']} and ('admin' in actor['permissions'] or {'work','record'} <= set(actor['permissions'])),
             'capture':state['capture']}
+
+    def _studio_verification_plans(self, s, actor, task, con):
+        if not task: return {'items':[], 'partial':False}
+        # Bounded recent projection, not another plan store. Core's existing
+        # action redaction applies before any presentation of the result.
+        rows=con.execute('SELECT id FROM records WHERE collection=? AND subject_id=? ORDER BY created_seq DESC,id DESC LIMIT 51',
+            ('bot_actions',task['id'])).fetchall()
+        plans=[]; size=0; partial=len(rows)>50
+        from .model import canonical
+        for row in rows[:50]:
+            record=self._crew_action_view(s,actor,task,self._dev_get(s,'bot_actions',row[0]),con)
+            if record['kind']!='plan_verification': continue
+            result=record.get('details',{}).get('result')
+            if not isinstance(result,dict): continue
+            candidate={'id':record['id'],'task_id':task['id'],'result':result}
+            size+=len(canonical(candidate).encode())
+            if len(plans)>=10 or size>65536: partial=True; break
+            plans.append(candidate)
+        return {'items':plans,'partial':partial,'coverage':'Latest 50 action receipts; up to 10 plans and 64 KiB',
+            'history_request':{'task_id':task['id'],'kind':'actions'}}
 
     def cmd_studio_import_update(self, s, actor, a, fx, n, con):
         c=self._change(s,actor,{'change_id':a['work_id'],'version':a['version']})
