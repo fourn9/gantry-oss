@@ -40,5 +40,5 @@ Frozen comparison source: 2beb863. Real three-Bot run: 690.36 s, all three
 completed, one integration conflict recovered by the lead, zero parent semantic
 intervention after setup. Independent A/B both pass: 67.14 s vs 104.71 s; no
 speedup in this preliminary case. Python 1,965 tests passed (3 skipped), final
-UI focused regression passed, security baseline/pip-audit passed. GitHub PR #38
+UI focused regression and all 124 Node tests passed, security baseline/pip-audit passed. GitHub PR #38
 contains the source and sanitized evidence; required CI/merge is tracked there.

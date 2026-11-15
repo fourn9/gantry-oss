@@ -119,5 +119,5 @@ build/verify tools. A second B preparation reused the shared fixture and matched
 all initial file hashes and acceptance hashes. A native audit check changed only
 the CAD source position and confirmed that final verification rejected the stale
 STEP without rebuilding it; changing the frozen evaluator was also rejected.
-No model was invoked during harness implementation. The experiment result remains
-unmeasured until the opt-in runs are completed.
+No model was invoked during harness implementation. The later real-model results
+are recorded in [the preliminary result report](ENGINEERING_COMPARISON_RESULT.md).
