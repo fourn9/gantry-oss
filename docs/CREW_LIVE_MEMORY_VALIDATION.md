@@ -2,7 +2,7 @@
 
 2026-11-15. Tested source: `3a6b7a217c7e1ee78d6ac2c1f2fb863ac6a12d12`.
 
-**The live-model path completed after manual recovery. It was not an
+**Initial run: the live-model path completed after manual recovery. It was not an
 uninterrupted autonomous success or evidence of engineering speedup.**
 
 ## Method
@@ -81,3 +81,69 @@ it recovered independently and recorded the retrieval failure as a lesson.
 No product code was changed during this exercise. Private model journals,
 credentials and experiment data are intentionally excluded from public source.
 Further tests need independent no-memory comparisons and domain-specific work.
+
+
+## Follow-up: automatic replan and discoverable evidence (2026-11-15)
+
+Tested implementation: `c858dfd`. A fresh isolated run repeated the same anonymous
+fixture with separate Bot principals and real subscription inference. The parent
+again prepared acceptance/tools/roles and activated the standing responsibility
+after diagnosis. There were **no parent repairs, restarts, journal edits, answer
+rewrites or delegated solution values after activation**. No model mocks or paid
+API fallback were used. This does not remove the need for initial owner setup.
+
+Observed sequence:
+
+1. The diagnostic Bot ran the unchanged evaluator and recorded failure evidence
+   and a conditional lesson. The next task recalled and rechecked that lesson.
+2. Lead compared alternatives, selected one configuration edit, and delegated
+   mechanical implementation and an independent control-side source review.
+3. Specialists returned their scoped change and evidence. Both recorded explicit
+   memory-to-action usage, distinguishing diagnosis from implementation authority.
+4. Lead's planning input became stale **twice** as specialist reflections arrived.
+   The worker preserved generations 0 and 1, refreshed the memory packet and
+   accepted generation 2. No parent recovery was needed.
+5. Lead followed `inspect` overview sections to both reports, the candidate,
+   assessment and saved action evidence. Three batched observations resolved the
+   peer retrieval sequence; there were no failed pointer requests or action errors.
+6. Lead integrated the specialist candidate and ran the unchanged evaluator on
+   the combined state: exit zero, all four numeric predicates true. Five
+   reflections completed. Ledger verification covered 1,285 events; replay matched.
+
+The final assessment still says `needs_review`: formal requirement linkage and
+physical dependency mapping are missing in this deliberately small fixture.
+Physical geometry, electrical behavior and hardware performance remain unverified.
+There was no formal adoption. This validates the development/recovery path, not
+physical correctness, robot completion or general autonomous engineering ability.
+
+### Observed timing, not a controlled speedup experiment
+
+| Observation | Previous run | Follow-up |
+| --- | ---: | ---: |
+| Elapsed diagnosis through final reflection | 489.4 s | 382.8 s |
+| Parent hold-to-recovery interval | 119.2 s | 0 s |
+| Automatic memory refreshes | 0 | 2 |
+| Completed model calls | 30 | 29 |
+| Failed peer pointer requests | 5 | 0 |
+
+Follow-up diagnosis took 56.1 seconds and continuation 326.3 seconds. Summed model
+call time was 505.7 seconds (parallel calls overlap), with 782,612 input tokens,
+11,926 output tokens and 62,464 cached input tokens reported by the provider.
+Setup/parent chat usage is excluded. The default model was unpinned and local
+tests ran concurrently, so the elapsed reduction is **not a causal speedup claim**.
+The concrete result is removal of the observed manual recovery and retrieval
+failures in this run. Replanning still consumes model calls; memory coalescing and
+more compact evidence retrieval need further measurements.
+
+### Regression and disclosure
+
+Local Python suite: 1,937 tests passed, 3 skipped; the final dedicated refresh
+suite has 9 passing tests, including working-note updates, durable-pointer crashes
+and full active-generation task recovery. Peer retrieval has 7 dedicated passing
+tests including long reports, old receipts, stale-page hashes and access denial.
+Node tests: 119 passed. Development-loop smoke and security baseline passed.
+GitHub CI runs the final combined tree on Linux/macOS and Python 3.11/3.12.
+
+Raw model journals, credentials, ledger and per-action evidence remain private.
+The implementation and this sanitized report are public. The prior manually
+recovered run remains documented above; it has not been relabeled a success.
