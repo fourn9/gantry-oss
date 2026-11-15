@@ -11,6 +11,7 @@ READ_TOOLS.add('get_design_assessment')
 READ_TOOLS.update({'studio_library','studio_related','studio_context','studio_overview','studio_work','studio_inbox','studio_team','get_onboarding','list_onboardings'})
 READ_TOOLS.update({'get_persistent_bot', 'list_persistent_memories', 'bot_inbox'})
 DEVELOP_TOOLS = set('record capture_artifact begin_change checkpoint_change share_change integrate_changes submit_change_review respond_to_change_review create_work claim_work submit_work discuss'.split())
+DEVELOP_TOOLS.add('extract_json_evidence')
 DEVELOP_TOOLS.update({'studio_comment','studio_acknowledge','studio_import_update','studio_share_update','studio_sync_update','record_state_restore'})
 REVIEW_TOOLS = set('claim_change_review submit_specialist_review complete_change_review propose_review_work reflect_change_review claim_mentor_job check_mentor_job finish_mentor_job fail_mentor_job'.split())
 REVIEW_TOOLS.add('recover_mentor_job')
@@ -60,3 +61,5 @@ def connection_config(client, url, token_file, profile, executable):
     if client == 'codex':
         return '[mcp_servers.gantry]\ncommand = '+json.dumps(command)+'\nargs = '+json.dumps(args)+'\n'
     return json.dumps({'mcpServers': {'gantry': {'type': 'stdio', 'command': command, 'args': args}}}, indent=2)+'\n'
+
+PROFILES['bot'].add('extract_json_evidence')
