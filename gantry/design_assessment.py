@@ -223,7 +223,22 @@ def build(service, s, actor, baseline_id, state_id, con):
         'formal_adoption': False, 'partial': False,
         'limitations': ['Declared dependencies may be incomplete; test adequacy requires engineering judgment.',
                        'Tool exit status alone is not requirement evidence; no physical certification or automatic adoption.']}
-    result['id'] = 'assessment_' + digest(result)
+    from .engineering_evidence import build as evidence_projection
+    result['engineering_evidence'], evidence_gaps = evidence_projection(
+        service, s, actor, before, after, left, right, old, new, changes, checks, con)
+    result['gaps'] = sorted(set(result['gaps'] + evidence_gaps))
+    result['partial'] = result['engineering_evidence']['coverage']['partial']
+    if evidence_gaps: result['status'] = 'needs_review'
+    # A query watermark supports repeatable pagination; unrelated ledger writes
+    # must not change the identity of identical engineering evidence.
+    import copy
+    identity = copy.deepcopy(result)
+    for side in ('before','after'):
+        coverage = identity['engineering_evidence']['coverage'][side]
+        coverage.pop('as_of_seq', None)
+        for key in ('request','next_request'):
+            if coverage.get(key): coverage[key].pop('as_of_seq', None)
+    result['id'] = 'assessment_' + digest(identity)
     return bounded(result)
 
 

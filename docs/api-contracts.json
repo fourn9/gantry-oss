@@ -4491,6 +4491,78 @@
       "type": "object"
     }
   },
+  "extract_json_evidence": {
+    "description": "extract json evidence",
+    "schema": {
+      "additionalProperties": false,
+      "properties": {
+        "basis": {
+          "type": "object"
+        },
+        "fields": {
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "frame": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "name": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "pointer": {
+                "type": "string"
+              },
+              "time_basis": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "unit": {
+                "minLength": 1,
+                "type": "string"
+              }
+            },
+            "required": [
+              "name",
+              "pointer"
+            ],
+            "type": "object"
+          },
+          "maxItems": 100,
+          "minItems": 1,
+          "type": "array"
+        },
+        "intent": {
+          "type": "object"
+        },
+        "path": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "profile": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "state_id": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "subject_id": {
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "required": [
+        "state_id",
+        "subject_id",
+        "path",
+        "profile",
+        "fields"
+      ],
+      "type": "object"
+    }
+  },
   "fail_analysis": {
     "description": "fail analysis",
     "schema": {

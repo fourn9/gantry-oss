@@ -13,6 +13,7 @@ from .contracts import CONTRACTS, S, validate
 from .crew_json import INSPECT_JSON_SCHEMA, inspect_json, pointer_value
 from .crew_peer import inspect_peer, inspect_records
 from .crew_observe import OBSERVE_SCHEMA, observe
+from .crew_verification import SCHEMA as VERIFICATION_SCHEMA, plan_verification
 from .crew_timing import span
 from .connection_policy import safe_path, clean_bytes
 from .continuity_adapter import capture_workspace
@@ -23,12 +24,14 @@ from .runner import persist
 from . import project_sandbox
 
 SCHEMA = {'type': 'object', 'properties': {
-    'action': {'enum': ['observe', 'issue_open', 'issue_review', 'issue', 'issues', 'requirements', 'propose_requirements', 'integrate', 'read', 'inspect_json', 'edit', 'replace', 'context', 'records', 'inspect', 'tool', 'publish_physical', 'ask', 'resolve', 'decision', 'remember', 'working_state', 'experience_use', 'team', 'stop', 'finish']},
+    'action': {'enum': ['observe', 'plan_verification', 'extract_evidence', 'issue_open', 'issue_review', 'issue', 'issues', 'requirements', 'propose_requirements', 'integrate', 'read', 'inspect_json', 'edit', 'replace', 'context', 'records', 'inspect', 'tool', 'publish_physical', 'ask', 'resolve', 'decision', 'remember', 'working_state', 'experience_use', 'team', 'stop', 'finish']},
     'arguments_json': S, 'rationale': S}, 'required': ['action', 'arguments_json', 'rationale'], 'additionalProperties': False}
 API_ACTIONS = {'issue_open': 'open_bot_issue', 'issue_review': 'review_bot_issue', 'ask': 'ask_bot', 'decision': 'record_bot_decision', 'remember': 'record_bot_experience',
                'working_state': 'update_bot_working_state', 'experience_use': 'record_bot_learning_use',
                'propose_requirements': 'propose_bot_requirements'}
 GUIDE = {
+    'extract_evidence': 'Acquire declared scalar fields from a saved JSON file: subject_id, path, profile, fields [{name,pointer,unit?,frame?,time_basis?}]. Runtime pins the current saved state; no arbitrary source hashes or state substitution. Values come from exact JSON pointers, not model transcription. Extraction is not physical validation or acceptance; retain source hashes, units, assumptions and missing semantics.',
+    'plan_verification': 'Record verification intent before execution: plan_path, check_ids, purpose, question, assumptions, missing_inputs, tool_name, expected_outputs (exact selected report paths), next_steps {pass,fail,unknown}. Copies criteria and requirement refs only from the unchanged baseline physical plan and pins current inputs. Missing tools/inputs, report scope or tool_evidence mapping return unexecutable. Planned is not executed or safe. Choose the subsequent tool action and review measured results yourself; next steps never run automatically.',
     'observe': 'Retrieve 1-4 independent read/context/inspect/inspect_json requests in ONE turn: requests [{action,arguments}]. Read chunks deliver at most 2000 bytes each, with exact next_offset. Individual source versions/errors are preserved. Large results explicitly require narrower follow-up retrieval. No writes, tools, recursion or decisions. This is not an atomic cross-task snapshot. Prefer this when several known inputs are needed together.',
     'issue_open': 'Promote a saved followup: source_task_id, source_attempt, followup_id, owner_bot_id, paths, completion, verification_plan (saved physical plan path), check_ids. Explicitly declare scoped operational acceptance; preserve historical source. Returns stable issue ID and links this task. No adoption.',
     'issue_review': 'issue_id, version, status (working/verifying/deferred/reopened/resolved), state_id, reason, evidence; verification_task_ids for resolved. Responsible Bot or manager only, using an issue-linked task. Resolve the exact completed verification output state with fresh matching tool evidence and frozen passing checks. Completed child work alone is not resolution. Reopen explicitly for a new cycle. Optional reassessment while reopening sets a new verification_plan/check_ids/requirement_refs at this task state, preserves old acceptance and requires fresh verification; never silently drop requirements.',
@@ -64,6 +67,7 @@ def _schema(properties, required=None):
 def action_schemas():
     # Build from the authoritative contracts, not hand-maintained prose alone.
     schemas = {'finish': BOT_ANSWER, 'inspect_json': INSPECT_JSON_SCHEMA, 'observe': OBSERVE_SCHEMA,
+        'plan_verification': VERIFICATION_SCHEMA,
         'edit': _schema({'path': S, 'content': {'type': 'string'}, 'expected_hash': S}),
         'replace': _schema({'path': S, 'expected_hash': S, 'old_text': S, 'new_text': {'type': 'string'}}),
         'tool': _schema({'name': S}), 'publish_physical': _schema({'plan_path': S}),
@@ -74,7 +78,8 @@ def action_schemas():
         'inspect': _schema({'task_id': S, 'pointer': {'type':'string'}, 'offset': {'type':'integer','minimum':0},
                             'limit': {'type':'integer','minimum':1,'maximum':65536}}, ['task_id'])}
     for name, op in {**API_ACTIONS, 'integrate': 'integrate_bot_task', 'resolve': 'resolve_bot_question', 'team': 'propose_bot_team',
-                     'records': 'get_bot_records', 'requirements': 'get_bot_requirements', 'issue': 'get_bot_issue', 'issues': 'list_bot_issues'}.items():
+                     'records': 'get_bot_records', 'requirements': 'get_bot_requirements', 'issue': 'get_bot_issue', 'issues': 'list_bot_issues',
+                     'extract_evidence': 'extract_json_evidence'}.items():
         schema = json.loads(json.dumps(CONTRACTS[op]['schema']))
         for key in ('task_id', 'fence', 'basis', 'intent'):
             schema['properties'].pop(key, None)
@@ -83,6 +88,8 @@ def action_schemas():
             schema['properties'].update(task_id=S, page_hash=S, pointer={'type':'string'}, offset={'type':'integer','minimum':0})
         if name in {'issue','issues'}:
             schema['properties'].update(pointer={'type':'string'}, offset={'type':'integer','minimum':0})
+        if name == 'extract_evidence':
+            schema['properties'].pop('state_id'); schema['required'].remove('state_id')
         schemas[name] = schema
     return schemas
 
@@ -192,6 +199,12 @@ def _api_effect(client, operation, args, step, key):
 
 def _execute(client, context, ref, config, action, args, workspace, step, key):
     scope = context['task']['write_scope']
+    if action == 'plan_verification':
+        return plan_verification(client, context, config, args, workspace)
+    if action == 'extract_evidence':
+        validate(args, action_schemas()['extract_evidence'])
+        return _api_effect(client, 'extract_json_evidence',
+            {**args, 'state_id': context['development']['state']['id']}, step, key)
     if action == 'observe':
         return observe(args, action_schemas(), lambda kind, request:
             _execute(client, context, ref, config, kind, request, workspace, step, key))

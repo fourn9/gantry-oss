@@ -28,7 +28,18 @@ register('query_evidence', {'state_id': S, 'subject_id': S, 'profile': S, 'after
     'limit': {'type': 'integer', 'minimum': 1, 'maximum': 100}}, ['state_id'])
 
 
+register('extract_json_evidence', {'state_id':S,'subject_id':S,'path':S,'profile':S,
+    'fields':{'type':'array','minItems':1,'maxItems':100,'items':{'type':'object',
+        'properties':{'name':S,'pointer':{'type':'string'},'unit':S,'frame':S,'time_basis':S},
+        'required':['name','pointer'],'additionalProperties':False}}},
+    ['state_id','subject_id','path','profile','fields'])
+
+
 class EvidenceMixin:
+    def cmd_extract_json_evidence(self, s, actor, a, fx, n, con):
+        from .evidence_extract import extract
+        return extract(self,s,actor,a,fx,n,con)
+
     def cmd_record_evidence_view(self, s, actor, a, fx, n, con):
         self.allowed(actor, 'record')
         state = self._dev_get(s, 'dev_states', a['state_id'])

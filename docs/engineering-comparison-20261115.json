@@ -1,0 +1,227 @@
+{
+  "arms": {
+    "A": {
+      "acceptance_hash": "1b23f21c4e465a2f27b4d6b50a396d5651fd95be543e8b66562c2fe6ec571c6d",
+      "error": null,
+      "fixture_manifest_hash": "ebe1c924550020aa0dc68e7031ac87464d1acea1134b9fd8c8ba16e048798bf8",
+      "implementation_hash": "ca474c204607cd7cce2931883b6cf8f3c16255a5965f32d49ac7477ad3d03186",
+      "metrics": {
+        "action_errors": 0,
+        "deliberate_sleep_seconds": 0,
+        "host_sleep_seconds": null,
+        "human_active_seconds": null,
+        "human_interventions_during_run": 0,
+        "model_attempts": 6,
+        "model_errors": 0,
+        "model_seconds": 65.69650837499648,
+        "other_harness_record_restore_wait_seconds": 0.055144207915986954,
+        "provider_wait_seconds": null,
+        "tool_attempts": 3,
+        "tool_errors": 0,
+        "tool_seconds": 1.3908204170875251,
+        "total_wall_seconds": 67.142473,
+        "usage": {
+          "cached_input_tokens": 0,
+          "complete": true,
+          "cost_reason": "Subscription usage; per-call money not reported",
+          "input_tokens": 118574,
+          "monetary_cost": null,
+          "observed_cached_input_tokens": 0,
+          "observed_input_tokens": 118574,
+          "observed_output_tokens": 667,
+          "output_tokens": 667
+        }
+      },
+      "setup_seconds": 0.3147854170529172,
+      "status": "accepted",
+      "validation": {
+        "accepted": true,
+        "actual_tool_evidence_linked": true,
+        "comparisons": [
+          {
+            "criterion": {
+              "max": 0.001,
+              "metric": "overlap",
+              "unit": "mm3"
+            },
+            "observed": {
+              "unit": "mm3",
+              "value": 0.0
+            },
+            "passed": true
+          },
+          {
+            "criterion": {
+              "metric": "clearance",
+              "min": 1,
+              "unit": "mm"
+            },
+            "observed": {
+              "unit": "mm",
+              "value": 5.0
+            },
+            "passed": true
+          },
+          {
+            "criterion": {
+              "max": 20,
+              "metric": "carrier_x",
+              "min": 11,
+              "unit": "mm"
+            },
+            "observed": {
+              "unit": "mm",
+              "value": 15.0
+            },
+            "passed": true
+          },
+          {
+            "criterion": {
+              "max": 0.01,
+              "metric": "cad_source_error",
+              "unit": "mm"
+            },
+            "observed": {
+              "unit": "mm",
+              "value": 0.0
+            },
+            "passed": true
+          },
+          {
+            "criterion": {
+              "max": 0.01,
+              "metric": "control_error",
+              "unit": "mm"
+            },
+            "observed": {
+              "unit": "mm",
+              "value": 1.517022951702529e-09
+            },
+            "passed": true
+          }
+        ],
+        "formal_adoption": false,
+        "submitted_report_fresh": true
+      }
+    },
+    "B": {
+      "acceptance_hash": "1b23f21c4e465a2f27b4d6b50a396d5651fd95be543e8b66562c2fe6ec571c6d",
+      "error": null,
+      "fixture_manifest_hash": "ebe1c924550020aa0dc68e7031ac87464d1acea1134b9fd8c8ba16e048798bf8",
+      "implementation_hash": "ca474c204607cd7cce2931883b6cf8f3c16255a5965f32d49ac7477ad3d03186",
+      "metrics": {
+        "action_errors": 0,
+        "deliberate_sleep_seconds": 0,
+        "host_sleep_seconds": null,
+        "human_active_seconds": null,
+        "human_interventions_during_run": 0,
+        "model_attempts": 7,
+        "model_errors": 0,
+        "model_seconds": 102.90331512596458,
+        "other_harness_record_restore_wait_seconds": 0.5302784570441088,
+        "provider_wait_seconds": null,
+        "tool_attempts": 3,
+        "tool_errors": 0,
+        "tool_seconds": 1.2803414169913157,
+        "total_wall_seconds": 104.713935,
+        "usage": {
+          "cached_input_tokens": 20736,
+          "complete": true,
+          "cost_reason": "Subscription usage; per-call money not reported",
+          "input_tokens": 227099,
+          "monetary_cost": null,
+          "observed_cached_input_tokens": 20736,
+          "observed_input_tokens": 227099,
+          "observed_output_tokens": 1074,
+          "output_tokens": 1074
+        }
+      },
+      "setup_seconds": 0.38477929204236716,
+      "status": "accepted",
+      "validation": {
+        "accepted": true,
+        "actual_tool_evidence_linked": true,
+        "comparisons": [
+          {
+            "criterion": {
+              "max": 0.001,
+              "metric": "overlap",
+              "unit": "mm3"
+            },
+            "observed": {
+              "unit": "mm3",
+              "value": 0.0
+            },
+            "passed": true
+          },
+          {
+            "criterion": {
+              "metric": "clearance",
+              "min": 1,
+              "unit": "mm"
+            },
+            "observed": {
+              "unit": "mm",
+              "value": 5.0
+            },
+            "passed": true
+          },
+          {
+            "criterion": {
+              "max": 20,
+              "metric": "carrier_x",
+              "min": 11,
+              "unit": "mm"
+            },
+            "observed": {
+              "unit": "mm",
+              "value": 15.0
+            },
+            "passed": true
+          },
+          {
+            "criterion": {
+              "max": 0.01,
+              "metric": "cad_source_error",
+              "unit": "mm"
+            },
+            "observed": {
+              "unit": "mm",
+              "value": 0.0
+            },
+            "passed": true
+          },
+          {
+            "criterion": {
+              "max": 0.01,
+              "metric": "control_error",
+              "unit": "mm"
+            },
+            "observed": {
+              "unit": "mm",
+              "value": 1.517022951702529e-09
+            },
+            "passed": true
+          }
+        ],
+        "formal_adoption": false,
+        "submitted_report_fresh": true
+      }
+    }
+  },
+  "date": "2026-11-15",
+  "limitations": [
+    "No causal speedup claim; n=1, unpinned default model, different context packaging.",
+    "B is one Bot without Mentor, prior memory, learning or delegation.",
+    "Nominal native CAD/software filter, not physical validation.",
+    "Parent development/setup labor and remote cost not measured."
+  ],
+  "model": "CLI default (unresolved)",
+  "reasoning_effort": "low",
+  "run_order": [
+    "A",
+    "B"
+  ],
+  "sample_size_per_arm": 1,
+  "source_commit": "2beb863cd055df4965ed21974a51cb4b78f4c09e"
+}

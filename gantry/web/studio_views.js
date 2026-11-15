@@ -1,3 +1,4 @@
+import {engineeringEvidence,verificationPlans} from './studio_engineering.js';
 import {requestActions,requestList,requestStatus} from './studio_bot_views.js';
 import {esc as e,icon,short,time} from './ui.js';
 import {statusText,checkLabel,versionLabel,structureLayout,relatedWorks,cadFile,codeFile,primaryComponents,libraryURL,participantName,anchorLabel} from './studio_model.js';
@@ -29,7 +30,7 @@ export function workDetail(detail,opts){
 }
 export function checks(detail){
  const v=detail.selected;const checks=v.engineering.checks;const evaluations=v.evaluations;
- return `<div class="studio-file">Checks for ${e(short(v.state.id))}</div>${(detail.activity||[]).map(x=>`<p class="studio-small">Execution ${e(short(x.id))} in progress · Result pending</p>`).join('')}${checks.length||evaluations.length?`<table class="studio-checks"><thead><tr><th>Check</th><th>Result on this version</th></tr></thead><tbody>${checks.map(c=>`<tr><td>${e(c.id)}<small>${e(c.scope)}</small></td><td>${e(checkLabel(c.effective_status))}${c.stale_inputs?.length||c.stale_evidence?.length?'<small>Inputs changed · previous result does not apply</small>':''}</td></tr>`).join('')}${evaluations.map(c=>`<tr><td>${e(c.scope)}<small>${e(short(c.state_id))}</small></td><td>${c.applicable?e(checkLabel(c.verdict)):'Previous version · not applicable'}</td></tr>`).join('')}</tbody></table>`:hint('Not tested','No evaluation is recorded for this version.')}${workspaceContext(v)}<p class="studio-small">Results apply to their recorded inputs and scope. Sharing and completing work do not adopt a design.</p>`;
+ return `<div class="studio-file">Checks for ${e(short(v.state.id))}</div>${(detail.activity||[]).map(x=>`<p class="studio-small">Execution ${e(short(x.id))} in progress · Result pending</p>`).join('')}${checks.length||evaluations.length?`<table class="studio-checks"><thead><tr><th>Check</th><th>Result on this version</th></tr></thead><tbody>${checks.map(c=>`<tr><td>${e(c.id)}<small>${e(c.scope)}</small></td><td>${e(checkLabel(c.effective_status))}${c.stale_inputs?.length||c.stale_evidence?.length?'<small>Inputs changed · previous result does not apply</small>':''}</td></tr>`).join('')}${evaluations.map(c=>`<tr><td>${e(c.scope)}<small>${e(short(c.state_id))}</small></td><td>${c.applicable?e(checkLabel(c.verdict)):'Previous version · not applicable'}</td></tr>`).join('')}</tbody></table>`:hint('Not tested','No evaluation is recorded for this version.')}${engineeringEvidence(detail)}${verificationPlans(detail)}${workspaceContext(v)}<p class="studio-small">Results apply to their recorded inputs and scope. Sharing and completing work do not adopt a design.</p>`;
 }
 export function conversation(detail,selection,draft,mentions){
  const {anchor,state_id,thread_id}=selection;
