@@ -163,3 +163,8 @@ Oversized field values are omitted with a source request. Scan, traversal and
 presentation limits set `coverage.partial`, the assessment's `partial`, and a gap;
 coverage counts describe the scanned projection, not an exhaustive project count.
 Use the source requests and `get_development_state` for complete original data.
+
+The projection source fingerprint covers the scanned views and derived rows before
+presentation clipping; it does not imply coverage beyond the reported scan bounds.
+Pagination watermarks are scoped to each state’s source views, so unrelated ledger
+writes do not invalidate an in-flight assessment.
