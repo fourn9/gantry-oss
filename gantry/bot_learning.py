@@ -31,6 +31,8 @@ class BotLearningMixin:
             environment_hash=s['bot_runtimes'][task['bot_id']]['environment_hash'],
             requirement_refs=copy.deepcopy(task.get('requirement_refs', [])),
             working_state=copy.deepcopy(self._working_note(s, task['session_id'], task['bot_id'])),
+            personal_preferences=self._preference_context(s, actor, task, con),
+            commitment_context=self.cmd_list_bot_commitments(s, actor, {'session_id':task['session_id'], 'bot_id':task['bot_id'], 'active_only':True, 'limit':20}, [], [], con),
             query={'after': a.get('after', ''), 'limit': limit},
             recall=recall(self, s, actor, task, con, a.get('after', ''), limit), created_seq=s['seq']+1)
         if a.get('compact'): packet['compact'] = True
@@ -64,6 +66,11 @@ class BotLearningMixin:
         require(packet.get('working_state') == self._working_note(s, task['session_id'], task['bot_id']),
                 'stale_basis', 'Working commitments changed; prepare a new plan',
                 replan_reason='working_context_changed')
+        require((packet.get('personal_preferences') or {}).get('basis', digest([])) == self._preference_context(s, actor, task, con)['basis'],
+                'stale_basis', 'Human feedback changed; prepare a new plan', replan_reason='working_context_changed')
+        current_commitments = self.cmd_list_bot_commitments(s, actor, {'session_id':task['session_id'], 'bot_id':task['bot_id'], 'active_only':True, 'limit':20}, [], [], con)
+        require(packet.get('commitment_context', {'items':[], 'next_cursor':None}) == current_commitments,
+                'stale_basis', 'Responsibilities or linked outcomes changed; prepare a new plan', replan_reason='working_context_changed')
         current = recall(self, s, actor, task, con, **packet['query'])
         require(current == packet['recall'], 'stale_basis', 'Experience changed; prepare a new plan',
                 replan_reason='experience_changed')
@@ -73,6 +80,8 @@ class BotLearningMixin:
             mid = decision['memory_id']
             require(mid in available and mid not in seen, 'invalid_input', 'Use a unique recalled memory ID')
             seen.add(mid); self._learning_source(s, actor, task, mid)
+            require(decision['use'] in available[mid]['allowed_uses'],
+                    'stale_basis', 'Procedure disposition does not permit this use')
             require(decision['use'] != 'apply' or not available[mid]['applicability_flags'],
                     'stale_basis', 'Changed, incomplete or contradicted experience must be rechecked or rejected')
         require(seen == set(available), 'invalid_input', 'Record apply/recheck/reject for every recalled item')

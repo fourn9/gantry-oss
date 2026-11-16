@@ -138,7 +138,7 @@ Gantry preserves original captured data. It does not infer complete cross-tool d
 | Import, share or restore a project | [Guided onboarding](docs/GUIDED_ONBOARDING.md) · [Connected workspaces](docs/CONNECTED_WORKSPACE.md) |
 | Link requirements, changes and checks | [Requirement traceability](docs/REQUIREMENT_TRACEABILITY.md) · [Design change loop](docs/DESIGN_CHANGE_LOOP.md) |
 | Configure a Bot organization | [Studio team onboarding](docs/STUDIO_CREW_ONBOARDING.md) · [CLI onboarding](docs/CREW_SETUP.md) · [Crew organization](docs/CREW_ORGANIZATION.md) · [Persistent Bots](docs/PERSISTENT_BOTS.md) |
-| Use and evaluate Bot experience | [Learning](docs/BOT_LEARNING.md) · [Continuity](docs/BOT_CONTINUITY.md) · [Paired evaluation](docs/BOT_LEARNING_EVALUATION.md) |
+| Use and evaluate Bot experience | [Learning](docs/BOT_LEARNING.md) · [Continuity](docs/BOT_CONTINUITY.md) · [Personal Bot work cycle](docs/PERSONAL_BOT_DESIGN.md) · [Paired evaluation](docs/BOT_LEARNING_EVALUATION.md) |
 | Connect engineering tools | [Engineering workflow](docs/ENGINEERING-WORKFLOW.md) · [External write plans](docs/EXTERNAL-WRITES.md) |
 | Operate a shared deployment | [Cloud operations](docs/CLOUD-OPERATIONS.md) · [Advanced administration](docs/ADMIN-AGENTS.md) |
 | Understand the architecture | [Architecture](docs/ARCHITECTURE.md) · [Ledger / Crew boundary](docs/SERVICE_SPLIT.md) |

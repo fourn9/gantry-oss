@@ -71,7 +71,8 @@ class CrewCoordinationMixin:
             if con is not None and view(self, s, actor, task, con)['available']: return record
             return {**record, 'details': {'private': True, 'reason': 'Experience check observations'}}
         if not (own or self._bd_owner(actor, project)) and record['kind'] in {
-                'working_state', 'experience_use', 'remember', 'context', 'records', 'inspect', 'finish'}:
+                'working_state', 'experience_use', 'remember', 'context', 'records', 'inspect', 'finish',
+                'commitment_create', 'commitment_update', 'procedure_decision', 'commitment', 'commitments'}:
             # Raw finish arguments may contain private experience receipts.
             # The shared, sanitized task report remains available separately.
             return {**record, 'details': {'private': True, 'reason': 'Bot working context or memory'}}

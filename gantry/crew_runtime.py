@@ -24,12 +24,17 @@ from .runner import persist
 from . import project_sandbox
 
 SCHEMA = {'type': 'object', 'properties': {
-    'action': {'enum': ['observe', 'plan_verification', 'extract_evidence', 'issue_open', 'issue_review', 'issue', 'issues', 'requirements', 'propose_requirements', 'integrate', 'read', 'inspect_json', 'edit', 'replace', 'context', 'records', 'inspect', 'tool', 'publish_physical', 'ask', 'resolve', 'decision', 'remember', 'working_state', 'experience_use', 'team', 'stop', 'finish']},
+    'action': {'enum': ['commitment', 'commitments', 'commitment_create', 'commitment_update', 'procedure_decision', 'observe', 'plan_verification', 'extract_evidence', 'issue_open', 'issue_review', 'issue', 'issues', 'requirements', 'propose_requirements', 'integrate', 'read', 'inspect_json', 'edit', 'replace', 'context', 'records', 'inspect', 'tool', 'publish_physical', 'ask', 'resolve', 'decision', 'remember', 'working_state', 'experience_use', 'team', 'stop', 'finish']},
     'arguments_json': S, 'rationale': S}, 'required': ['action', 'arguments_json', 'rationale'], 'additionalProperties': False}
-API_ACTIONS = {'issue_open': 'open_bot_issue', 'issue_review': 'review_bot_issue', 'ask': 'ask_bot', 'decision': 'record_bot_decision', 'remember': 'record_bot_experience',
+API_ACTIONS = {'commitment_create': 'create_bot_commitment', 'commitment_update': 'update_bot_commitment', 'procedure_decision': 'record_bot_procedure_decision', 'issue_open': 'open_bot_issue', 'issue_review': 'review_bot_issue', 'ask': 'ask_bot', 'decision': 'record_bot_decision', 'remember': 'record_bot_experience',
                'working_state': 'update_bot_working_state', 'experience_use': 'record_bot_learning_use',
                'propose_requirements': 'propose_bot_requirements'}
 GUIDE = {
+    'commitment': 'commitment_id, optional after/limit and pointer/offset. Retrieve your own responsibility and paginated lifecycle history. Completion is the responsible Bot judgment, not adoption or physical validation.',
+    'commitments': 'Optional active_only/after/limit and pointer/offset. Page your responsibilities beyond working_state.commitments; project and Bot identity are supplied by runtime. Include closed records when auditing prior decisions.',
+    'commitment_create': 'Create your continuing responsibility: summary, completion, priority, priority_reason, due_at (UTC epoch milliseconds or null), task_ids. Links are your own or authorized delegated tasks. A saved responsibility is not a new task, permission, adoption or verified success. Existing owner standing delegation governs waking. Inspect working_state.commitments for unresolved items.',
+    'commitment_update': 'Reconcile an existing responsibility: commitment_id, version, status (open/working/waiting/completed/cancelled), task_ids, due_at, reason, evidence. Optional priority and priority_reason must be supplied together to reprioritize. Read linked results first. Completion/cancellation needs evidence and no unfinished linked tasks; terminal linked tasks may be retired explicitly, retaining history. Records your judgment and never cancels, completes or authorizes linked tasks.',
+    'procedure_decision': 'Select an existing authored procedure lesson: memory_id, version (latest procedure_decision.version or 0), status (candidate/preferred/retired), reason, check_ids. Preferred requires independent scoped experience_check receipts with successful recorded read-only tool receipts; a claim of usefulness is insufficient. Recheck changed conditions, retire misleading procedures. This does not grant authority or establish general engineering validity.',
     'extract_evidence': 'Acquire declared scalar fields from a saved JSON file: subject_id, path, profile, fields [{name,pointer,unit?,frame?,time_basis?}]. Runtime pins the current saved state; no arbitrary source hashes or state substitution. Values come from exact JSON pointers, not model transcription. Extraction is not physical validation or acceptance; retain source hashes, units, assumptions and missing semantics.',
     'plan_verification': 'Record verification intent before execution: plan_path, check_ids, purpose, question, assumptions, missing_inputs, tool_name, expected_outputs (exact selected report paths), next_steps {pass,fail,unknown}. Copies criteria and requirement refs only from the unchanged baseline physical plan and pins current inputs. Missing tools/inputs, report scope or tool_evidence mapping return unexecutable. Planned is not executed or safe. Choose the subsequent tool action and review measured results yourself; next steps never run automatically.',
     'observe': 'Retrieve 1-4 independent read/context/inspect/inspect_json requests in ONE turn: requests [{action,arguments}]. Read chunks deliver at most 2000 bytes each, with exact next_offset. Individual source versions/errors are preserved. Large results explicitly require narrower follow-up retrieval. No writes, tools, recursion or decisions. This is not an atomic cross-task snapshot. Prefer this when several known inputs are needed together.',
@@ -78,6 +83,7 @@ def action_schemas():
         'inspect': _schema({'task_id': S, 'pointer': {'type':'string'}, 'offset': {'type':'integer','minimum':0},
                             'limit': {'type':'integer','minimum':1,'maximum':65536}}, ['task_id'])}
     for name, op in {**API_ACTIONS, 'integrate': 'integrate_bot_task', 'resolve': 'resolve_bot_question', 'team': 'propose_bot_team',
+                     'commitment': 'get_bot_commitment', 'commitments': 'list_bot_commitments',
                      'records': 'get_bot_records', 'requirements': 'get_bot_requirements', 'issue': 'get_bot_issue', 'issues': 'list_bot_issues',
                      'extract_evidence': 'extract_json_evidence'}.items():
         schema = json.loads(json.dumps(CONTRACTS[op]['schema']))
@@ -86,8 +92,11 @@ def action_schemas():
             if key in schema['required']: schema['required'].remove(key)
         if name == 'records':
             schema['properties'].update(task_id=S, page_hash=S, pointer={'type':'string'}, offset={'type':'integer','minimum':0})
-        if name in {'issue','issues'}:
+        if name in {'issue','issues','commitment','commitments'}:
             schema['properties'].update(pointer={'type':'string'}, offset={'type':'integer','minimum':0})
+        if name == 'commitments':
+            for key in ('session_id','bot_id'):
+                schema['properties'].pop(key); schema['required'].remove(key)
         if name == 'extract_evidence':
             schema['properties'].pop('state_id'); schema['required'].remove('state_id')
         schemas[name] = schema
@@ -208,7 +217,7 @@ def _execute(client, context, ref, config, action, args, workspace, step, key):
     if action == 'observe':
         return observe(args, action_schemas(), lambda kind, request:
             _execute(client, context, ref, config, kind, request, workspace, step, key))
-    require(context['task'].get('studio_mode') != 'ask' or action not in {'propose_requirements','integrate','edit','replace','tool','publish_physical','team','stop','issue_open','issue_review'},
+    require(context['task'].get('studio_mode') != 'ask' or action not in {'propose_requirements','integrate','edit','replace','tool','publish_physical','team','stop','issue_open','issue_review','commitment_create','commitment_update','procedure_decision'},
             'scope_denied', 'Ask cannot edit, execute tools or change team work')
     if action == 'integrate':
         from .bot_execution import safe_fingerprint
@@ -226,6 +235,14 @@ def _execute(client, context, ref, config, action, args, workspace, step, key):
         other = client.call('get_bot_task', {'task_id': args['task_id']})
         require(other['task']['session_id'] == context['task']['session_id'], 'scope_denied', 'Inspect this project only')
         return inspect_peer(other, args, _context_value)
+    if action in {'commitment', 'commitments'}:
+        validate(args, action_schemas()[action])
+        selected = {k:v for k,v in args.items() if k not in {'pointer','offset'}}
+        if action == 'commitments': selected.update(session_id=context['task']['session_id'], bot_id=context['task']['bot_id'])
+        result = client.call('get_bot_commitment' if action == 'commitment' else 'list_bot_commitments', selected)
+        require(action != 'commitment' or result['session_id'] == context['task']['session_id'],
+                'scope_denied', 'Inspect responsibility within this task project')
+        return _context_value(result, {'pointer':args['pointer'], 'offset':args.get('offset',0)}) if 'pointer' in args else result
     if action in {'issue', 'issues'}:
         require('task_id' not in args, 'invalid_input', 'Runtime supplies task identity')
         selected = {k:v for k,v in args.items() if k not in {'pointer','offset'}}
@@ -390,7 +407,7 @@ def _publish_tool_evidence(client, ref, config, workspace, saved, marker, key):
 def action_input(full, workspace, config, last_result, number):
     from .bot_execution import _input, _fit_optional_previews
     context = _input(full, workspace)
-    context.update(action_guide=GUIDE, action_schemas=action_schemas(),
+    context.update(action_guide=dict(GUIDE), action_schemas=action_schemas(),
         available_tools=config.get('local_tools', {}), tool_evidence=config.get('tool_evidence', {}),
         last_result=result_preview(last_result), round=number,
         instruction=context['instruction'] + ' Choose ONE action each turn; put its JSON object in arguments_json. '
@@ -398,6 +415,14 @@ def action_input(full, workspace, config, last_result, number):
         'Use context to fetch omitted records, inspect to retrieve peer tasks, read for files, tool for real tests, and edit for changes. '
         'Use your own judgment; report, ask or delegate rather than invent evidence. '
         'Record consequential decisions and reusable lessons. Organization workers run independently.')
+    # Upgrades do not silently widen existing scoped credentials. This is an
+    # advertised capability filter; Core remains the authority at execution.
+    commands = full.get('executor_commands')
+    if commands is not None:
+        direct = {**API_ACTIONS, 'commitment':'get_bot_commitment', 'commitments':'list_bot_commitments'}
+        for action, command in direct.items():
+            if command not in commands:
+                context['action_guide'].pop(action, None); context['action_schemas'].pop(action, None)
     _fit_optional_previews(context, list(full['development']['manifest']), limit=480000)
     if len(canonical(context).encode()) > 480000 and last_result is not None:
         context['last_result'] = {'truncated': True, 'sha256': digest(last_result),
@@ -426,10 +451,13 @@ def run_actions(client, initial, ref, infer, config, root):
                 context = json.loads(input_path.read_text()) if input_path.exists() else action_input(full, workspace, config, state['last_result'], number)
             persist(input_path, context)
             with span(step, 'model'):
-                receipt = infer(context, SCHEMA, step/'model'); validate(receipt['output'], SCHEMA)
+                schema = json.loads(json.dumps(SCHEMA))
+                schema['properties']['action']['enum'] = [v for v in schema['properties']['action']['enum'] if v in context['action_schemas']]
+                receipt = infer(context, schema, step/'model'); validate(receipt['output'], schema)
             saved = {'phase': 'prepared', 'receipt': receipt, 'before': safe_fingerprint(workspace),
                      'input_state': full['development']['state']['id'],
-                     'discussion_version': context['task']['discussion_version']}
+                     'discussion_version': context['task']['discussion_version'],
+                     'preferences_basis': (context.get('personal_preferences') or {}).get('basis', digest([]))}
             persist(marker, saved)
         output = saved['receipt']['output']; action = output['action']
         key = 'crew-action:' + digest([ref['task_id'], initial['task']['attempt'], number])
@@ -451,7 +479,7 @@ def run_actions(client, initial, ref, infer, config, root):
             persist(marker, saved)
             state.update(next=number+1, last_result=saved['result']); persist(state_path, state); continue
         if saved['phase'] == 'prepared':
-            try: client.call('check_bot_task', ref)
+            try: client.call('check_bot_task', {**ref, 'preferences_basis': saved.get('preferences_basis', digest([]))})
             except Fault as exc:
                 if exc.code != 'stale_basis': raise
                 saved.update(phase='stale', result={'error': 'stale_basis', 'discarded_model_answer': True})

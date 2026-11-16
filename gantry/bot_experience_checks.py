@@ -34,9 +34,13 @@ def source(core, s, task, pin):
 
 
 def prepare(core, s, actor, requester, response, memory_id, con):
+    from .bot_learning_recall import context_basis
     memory = core._learning_source(s, actor, requester, memory_id)
     pin = dict(memory_id=memory_id, memory_hash=digest(memory), request_task_id=requester['id'],
-        state_id=response['state_id'], requirement_refs=copy.deepcopy(response.get('requirement_refs', [])))
+        state_id=response['state_id'], requirement_refs=copy.deepcopy(response.get('requirement_refs', [])),
+        requester_context_basis=context_basis(s, requester),
+        requester_environment_hash=s['bot_runtimes'][requester['bot_id']]['environment_hash'],
+        checker_environment_hash=s['bot_runtimes'][response['bot_id']]['environment_hash'])
     source(core, s, response, pin)
     pin["related_updates"] = correction_links(core, s, response, pin, con)
     return pin

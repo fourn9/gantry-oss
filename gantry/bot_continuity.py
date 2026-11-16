@@ -8,7 +8,7 @@ class BotContinuityMixin:
     def _working_note(self, s, sid, bid):
         return s.get('bot_working_states', {}).get(digest([sid, bid]))
 
-    def _working_context(self, s, actor, task):
+    def _working_context(self, s, actor, task, con=None):
         project, session = self._bd_project(s, actor, task['session_id'], active=False)
         if not self._bd_owner(actor, project):
             if actor['id'] != task['principal_id']: return None
@@ -17,14 +17,18 @@ class BotContinuityMixin:
         require(not note or self._bd_owner(actor, project) or note['principal_id'] == actor['id'],
                 'unauthorized', 'Working context belongs to a previous principal')
         continuation = s.get('bot_continuations', {}).get(digest([task['session_id'], task['bot_id']]))
-        return {'note': copy.deepcopy(note), 'project': copy.deepcopy(project),
+        result = {'note': copy.deepcopy(note), 'project': copy.deepcopy(project),
                 'continuation': copy.deepcopy(continuation),
                 'active_state_id': session.get('active_state'),
                 'interpretation': 'Bot-authored working hypotheses; canonical project/state requirements prevail'}
+        if con is not None:
+            result['commitments'] = self.cmd_list_bot_commitments(s, actor,
+                {'session_id': task['session_id'], 'bot_id': task['bot_id'], 'limit': 20, 'active_only': True}, [], [], con)
+        return result
 
     def cmd_get_bot_working_state(self, s, actor, a, fx, n, con):
         b = self._bd_binding(s, a['session_id'], a['bot_id'])
-        result = self._working_context(s, actor, {**a, 'principal_id':b['principal_id']})
+        result = self._working_context(s, actor, {**a, 'principal_id':b['principal_id']}, con)
         require(result is not None, 'unauthorized', 'Working notes are private to their Bot and owner')
         return result
 
