@@ -22,6 +22,7 @@ from .model import Fault, canonical, digest, require
 from .project_files import read_file, write_file
 from .runner import persist
 from . import project_sandbox
+from . import crew_plan_tool
 
 SCHEMA = {'type': 'object', 'properties': {
     'action': {'enum': ['observe', 'plan_verification', 'extract_evidence', 'issue_open', 'issue_review', 'issue', 'issues', 'requirements', 'propose_requirements', 'integrate', 'read', 'inspect_json', 'edit', 'replace', 'context', 'records', 'inspect', 'tool', 'publish_physical', 'ask', 'resolve', 'decision', 'remember', 'working_state', 'experience_use', 'team', 'stop', 'finish']},
@@ -398,6 +399,9 @@ def action_input(full, workspace, config, last_result, number):
         'Use context to fetch omitted records, inspect to retrieve peer tasks, read for files, tool for real tests, and edit for changes. '
         'Use your own judgment; report, ask or delegate rather than invent evidence. '
         'Record consequential decisions and reusable lessons. Organization workers run independently.')
+    if crew_plan_tool.enabled(config):
+        context['action_guide'] = {**GUIDE, 'plan_and_tool': crew_plan_tool.GUIDE}
+        context['action_schemas']['plan_and_tool'] = VERIFICATION_SCHEMA
     _fit_optional_previews(context, list(full['development']['manifest']), limit=480000)
     if len(canonical(context).encode()) > 480000 and last_result is not None:
         context['last_result'] = {'truncated': True, 'sha256': digest(last_result),
@@ -425,11 +429,17 @@ def run_actions(client, initial, ref, infer, config, root):
             with span(step, 'context'):
                 context = json.loads(input_path.read_text()) if input_path.exists() else action_input(full, workspace, config, state['last_result'], number)
             persist(input_path, context)
-            with span(step, 'model'):
-                receipt = infer(context, SCHEMA, step/'model'); validate(receipt['output'], SCHEMA)
+            with span(step, 'context' if state.get('queued_tool') else 'model'):
+                if state.get('queued_tool'):
+                    receipt = crew_plan_tool.resume(client, full, config, workspace, state['queued_tool'], safe_fingerprint(workspace))
+                else:
+                    schema = crew_plan_tool.model_schema(SCHEMA, config)
+                    receipt = infer(context, schema, step/'model'); validate(receipt['output'], schema)
+            receipt, combined_plan = crew_plan_tool.split(receipt, config)
             saved = {'phase': 'prepared', 'receipt': receipt, 'before': safe_fingerprint(workspace),
                      'input_state': full['development']['state']['id'],
                      'discussion_version': context['task']['discussion_version']}
+            if combined_plan is not None: saved['combined_plan'] = combined_plan
             persist(marker, saved)
         output = saved['receipt']['output']; action = output['action']
         key = 'crew-action:' + digest([ref['task_id'], initial['task']['attempt'], number])
@@ -537,7 +547,8 @@ def run_actions(client, initial, ref, infer, config, root):
                         'checkpoint_fingerprint': safe_fingerprint(workspace), 'final_result': result}
         if saved.get('feedback_args'):
             _return_effect(client, saved, marker, 'feedback_args', 'record_bot_action', key+':feedback', ref)
-        state.update(next=number+1, last_result=saved['result']); persist(state_path, state)
+        state.update(next=number+1, last_result=saved['result'], queued_tool=crew_plan_tool.queue(saved, key))
+        persist(state_path, state)
 
 
 def reconcile_finish(client, root):
