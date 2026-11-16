@@ -240,6 +240,32 @@ def runtime_spans(root):
     return rows
 
 
+def publication_ancestry(owner, final, publication_state_id, raw_check, cache):
+    """Return a same-session immutable ancestry proof for this exact check.
+
+    Current input/report hashes, effective dependency status and actual tool
+    provenance are checked separately. An ancestor relationship alone is not
+    sufficient to reuse a result. Missing ancestry is not silently inferred.
+    """
+    root=final['state'];session=root.get('session_id');frontier=[(root['id'],[])];seen=set()
+    cache[root['id']]=final
+    while frontier and len(seen)<1000:
+        ident,path=frontier.pop()
+        if ident in seen:continue
+        seen.add(ident)
+        if ident not in cache:cache[ident]=owner.call('get_development_state',{'state_id':ident})
+        state=cache[ident]['state']
+        if state.get('id')!=ident:continue
+        if ident!=root['id'] and (not session or state.get('session_id')!=session):continue
+        chain=path+[ident]
+        if ident==publication_state_id:
+            saved=state.get('context',{}).get('environment',{}).get('engineering',{}).get('checks',[])
+            if raw_check in saved:return {'valid':True,'path':chain,'checked_states':len(seen)}
+            return {'valid':False,'reason':'published_check_different','checked_states':len(seen)}
+        for parent in state.get('parents',[]):frontier.append((parent,chain))
+    return {'valid':False,'reason':'ancestor_not_proven' if not frontier else 'ancestry_limit','checked_states':len(seen)}
+
+
 def final_audit(owner,view,records,case,root):
     state_id=view['task'].get('output_state',view['task']['state_id'])
     detail=owner.call('get_development_state',{'state_id':state_id});persist(root/'final-state.json',detail)
@@ -255,6 +281,7 @@ def final_audit(owner,view,records,case,root):
     if mapping:
         plan=json.loads((workspace/mapping['plan_path']).read_text())
         actions=[a for value in records.values() for a in value['actions']]
+        ancestry_cache={}
         for check in plan['checks']:
             if not check['required']:continue
             report=json.loads((audit/check['report']).read_text()) if (audit/check['report']).exists() else None
@@ -270,15 +297,18 @@ def final_audit(owner,view,records,case,root):
                 and not a['details'].get('result',{}).get('reason')
                 and a['details'].get('result',{}).get('output_artifact')==execution.get('output_artifact') for a in actions)
             raw_check=next((c for c in detail['state']['context']['environment'].get('engineering',{}).get('checks',[]) if c['id']==check['id']),{})
-            publication=any(a['kind']=='tool_evidence' and a['details'].get('result',{}).get('exit_code')==0
-                and check['report'] in a['details'].get('result',{}).get('refreshed_paths',[])
-                and a['details'].get('result',{}).get('evidence_publication',{}).get('state_id')==detail['state']['id']
-                and raw_check in a['details'].get('result',{}).get('evidence_publication',{}).get('checks',[]) for a in actions)
+            publication_proofs=[]
+            for action in actions:
+                source=action['details'].get('result',{});publication=source.get('evidence_publication',{})
+                if (action['kind']=='tool_evidence' and source.get('exit_code')==0
+                    and check['report'] in source.get('refreshed_paths',[]) and raw_check in publication.get('checks',[])):
+                    publication_proofs.append(publication_ancestry(owner,detail,publication.get('state_id'),raw_check,ancestry_cache))
+            publication=any(proof['valid'] for proof in publication_proofs)
             linked_ok=bool(receipt and publication and execution.get('exit_code')==0 and execution.get('action_key') and linked.get('effective_status')=='pass'
                 and linked.get('evidence',{}).get(check['report'])==hashes.get(check['report'])
                 and all(linked.get('inputs',{}).get(p)==hashes.get(p) for p in check['inputs']))
             result['checks'].append({'id':check['id'],'fresh_evaluation':observed,'submitted_evaluation':submitted,'actual_tool_linked':linked_ok,
-                'audit_inputs_unchanged':audit_inputs_unchanged})
+                'audit_inputs_unchanged':audit_inputs_unchanged,'publication_ancestry':publication_proofs})
     result['accepted']=bool(tool['exit_code']==0 and not tool.get('reason') and result['checks'] and
         all(c['fresh_evaluation']['status']=='pass' and c['submitted_evaluation']['status']=='pass' and c['actual_tool_linked']
             and c['audit_inputs_unchanged'] for c in result['checks']))
