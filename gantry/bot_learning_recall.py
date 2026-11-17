@@ -87,6 +87,8 @@ def recall(core, s, actor, task, con, after='', limit=20):
             allowed_uses=['recheck', 'reject'] if flags else ['apply', 'recheck', 'reject'],
             related_updates=links.get(memory['id'], []), reported_utility=counts,
             utility_truncated=len(rows)>100, evidence_status='reported_experience_not_independent_verification')
+        from .bot_procedures import decorate
+        result = decorate(core, s, actor, task, result, con)
         score = len(overlap)*3 + len(matching_paths)*2 + len(matching_requirements)*4
         ranked.append((score, counts['helpful']-counts['harmful'], memory['created_seq'], memory['id'], result))
     ranked.sort(key=lambda x: x[:4], reverse=True)

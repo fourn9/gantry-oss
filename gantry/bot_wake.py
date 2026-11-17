@@ -84,17 +84,29 @@ class BotWakeMixin:
     def _poll_continuation(self, s, actor, policy, fx, n, con):
         self._continuation_valid(s, actor, policy)
         note = self._working_note(s, policy['session_id'], policy['bot_id'])
-        if not note and not policy.get('routine'): return {'status':'idle','continuation_id':policy['id']}
         require(not note or note['principal_id']==actor['id'], 'unauthorized', 'Working note belongs to a previous executor')
         # Do not overlap any existing work for this Bot/project. In particular,
         # held work may have uncertain external effects and must not be replaced.
         rows = con.execute("SELECT id FROM records WHERE collection='bot_tasks' AND subject_id=? AND session_id=? "
             "AND COALESCE(json_extract(body,'$.value.status'),json_extract(body,'$.status')) "
-            "IN ('pending','running','waiting','held') LIMIT 1", (policy['bot_id'],policy['session_id']))
+            "IN ('pending','running','waiting','held','handoff_requested') LIMIT 1", (policy['bot_id'],policy['session_id']))
         active = rows.fetchone()
         if active: return {'status':'active','continuation_id':policy['id'],'task_id':active[0]}
         reasons, signal, session = self._continuation_signal(s, policy, note)
         if signal == policy.get('last_signal'): reasons = []
+        commitments, cursor = self._commitment_wake_batch(s, actor, policy, con)
+        if cursor != policy.get('commitment_cursor'):
+            policy['commitment_cursor'] = cursor
+            self._dev_save(s, fx, 'bot_continuations', policy)
+        if commitments: reasons.append('commitment_changed')
+        # Project preferences apply to new work; task-scoped feedback stays with
+        # its original task and must not become a standing personal instruction.
+        preferences = self._preference_context(s, actor, {'id': None,
+            'session_id': policy['session_id'], 'bot_id': policy['bot_id'],
+            'principal_id': policy['principal_id']}, con)
+        preference_signal = preferences['basis']
+        if preference_signal != policy.get('preference_signal', digest([])):
+            reasons.append('preference_changed')
         now = self.clock()
         scheduled_at = policy.get('next_due_at')
         routine_due = policy.get('routine') and scheduled_at is not None and now >= scheduled_at
@@ -116,12 +128,16 @@ class BotWakeMixin:
         stored = self._dev_get(s, 'bot_tasks', task['id'])
         stored.update(continuation_id=policy['id'], continuation_version=policy['version'],
                       continuation_reason=reasons, working_note_version=note['version'] if note else None)
+        if commitments: stored['commitment_ids'] = [record['id'] for record, _ in commitments]
         if routine_due:
             stored.update(routine_scheduled_at=scheduled_at, routine_enqueued_at=now)
             # Coalesce downtime instead of enqueuing every missed interval.
             policy['next_due_at'] = now + policy['routine']['interval_ms']
         self._dev_save(s, fx, 'bot_tasks', stored)
-        policy.update(last_signal=signal, last_task_id=task['id'])
+        for commitment, observed in commitments:
+            commitment['wake_signal'] = observed
+            self._dev_save(s, fx, 'bot_commitments', commitment)
+        policy.update(last_signal=signal, last_task_id=task['id'], preference_signal=preference_signal)
         self._dev_save(s, fx, 'bot_continuations', policy)
         return {'status':'queued','continuation_id':policy['id'],'task_id':task['id'],'reason':reasons}
 

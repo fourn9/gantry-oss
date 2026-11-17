@@ -1143,6 +1143,10 @@
         "intent": {
           "type": "object"
         },
+        "preferences_basis": {
+          "minLength": 1,
+          "type": "string"
+        },
         "task_id": {
           "minLength": 1,
           "type": "string"
@@ -4055,6 +4059,82 @@
       "type": "object"
     }
   },
+  "create_bot_commitment": {
+    "description": "create bot commitment",
+    "schema": {
+      "additionalProperties": false,
+      "properties": {
+        "basis": {
+          "type": "object"
+        },
+        "completion": {
+          "items": {
+            "maxLength": 4000,
+            "minLength": 1,
+            "type": "string"
+          },
+          "maxItems": 40,
+          "minItems": 1,
+          "type": "array"
+        },
+        "due_at": {
+          "minimum": 1,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "fence": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "intent": {
+          "type": "object"
+        },
+        "priority": {
+          "enum": [
+            "low",
+            "normal",
+            "high"
+          ]
+        },
+        "priority_reason": {
+          "maxLength": 4000,
+          "minLength": 1,
+          "type": "string"
+        },
+        "summary": {
+          "maxLength": 4000,
+          "minLength": 1,
+          "type": "string"
+        },
+        "task_id": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "task_ids": {
+          "items": {
+            "maxLength": 4000,
+            "minLength": 1,
+            "type": "string"
+          },
+          "maxItems": 40,
+          "type": "array"
+        }
+      },
+      "required": [
+        "task_id",
+        "fence",
+        "summary",
+        "completion",
+        "priority",
+        "priority_reason",
+        "due_at",
+        "task_ids"
+      ],
+      "type": "object"
+    }
+  },
   "create_improvement": {
     "description": "create improvement",
     "schema": {
@@ -5229,6 +5309,37 @@
       },
       "required": [
         "analysis_id"
+      ],
+      "type": "object"
+    }
+  },
+  "get_bot_commitment": {
+    "description": "get bot commitment",
+    "schema": {
+      "additionalProperties": false,
+      "properties": {
+        "after": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "basis": {
+          "type": "object"
+        },
+        "commitment_id": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "intent": {
+          "type": "object"
+        },
+        "limit": {
+          "maximum": 100,
+          "minimum": 1,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "commitment_id"
       ],
       "type": "object"
     }
@@ -6506,6 +6617,45 @@
       },
       "required": [
         "revision_id"
+      ],
+      "type": "object"
+    }
+  },
+  "list_bot_commitments": {
+    "description": "list bot commitments",
+    "schema": {
+      "additionalProperties": false,
+      "properties": {
+        "active_only": {
+          "type": "boolean"
+        },
+        "after": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "basis": {
+          "type": "object"
+        },
+        "bot_id": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "intent": {
+          "type": "object"
+        },
+        "limit": {
+          "maximum": 100,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "session_id": {
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "required": [
+        "session_id",
+        "bot_id"
       ],
       "type": "object"
     }
@@ -9383,6 +9533,66 @@
       "type": "object"
     }
   },
+  "record_bot_procedure_decision": {
+    "description": "record bot procedure decision",
+    "schema": {
+      "additionalProperties": false,
+      "properties": {
+        "basis": {
+          "type": "object"
+        },
+        "check_ids": {
+          "items": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "maxItems": 10,
+          "type": "array"
+        },
+        "fence": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "intent": {
+          "type": "object"
+        },
+        "memory_id": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "reason": {
+          "maxLength": 4000,
+          "minLength": 1,
+          "type": "string"
+        },
+        "status": {
+          "enum": [
+            "candidate",
+            "preferred",
+            "retired"
+          ]
+        },
+        "task_id": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "version": {
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "task_id",
+        "fence",
+        "memory_id",
+        "version",
+        "status",
+        "reason",
+        "check_ids"
+      ],
+      "type": "object"
+    }
+  },
   "record_evidence_view": {
     "description": "record evidence view",
     "schema": {
@@ -11231,6 +11441,74 @@
       },
       "required": [
         "session_id"
+      ],
+      "type": "object"
+    }
+  },
+  "set_bot_preference": {
+    "description": "set bot preference",
+    "schema": {
+      "additionalProperties": false,
+      "properties": {
+        "basis": {
+          "type": "object"
+        },
+        "bot_id": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "enabled": {
+          "type": "boolean"
+        },
+        "intent": {
+          "type": "object"
+        },
+        "key": {
+          "maxLength": 128,
+          "minLength": 1,
+          "type": "string"
+        },
+        "reason": {
+          "maxLength": 2000,
+          "minLength": 1,
+          "type": "string"
+        },
+        "scope": {
+          "enum": [
+            "task",
+            "project"
+          ]
+        },
+        "session_id": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "task_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "text": {
+          "maxLength": 2000,
+          "minLength": 1,
+          "type": "string"
+        },
+        "version": {
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "session_id",
+        "bot_id",
+        "key",
+        "version",
+        "scope",
+        "task_id",
+        "text",
+        "reason",
+        "enabled"
       ],
       "type": "object"
     }
@@ -13302,6 +13580,99 @@
       },
       "required": [
         "subscription_id"
+      ],
+      "type": "object"
+    }
+  },
+  "update_bot_commitment": {
+    "description": "update bot commitment",
+    "schema": {
+      "additionalProperties": false,
+      "properties": {
+        "basis": {
+          "type": "object"
+        },
+        "commitment_id": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "due_at": {
+          "minimum": 1,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "evidence": {
+          "items": {
+            "maxLength": 4000,
+            "minLength": 1,
+            "type": "string"
+          },
+          "maxItems": 40,
+          "type": "array"
+        },
+        "fence": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "intent": {
+          "type": "object"
+        },
+        "priority": {
+          "enum": [
+            "low",
+            "normal",
+            "high"
+          ]
+        },
+        "priority_reason": {
+          "maxLength": 4000,
+          "minLength": 1,
+          "type": "string"
+        },
+        "reason": {
+          "maxLength": 4000,
+          "minLength": 1,
+          "type": "string"
+        },
+        "status": {
+          "enum": [
+            "open",
+            "working",
+            "waiting",
+            "completed",
+            "cancelled"
+          ]
+        },
+        "task_id": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "task_ids": {
+          "items": {
+            "maxLength": 4000,
+            "minLength": 1,
+            "type": "string"
+          },
+          "maxItems": 40,
+          "type": "array"
+        },
+        "version": {
+          "minimum": 1,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "task_id",
+        "fence",
+        "commitment_id",
+        "version",
+        "status",
+        "task_ids",
+        "due_at",
+        "reason",
+        "evidence"
       ],
       "type": "object"
     }

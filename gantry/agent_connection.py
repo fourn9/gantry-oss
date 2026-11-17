@@ -63,3 +63,4 @@ def connection_config(client, url, token_file, profile, executable):
     return json.dumps({'mcpServers': {'gantry': {'type': 'stdio', 'command': command, 'args': args}}}, indent=2)+'\n'
 
 PROFILES['bot'].add('extract_json_evidence')
+PROFILES['bot'].update({'create_bot_commitment', 'update_bot_commitment', 'get_bot_commitment', 'list_bot_commitments', 'record_bot_procedure_decision'})
