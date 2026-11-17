@@ -48,6 +48,34 @@ class BotReadObservationTests(unittest.TestCase):
                           'next_offset':offset+len(chunk) if offset+len(chunk)<len(raw) else None}}})
         return {'task':{'id':'task'},'actions':list(reversed(actions)),'development':{'manifest':{'source.txt':{'hash':sha,'size':len(raw)}}}}
 
+    def test_small_reads_across_documents_survive_within_existing_byte_budget(self):
+        from gantry.bot_observations import recent_reads
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp); actions = []; manifest = {}
+            for index in range(6):
+                path = f'document-{index}.txt'; raw = (str(index)*1000).encode()
+                (root/path).write_bytes(raw); sha = hashlib.sha256(raw).hexdigest()
+                manifest[path] = {'hash': sha, 'size': len(raw)}
+                for offset in (0, 500):
+                    actions.append({'id': f'action-{index}-{offset}', 'task_id': 'task',
+                        'attempt': 1, 'kind': 'read', 'details': {
+                            'arguments': json.dumps({'path': path, 'offset': offset}),
+                            'result': {'text': raw[offset:offset+500].decode(), 'hash': sha,
+                                'size': len(raw), 'next_offset': 500 if offset == 0 else None}}})
+            context = {'task': {'id': 'task'}, 'actions': list(reversed(actions)),
+                       'development': {'manifest': manifest}}
+            packet = recent_reads(context, root)
+            self.assertEqual(len(packet['items']), 12)
+            self.assertEqual({x['path'] for x in packet['items']}, set(manifest))
+            self.assertLessEqual(len(canonical(packet).encode()), 32768)
+            self.assertLessEqual(packet['coverage']['source_bytes_checked'], 2*1024*1024)
+            # Consultation/resumption can reuse the same unchanged authorized bytes;
+            # it must not retain source text once that source changes.
+            (root/'document-0.txt').write_text('changed')
+            resumed = recent_reads(context, root)
+            self.assertFalse(any(x['path'] == 'document-0.txt' for x in resumed['items']))
+            self.assertEqual(len(resumed['items']), 10)
+
     def test_packet_scan_and_source_io_are_bounded_and_duplicates_not_repeated(self):
         from gantry.bot_observations import recent_reads
         with tempfile.TemporaryDirectory() as tmp:

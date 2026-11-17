@@ -12,8 +12,11 @@ from .crew_observe import observation_actions
 
 MAX_BYTES = 32768
 MAX_ACTIONS = 64
-MAX_ITEMS = 8
-MAX_SOURCE_FILES = 4
+# Short multi-document reads should fill the existing byte allowance rather than
+# evict a needed acceptance document merely because four other files were read.
+# Count ceilings still bound metadata and filesystem opens; byte caps are unchanged.
+MAX_ITEMS = 32
+MAX_SOURCE_FILES = 16
 MAX_SOURCE_BYTES = 2 * 1024 * 1024
 MAX_CONTEXT_BYTES = 48 * 1024
 
