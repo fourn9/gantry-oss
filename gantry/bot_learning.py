@@ -144,10 +144,21 @@ class BotLearningMixin:
         uses = self._learning_observations(s, record, con, 'bot_learning_uses')
         visible_evidence = [task['id'], plan['id'], record['report_record']['state_id']]
         visible_evidence.extend(v['id'] for v in observations + uses)
+        state = s['dev_states'][record['report_record']['state_id']]
+        manifest = self._manifest(s, state['snapshot'])
+        # Bounded metadata, never file bodies. A missing entry in a truncated
+        # page is not evidence that the file is absent from the state.
+        saved_paths = [{'path': p, 'hash': manifest[p]['hash']} for p in sorted(manifest)[:200]]
         return {**copy.deepcopy(record), 'plan': copy.deepcopy(plan),
             'task': {'id': task['id'], 'title': task['title'], 'completion': task['completion']},
             'evidence_rules': {'planning_intent_id': plan['id'], 'executor_report_task_id': task['id'],
                 'saved_state_id': record['report_record']['state_id'],
+                'saved_paths': saved_paths, 'saved_paths_total': len(manifest),
+                'saved_paths_truncated': len(manifest) > len(saved_paths),
+                'path_rules': 'lesson.paths must exist in this saved state and become hash-bound inputs. '
+                    'For planned or uncaptured files, use unresolved_paths with status and reason; these are not evidence. '
+                    'A truncated manifest does not establish absence. Omit paths you have not confirmed; '
+                    'record uncertainty in unknowns rather than inventing files or claiming verification.',
                 'visible_evidence_ids': sorted({v for v in visible_evidence if v}),
                 'not_evidence': 'Nested assessment IDs, requirement IDs, Bot IDs and this reflection ID are not observation citations.',
                 'observations': 'Same-attempt action, decision and experience-use IDs before this report; output_artifact IDs linked by those tool receipts',
@@ -175,7 +186,14 @@ class BotLearningMixin:
         team = {'session_id': task['session_id'], 'version': s['bot_projects'][task['session_id']]['version']}
         lesson_keys = [digest(v) for v in a['output']['lessons']]
         require(len(lesson_keys) == len(set(lesson_keys)), 'invalid_input', 'Do not duplicate a lesson in one reflection')
+        state = s['dev_states'][record['report_record']['state_id']]
+        manifest = self._manifest(s, state['snapshot'])
         for lesson in a['output']['lessons']:
+            unresolved = [v['path'] for v in (lesson.get('unresolved_paths') or [])]
+            self._dev_paths(unresolved)
+            require(len(unresolved) == len(set(unresolved)), 'invalid_input', 'Use unique unresolved paths')
+            require(not any(p in manifest or p in lesson['paths'] for p in unresolved),
+                'invalid_input', 'Unresolved paths must be absent from the named saved state')
             self._learning_evidence(s, task, record, lesson['evidence'], con)
             for relation in ('supersedes', 'contradicts'):
                 for mid in lesson[relation]:

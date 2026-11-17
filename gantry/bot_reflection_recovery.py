@@ -57,10 +57,15 @@ def recover_reflection(client, bot_id, reflection_id, infer, root, reason, retry
     if retry_inference and not monthly_retry:
         if (directory/'inference').exists(): (directory/'inference').rename(archive/'inference')
         if saved.get('validation_error') and saved.get('receipt'):
+            # Upgrade evidence guidance only on an explicitly requested new
+            # inference. The old input/receipt is archived above; state and
+            # original report stay fixed, with current access already checked.
+            saved['input']['packet']['evidence_rules'] = item['evidence_rules']
             saved['input'] = {**saved['input'], 'previous_submission': saved['receipt']['output'],
                 'validation_feedback': saved.pop('validation_error'),
                 'correction_instruction': 'Correct the rejected structured submission using the saved evidence. '
                     'Feedback may cite only unique memory IDs marked apply or recheck in plan.output.decisions. '
+                    'Follow packet.evidence_rules.path_rules: absent files belong in unresolved_paths, not captured paths. '
                     'Do not weaken requirements or invent evidence to satisfy validation.'}
         saved.pop('receipt', None); saved.pop('result', None); persist(marker, saved)
     if (directory/'held.json').exists(): (directory/'held.json').rename(archive/'held.json')
