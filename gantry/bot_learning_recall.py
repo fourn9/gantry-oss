@@ -58,6 +58,7 @@ def recall(core, s, actor, task, con, after='', limit=20):
         matching_requirements = set(r['requirement_id'] for r in refs or []) & set(r['requirement_id'] for r in task.get('requirement_refs', []))
         if not overlap and not matching_paths and not matching_requirements: continue
         flags = []
+        if lesson.get('unresolved_paths'): flags.append('unresolved_path_references')
         if any(manifest.get(p, {}).get('hash') != h for p, h in memory.get('input_hashes', {}).items()): flags.append('input_changed')
         if refs is None: flags.append('requirements_not_captured')
         elif refs != task.get('requirement_refs', []): flags.append('requirements_changed')

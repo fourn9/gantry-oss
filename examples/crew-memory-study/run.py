@@ -171,6 +171,40 @@ def category(operation,output,task_id=None):
     return 'judgment'
 
 
+def activity(operation, output, task_id=None):
+    """Observable intent, not hidden thought; tool requests include model latency."""
+    if operation == 'reflect_on_experience': return 'memory_update'
+    if output.get('action') in {'edit', 'replace', 'integrate'}: return 'editing'
+    if output.get('action') in {'tool', 'publish_physical'}: return 'verification'
+    return category(operation, output, task_id)
+
+
+def inference_failure_fatal(operation, error):
+    from gantry.bot_reflection_recovery import HELD_CODES
+    if operation != 'reflect_on_experience': return True
+    if isinstance(error, (OSError, ValueError)): return False
+    code = error.code if isinstance(error, Fault) else error
+    return code not in HELD_CODES
+
+
+def classify_worker_result(bot, item, warnings, errors):
+    """A durable reflection hold is not a failure of another Bot's development."""
+    if item.get('status') != 'held': return False
+    row = {'bot_id': bot, 'result': item}
+    if item.get('reflection_id') and not item.get('job_id'):
+        if row not in warnings: warnings.append(row)
+        return False
+    if row not in errors: errors.append(row)
+    return True
+
+
+def development_accepted(result):
+    # Learning completion is reported independently, never silently inferred.
+    return bool(result['root_status'] == 'completed' and result['engineering_accepted']
+        and result['workflow_accepted'] and result['within_observation_window']
+        and not result['errors'] and result['verify']['valid'] and result['replay']['matched'])
+
+
 def all_pages(client,name,args):
     result=[];after=None
     while True:
@@ -320,7 +354,7 @@ def run(case,root,condition,model,seconds,infer_fn=infer_monthly):
     setup_end=time.time_ns();persist(root/'parent-interventions.json',[{'kind':'setup','started_at_ns':setup_start,'finished_at_ns':setup_end,
         'description':'Frozen source, acceptance, roles and prior-memory import. No engineering solution supplied.'}])
     persist(root/'environment.json',environment());started=time.time_ns();mono=time.monotonic();lock=threading.RLock()
-    stop=threading.Event();abort=threading.Event();calls=[];errors=[];spans=[]
+    stop=threading.Event();abort=threading.Event();calls=[];errors=[];warnings=[];spans=[]
     def event(kind,**data):
         with lock:
             with (root/'timeline.jsonl').open('a') as f:f.write(canonical({'at_ns':time.time_ns(),'monotonic_ns':time.monotonic_ns(),'kind':kind,**data})+'\n')
@@ -338,22 +372,27 @@ def run(case,root,condition,model,seconds,infer_fn=infer_monthly):
                 output=receipt['output'];call.update(status='completed',output=output,provider=receipt.get('provider'));return receipt
             except Exception as exc:
                 call.update(status='failed',error=exc.code if isinstance(exc,Fault) else type(exc).__name__)
-                abort.set();stop.set();raise
+                if inference_failure_fatal(ident['operation'],exc): abort.set();stop.set()
+                raise
             finally:
                 end=time.time_ns();call.update(finished_at_ns=end,seconds=time.monotonic()-clock)
                 with lock:
                     calls.append(call);persist(root/'calls.json',calls)
                     spans.append({'id':span_id,'actor_type':'bot',**ident,'category':category(ident['operation'],output,ident['task_id']),
+                        'activity':activity(ident['operation'],output,ident['task_id']),
                         'phase':'model','started_at_ns':begin,'finished_at_ns':end,'monotonic_seconds':call['seconds'],'rework':None})
                 event('model_end',**ident,status=call['status'],action=output.get('action'))
         try:
             with BotWorker(clients[bot],configs[bot],root/'journals',infer) as w:
+                seen_holds=set()
                 while not stop.is_set():
                     for item in w.tick():
-                        event('worker_result',bot_id=bot,result=item)
-                        if item.get('status')=='held':
-                            with lock:errors.append({'bot_id':bot,'result':item})
-                            abort.set();stop.set()
+                        key=digest(item)
+                        if item.get('status')!='held' or key not in seen_holds:
+                            event('worker_result',bot_id=bot,result=item)
+                        if item.get('status')=='held': seen_holds.add(key)
+                        with lock: fatal = classify_worker_result(bot,item,warnings,errors)
+                        if fatal: abort.set();stop.set()
                     if not stop.is_set():
                         begin=time.time_ns();stop.wait(.25);end=time.time_ns()
                         with lock:spans.append({'id':uuid.uuid4().hex,'actor_type':'bot','bot_id':bot,'category':'waiting','phase':'wait',
@@ -375,24 +414,26 @@ def run(case,root,condition,model,seconds,infer_fn=infer_monthly):
     views,records,reflections=collect(owner,task,root);validation=None
     try:validation=final_audit(owner,views[task['id']],records,case,root)
     except Exception as exc:errors.append({'phase':'final_audit','code':exc.code if isinstance(exc,Fault) else type(exc).__name__,'message':str(exc)})
+    workflow=workflow_check(views,records,case);persist(root/'workflow-audit.json',workflow)
+    verified=owner.call('verify');replayed=owner.call('replay')
     finished=time.time_ns()
     persist(root/'model-spans.json',spans)
     spans.extend(runtime_spans(root))
     spans.append({'id':'final-audit','actor_type':'parent','bot_id':None,'category':'work','phase':'tool',
         'started_at_ns':audit_start,'finished_at_ns':finished,'monotonic_seconds':time.monotonic()-audit_clock,'rework':False})
     persist(root/'normalized-spans.json',spans);persist(root/'timing-summary.json',summarize_timing(spans,started,finished))
-    workflow=workflow_check(views,records,case);persist(root/'workflow-audit.json',workflow)
     result={'root_task_id':task['id'],'root_status':views[task['id']]['task']['status'],'condition':condition,'case_hash':digest(case),
         'model':model,'reasoning_effort':'low','started_at_ns':started,'finished_at_ns':finished,'wall_seconds':(finished-started)/1e9,
-        'monotonic_seconds':time.monotonic()-mono,'setup_seconds':(setup_end-setup_start)/1e9,'errors':errors,'validation':validation,
+        'monotonic_seconds':time.monotonic()-mono,'setup_seconds':(setup_end-setup_start)/1e9,'errors':errors,'reflection_warnings':warnings,'validation':validation,
         'pending_reflections':sum(x['status']!='completed' for values in reflections.values() for x in values),
-        'model_calls':len(calls),'parent_semantic_interventions':[],'verify':owner.call('verify'),'replay':owner.call('replay')}
+        'model_calls':len(calls),'parent_semantic_interventions':[],'verify':verified,'replay':replayed}
     result['engineering_accepted']=bool(validation and validation['accepted'])
     result['workflow_accepted']=workflow['accepted']
     result['within_observation_window']=result['wall_seconds']<=seconds and result['monotonic_seconds']<=seconds
-    result['accepted']=bool(result['root_status']=='completed' and result['engineering_accepted'] and result['workflow_accepted']
-        and result['within_observation_window'] and not errors and not result['pending_reflections']
-        and result['verify']['valid'] and result['replay']['matched'])
+    result['development_accepted']=development_accepted(result)
+    result['accepted']=bool(result['development_accepted'] and not result['pending_reflections'])
+    result['completion_wall_seconds']=(finished-setup_start)/1e9 if result['development_accepted'] else None
+    result['all_pipeline_accepted']=result['accepted']
     persist(root/'result.json',result);return result
 
 

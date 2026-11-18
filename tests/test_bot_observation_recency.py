@@ -5,24 +5,29 @@ import json
 import unittest
 
 from gantry.bot_execution import _bounded_collections
-from gantry.bot_observations import recent_context
+from gantry.bot_observations import MAX_ITEMS, MAX_BYTES, recent_context
 import test_crew_runtime as fixtures
 
 
 class ObservationRecencyTests(unittest.TestCase):
-    def test_actual_worker_retains_latest_eight_source_reads(self):
+    def test_actual_worker_retains_newest_bounded_source_read_window(self):
         c = fixtures.CrewRuntimeTests(); c.setUp(); self.addCleanup(c.tearDown)
         c.enable_loop('designer'); c.task('designer'); seen = []
         content = ''.join(f'{i:05}: source\n' for i in range(600))
+        reads = MAX_ITEMS + 4
         def infer(ctx, schema, directory):
             n = len(seen); seen.append(ctx)
             if n == 0:
                 return c.action('edit', {'path': 'mechanical.txt', 'content': content,
                     'expected_hash': hashlib.sha256(b'1').hexdigest()})
-            if n <= 12:
-                return c.action('read', {'path': 'mechanical.txt', 'offset': (n-1)*100, 'length': 100})
+            if n <= reads//4:
+                return c.action('observe', {'requests': [
+                    {'action': 'read', 'arguments': {'path': 'mechanical.txt',
+                        'offset': ((n-1)*4+i)*100, 'length': 100}} for i in range(4)]})
             offsets = [o['offset'] for o in ctx['read_observations']['items']]
-            self.assertEqual(offsets, list(range(400, 1200, 100)))
+            self.assertEqual(offsets, list(range(400, reads*100, 100)))
+            self.assertEqual(len(offsets), MAX_ITEMS)
+            self.assertLessEqual(len(json.dumps(ctx['read_observations'], separators=(',', ':')).encode()), MAX_BYTES)
             return c.action('finish', c.answer())
         with c.worker('designer', infer) as worker: result = worker.tick()[0]
         self.assertEqual(result['task']['status'], 'completed')
