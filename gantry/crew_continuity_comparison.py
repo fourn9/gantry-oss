@@ -13,15 +13,28 @@ ACTIVITIES = ('judgment', 'consultation', 'editing', 'verification', 'memory_upd
               'recording', 'waiting', 'preparation', 'repair', 'recovery', 'unknown')
 
 
+def _action_activity(action, args):
+    if action in ('ask', 'resolve', 'respond', 'message', 'inspect', 'inspect_json', 'team'):
+        return 'consultation'
+    if action == 'records' and args.get('task_id'): return 'consultation'
+    if action in ('edit', 'replace', 'patch', 'integrate'): return 'editing'
+    if action in ('tool', 'tool_evidence', 'plan_verification', 'publish_physical'): return 'verification'
+    if action == 'finish':
+        return 'consultation' if args.get('assignments') or args.get('report', {}).get('assignments') else 'recording'
+    if action in ('checkpoint', 'publish', 'share'): return 'recording'
+    if action == 'observe':
+        kinds = {_action_activity(r.get('action'), r.get('arguments', {})) for r in args.get('requests', [])}
+        return next(iter(kinds)) if len(kinds) == 1 else 'unknown'
+    return 'judgment'
+
+
 def activity(call):
-    operation = call.get('operation'); action = call.get('output', {}).get('action')
+    operation = call.get('operation'); output = call.get('output') or {}
     if operation == 'reflect_on_experience': return 'memory_update'
     if operation == 'plan_from_experience': return 'judgment'
-    if action in ('ask', 'resolve', 'respond', 'message'): return 'consultation'
-    if action in ('edit', 'replace', 'patch'): return 'editing'
-    if action in ('tool', 'tool_evidence', 'plan_verification'): return 'verification'
-    if action in ('checkpoint', 'publish', 'share', 'finish'): return 'recording'
-    return 'judgment'
+    try: args = json.loads(output.get('arguments_json', '{}'))
+    except (ValueError, TypeError): args = {}
+    return _action_activity(output.get('action'), args if isinstance(args, dict) else {})
 
 
 def _union(rows):
@@ -64,6 +77,8 @@ def timing(calls, spans, start, end):
                 for x in [*candidates,*[{**c,'actor_type':'bot','phase':'model'} for c in calls]]):
             dropped+=1;continue
         label=s.get('activity')
+        if label not in ACTIVITIES and phase == 'action' and isinstance(s.get('action'), str):
+            label = _action_activity(s['action'], {})
         if label not in ACTIVITIES:
             label=phases.get(phase,{'judgment':'judgment','consultation':'consultation',
                 'recording':'recording','waiting':'waiting'}.get(s.get('category'),'unknown'))
@@ -95,7 +110,7 @@ def score(result, window, calls=(), spans=(), observation_limit=1800):
     within=result.get('within_observation_window') is True
     # Keep the same after-setup limit in both arms; full primary includes setup/audit.
     if type(result.get('started_at_ns')) is int and type(result.get('finished_at_ns')) is int:
-        within=within and (result['finished_at_ns']-result['started_at_ns'])/1e9<=observation_limit
+        within=within and (end-result['started_at_ns'])/1e9<=observation_limit
     success=bool(result.get('root_status')=='completed' and (result.get('validation') or {}).get('accepted')
         and result.get('workflow_accepted') and result.get('verify',{}).get('valid')
         and result.get('replay',{}).get('matched') and within and not fatal)

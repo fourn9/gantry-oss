@@ -66,6 +66,26 @@ class ContinuityComparisonTests(unittest.TestCase):
         a=self.score();b=self.score();b['model']='different'
         with self.assertRaises(ValueError):compare({'before':[a,a],'after':[b,b]})
 
+    def test_wrapper_audit_deadline_applies_equally_to_old_and_new_result_windows(self):
+        r=result();r['started_at_ns']=10**9;r['finished_at_ns']=10*10**9
+        # Baseline's result stopped before verify/replay; wrapper records all of it.
+        s=self.score(r,end=1802)
+        self.assertFalse(s['within_observation_window']);self.assertFalse(s['success'])
+
+    def test_action_intents_cover_delegation_mixed_reads_and_tool_leaf(self):
+        from gantry.crew_continuity_comparison import activity
+        import json
+        def call(action,args=None):return {'operation':'action','output':{'action':action,
+            'arguments_json':json.dumps(args or {})}}
+        self.assertEqual(activity(call('finish',{'assignments':[{'bot_id':'peer'}]})),'consultation')
+        self.assertEqual(activity(call('finish')),'recording')
+        self.assertEqual(activity(call('integrate')),'editing')
+        self.assertEqual(activity(call('publish_physical')),'verification')
+        self.assertEqual(activity(call('observe',{'requests':[{'action':'read'},{'action':'inspect'}]})),'unknown')
+        self.assertEqual(activity(call('inspect')),'consultation')
+        leaf=span(2,3);leaf['action']='edit'
+        s=self.score(spans=[leaf]);self.assertEqual(s['timing']['by_activity']['editing']['union_seconds'],1)
+
     def test_payloads_do_not_leak_and_completed_ratio_is_descriptive(self):
         from gantry.crew_continuity_comparison import compare
         r=result();r['secret']='private';a=self.score(r,end=10);b=self.score(end=5)
