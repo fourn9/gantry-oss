@@ -23,6 +23,8 @@ Qwen improved from 8/24 to 16/24; Llama from 12/24 to 14/24. Twelve matched task
 
 On the 32 required cases the routed peer read the release and the requester inspected and cited the peer report. The report matched that release in 24 cases. Eight Llama peer reports said blue after reading amber. In another eight cases the peer answered correctly but the requester first saved the opposite value, then spent its remaining operations correcting and rechecking it. In the final two failures it had valid evidence and a passing check but chose redundant reads or writes instead of submission. These observations identify where the operation limit was spent. A cited completed report proves that a consultation occurred; it cannot certify that natural-language advice correctly reflects the underlying evidence.
 
+Counting both roles against **one** eight-operation budget changes how the same receipts are interpreted. Eight prior submissions and sixteen routed submissions completed within eight combined actions, all on agreement cases. All fourteen accepted routed consultations used nine combined actions: the requester asked, waited, inspected, cited, edited, checked and submitted (seven), and the peer read and reported (two). This is a secondary count from the same logs, not a separate run permitting a different strategy.
+
 The 48 task windows totaled 82.69 s before and 82.98 s after. Across the 18 doubly successful pairs, median completion times were 1.71 s and 1.48 s respectively. Model calls fell from 348 to 338. The primary improvement was more valid submissions under the operation cap. These are constrained local file decisions on six fixtures; model/order/lesson variants are repeated measurements. The data do not establish faster general engineering or CAD development.
 
 [Anonymous metrics for all 96 trials](evidence/worker-consultation.csv)
@@ -39,3 +41,5 @@ python examples/summarize_worker_consultation.py "$RESULTS/qwen" "$RESULTS/llama
 ```
 
 Model revisions: `mlx-community/Qwen2.5-1.5B-Instruct-4bit@8b403126fc14f14cfc99bb4cfa72ecbc129ea677` and `mlx-community/Llama-3.2-1B-Instruct-4bit@08231374eeacb049a0eade7922910865b8fce912`. Inference ran offline on an Apple M4 Pro. Private run folders contain the individual ledgers, prompts, model outputs, action receipts and elapsed times. The public CSV contains anonymous metrics.
+
+Local regression checks covered 2,034 Python tests (19 skipped, zero failures) and 127 JavaScript tests (zero failures). A separate normal Worker regression attempted submission with a passing tool and missing peer evidence, observed the rejection and recorded a blocked outcome.
