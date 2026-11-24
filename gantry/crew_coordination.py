@@ -45,6 +45,10 @@ class CrewCoordinationMixin:
             request = response.get('request')
             if request and self._cited_report_read(s, task, request, a['evidence']):
                 result['reviewed_basis'] = message['consultation_basis']
+                peer = s['bot_tasks'][request['task_id']]
+                report = peer['reports'][int(request['pointer'].split('/')[3])]['report']
+                if 'observation' in report:
+                    result['reviewed_observation'] = copy.deepcopy(report['observation'])
                 self._dev_save(s, fx, 'bot_task_messages', result)
         task['stamp'] = self._bd_stamp(s, actor, task, con)
         self._dev_save(s, fx, 'bot_tasks', task)

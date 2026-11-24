@@ -96,7 +96,8 @@ def score(owner, view, case, final_state, task_actions, require_peer=None):
         cited = any(a['kind'] == 'resolve' and question.get('answer_id') in json.loads(a['details']['arguments']).get('evidence', [])
                     and not a['details']['result'].get('error') for a in task_actions)
         consultations.append({'peer_task': peer_id, 'peer_checked_source': read, 'read_exact_report': inspected,
-            'cited': cited, 'status': question['status'], 'peer_status': peer['task']['status']})
+            'cited': cited, 'status': question['status'], 'peer_status': peer['task']['status'],
+            'wrong_report':peer['task']['status']=='completed' and peer['task']['reports'][-1]['report']['summary']!='Report release: '+expected})
     consulted = any(c['cited'] and c['read_exact_report'] and c['peer_checked_source']
                     and c['status'] == 'resolved' and c['peer_status'] == 'completed' for c in consultations)
     right = actual == hashlib.sha256(expected.encode()).hexdigest()
@@ -118,10 +119,26 @@ def run(f, model, home, case, state_id, past, mid, memory, feedback, rotation, s
     decisions = {'designer': [], 'control': []}
     wait_reports = 0
     design_config = f.configs['designer']
+    peer_config = f.configs['control']
+    handoff = (routing_study or {}).get('handoff',False)
+    policy = (routing_study or {}).get('policy',{})
+    colors = policy.get('allowed_values',['blue','amber'])
+    saves = {'Save '+v+' guide':v for v in colors}
+    reports = ['Report release: '+v for v in [*colors,'unknown']]
+    kinds = {**ACTION_KINDS, **dict.fromkeys(saves,'edit'), **dict.fromkeys(reports,'finish')}
+    send_read = 'Report the value from my cited read'
+    use_review = 'Save the value from the signed records or reviewed answer'
+    check_submit = 'Run the check and submit this candidate on success'
+    pause = 'Block this task for further review'
+    if handoff:
+        peer_guide = {**peer_config['evidence_guide'],'publish_observed':{'requester':'designer','allowed_values':colors}}
+        peer_config = {**peer_config,'evidence_guide':peer_guide}
+        owner.call('configure_bot_runtime',{'bot_id':'control','version':2,'principal_id':'control','enabled':True,
+                                          'environment':environment_manifest(peer_config)})
     if routing_study is not None:
         spec = dict(design_config['evidence_guide'])
         if routing_study['enabled']:
-            spec['consultation_policy'] = routing_study['policy']
+            spec['consultation_policy'] = {**policy, **({'literal_source':peer_config['evidence_guide']['source']} if handoff else {})}
         design_config = {**design_config, 'evidence_guide': spec}
         owner.call('configure_bot_runtime', {'bot_id':'designer', 'version':2, 'principal_id':'designer',
                                             'enabled':True, 'environment':environment_manifest(design_config)})
@@ -159,7 +176,7 @@ def run(f, model, home, case, state_id, past, mid, memory, feedback, rotation, s
             kind, args = 'finish', f.answer(status='failed', summary='Decision budget exhausted')
         else:
             if peer:
-                options = [PEEK, *REPORTS]
+                options = [PEEK, *reports]
                 prompt = 'Manufacturing reviewer. Identify the effective released guide for this revision. Report your finding to the requester.'
             else:
                 prompt = (ctx['task']['title']+'. Drawing shows blue. Deliver the correct saved guide after a passing release check. '
@@ -175,11 +192,21 @@ def run(f, model, home, case, state_id, past, mid, memory, feedback, rotation, s
                 options = [READ]
                 if not q: options.append(ASK)
                 if q.get('status') == 'answered': options.extend([INSPECT, RESOLVE])
-                options.extend([BLUE, AMBER, CHECK_ACTION, SUBMIT])
+                options.extend([*saves, CHECK_ACTION, SUBMIT])
             options = options[rotation:]+options[:rotation]
             prompt += '\nYour previous actions and observations: '+json.dumps([(row['choice'], row.get('result')) for row in log])
             stamp = time.perf_counter()
             primed = not peer and len(log) < len(prefix)
+            guide = ctx.get('evidence_guide') if guided else None
+            suggested = None
+            offer = (guide or {}).get('offer') if handoff else None
+            if offer:
+                if offer['action']=='finish':
+                    suggested = send_read if peer else SUBMIT
+                elif offer['action']=='edit':
+                    suggested = use_review
+                elif offer['action']=='tool' and consumed+2<=limit:
+                    suggested = check_submit
             if primed:
                 choice = prefix[len(log)]
                 assert choice in options
@@ -187,6 +214,8 @@ def run(f, model, home, case, state_id, past, mid, memory, feedback, rotation, s
                 order = [PEEK, REPORTS[1]] if peer else [READ, ASK, INSPECT, RESOLVE, AMBER, CHECK_ACTION, SUBMIT]
                 choice = order[len(log)]
                 assert choice in options, (choice, options, q)
+                if handoff and suggested:
+                    choice = suggested
             else:
                 guide = ctx.get('evidence_guide') if guided else None
                 if guided:
@@ -205,8 +234,22 @@ def run(f, model, home, case, state_id, past, mid, memory, feedback, rotation, s
                                    +'. Comparison: '+route['status']+'. Responsible peer: '+route['peer']+'.')
                 writes = None
                 if retry_aware and not peer:
-                    writes = {o:hashlib.sha256(color.encode()).hexdigest() for o,color in [(BLUE,'blue'),(AMBER,'amber')]}
-                choice = choose_focused(model.choose, prompt, options, ACTION_KINDS, guide, writes)
+                    writes = {o:hashlib.sha256(color.encode()).hexdigest() for o,color in saves.items()}
+                if suggested:
+                    # Present the reference once; moving between the focused and full menu remains a model choice.
+                    if suggested == send_read:
+                        alternatives = [PEEK,send_read,pause]
+                    elif suggested == use_review:
+                        alternatives = [READ,use_review,CHECK_ACTION,SUBMIT,pause]
+                    elif suggested == check_submit:
+                        alternatives = [READ,CHECK_ACTION,check_submit,SUBMIT,pause]
+                    else:
+                        alternatives = [READ,CHECK_ACTION,SUBMIT,pause]
+                    alternatives = alternatives[rotation:]+alternatives[:rotation]
+                    labels = {o:('offered' if o==suggested else 'other') for o in alternatives}
+                    choice = choose_focused(model.choose,prompt,alternatives,labels,{'focus_actions':['offered']})
+                else:
+                    choice = choose_focused(model.choose, prompt, options, kinds, guide, writes)
             log.append({'choice': choice, 'source': 'fixture' if smoke or primed else 'model', 'decision_seconds': time.perf_counter()-stamp,
                         'input_state': ctx['development']['state']['id']})
             if choice in (READ, PEEK):
@@ -218,8 +261,17 @@ def run(f, model, home, case, state_id, past, mid, memory, feedback, rotation, s
                 kind, args = 'inspect', q['response_report']['request']
             elif choice == RESOLVE:
                 kind, args = 'resolve', {'message_id': q['id'], 'reason': 'Reviewed this fixture question', 'evidence': [q['answer_id']]}
-            elif choice in (AMBER, BLUE):
-                kind, args = 'edit', {'path': 'mechanical.txt', 'content': choice.split()[1],
+            elif choice == send_read:
+                kind, args = 'finish', f.answer(**offer['arguments'])
+            elif choice == use_review:
+                kind,args = 'edit',offer['arguments']
+            elif choice == check_submit:
+                report = f.answer(summary='Submitted after the saved candidate passed its release check')
+                kind,args = 'tool',{'name':'release_check','submit_on_pass':{k:report[k] for k in ('summary','rationale','unverified')}}
+            elif choice == pause:
+                kind,args = 'finish',f.answer(status='blocked',summary='Request further review of this step')
+            elif choice in saves:
+                kind, args = 'edit', {'path': 'mechanical.txt', 'content': saves[choice],
                                       'expected_hash': hashlib.sha256(ctx['files']['mechanical.txt'].encode()).hexdigest()}
             elif choice == CHECK_ACTION:
                 kind, args = 'tool', {'name': 'release_check'}
@@ -232,7 +284,7 @@ def run(f, model, home, case, state_id, past, mid, memory, feedback, rotation, s
     task = owner.call('assign_bot_task', {**f.assignment('designer', title='Select fixture guide for '+case[0], state_id=state_id),
                                           'session_id': f.sid})
     with BotWorker(clients['designer'], design_config, home/'runtime', infer) as designer, \
-            BotWorker(clients['control'], f.configs['control'], home/'runtime', infer) as control:
+            BotWorker(clients['control'], peer_config, home/'runtime', infer) as control:
         for worker in (designer, control, designer):
             results = worker.tick()
             receipts.extend([{'task_id': r.get('task', {}).get('id'), 'status': r.get('status') or r.get('task', {}).get('status'),
@@ -249,11 +301,19 @@ def run(f, model, home, case, state_id, past, mid, memory, feedback, rotation, s
         assert not score(owner, view, case, final_state, [a for a in task_actions if a['kind'] != 'inspect'])['passed']
         assert not score(owner, view, (case[0], case[1], 'blue'), final_state, task_actions)['passed']
     edits = [a for a in task_actions if a['kind'] == 'edit']
+    rounds = [a for a in task_actions if isinstance(a['details'].get('round'),int)
+              and a['details'].get('stage')!='core_validation']
+    counted = [a for a in rounds if not (a['kind']=='finish' and
+               json.loads(a['details']['arguments']).get('summary')=='Decision budget exhausted')]
     return {**result, 'case': case[0], 'memory': memory, 'feedback': feedback, 'rotation': rotation, 'task_id': task['id'],
         'base_state': state_id, 'final_state': final_state, 'seconds': elapsed, 'clone_seconds': snapshot_seconds,
         'duplicate_saves': sum(a['details']['result'].get('changed') is False for a in edits),
         'checks': sum(a['kind']=='tool' for a in task_actions), 'receipts': receipts, 'decisions': decisions,
-        'parent_interventions': 0, 'wait_reports': wait_reports}
+        'parent_interventions': 0, 'wait_reports': wait_reports,
+        'auto_submits':sum(a['details'].get('provider',{}).get('kind')=='conditional_submission' for a in task_actions),
+        'recorded_operations':len(counted),
+        'wrong_peer_reports':sum(q['wrong_report'] for q in result['consultations']),
+        'wrong_edits':sum(a['details']['result'].get('hash') not in (None,result['expected_digest']) for a in edits)}
 
 
 def main():

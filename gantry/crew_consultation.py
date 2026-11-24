@@ -20,8 +20,10 @@ def validate_source(source):
 
 
 def validate_policy(policy):
-    require(isinstance(policy, dict) and set(policy) == {'peer', 'sources', 'allowed_values'},
+    require(isinstance(policy, dict) and set(policy) in ({'peer', 'sources', 'allowed_values'}, {'peer', 'sources', 'allowed_values','literal_source'}),
             'invalid_input', 'Specify the responsible peer, comparable sources and their allowed values')
+    if 'literal_source' in policy:
+        validate_source(policy['literal_source'])
     identifier(policy['peer'])
     sources, values = policy['sources'], policy['allowed_values']
     require(isinstance(sources, list) and 2 <= len(sources) <= 4, 'invalid_input', 'Choose two to four saved sources')
@@ -81,7 +83,10 @@ def compare(full, files, policy):
         claims.append(claim)
     values = {c['value'] for c in claims}
     status = 'missing' if None in values else 'consistent' if len(values) == 1 else 'conflict'
-    basis = digest([full['task']['id'], policy, claims])
+    inputs = [full['task']['id'], policy, claims]
+    if 'literal_source' in policy:
+        inputs.append(manifest.get(policy['literal_source']['path'], {}).get('hash'))
+    basis = digest(inputs)
     peer = policy['peer']
     consulted = any(q.get('to_bot_id') == peer and q.get('status') == 'resolved'
                     and q.get('consultation_basis') == basis and q.get('reviewed_basis') == basis

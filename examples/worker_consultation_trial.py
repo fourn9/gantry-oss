@@ -25,6 +25,15 @@ CASES = [
 SMOKE = ('diagnostic', 'conflict', {'design':'blue','integration':'amber'}, 'amber')
 
 
+HELD_OUT = [
+    ('hinge','consistent',{'design':'violet','integration':'violet'},'violet'),
+    ('keeper','consistent',{'design':'teal','integration':'teal'},'teal'),
+    ('platen','conflict',{'design':'white','integration':'teal'},'violet'),
+    ('piston','conflict',{'design':'violet','integration':'white'},'white'),
+    ('lever','missing',{'integration':'white'},'teal'),
+    ('spindle','missing',{},'white')]
+
+
 def fixture(row):
     name, condition, signed, release = row
     summary = release if condition == 'consistent' else '; '.join(field+' '+signed.get(field,'missing') for field in ('design','integration'))
@@ -38,6 +47,7 @@ def main():
     parser.add_argument('--model', type=Path)
     parser.add_argument('--output', required=True, type=Path)
     parser.add_argument('--smoke', action='store_true')
+    parser.add_argument('--handoff',choices=['pilot','regression','held-out'],help='Compare the routed baseline with evidence-bound handoff')
     args = parser.parse_args()
     root = args.output.resolve()
     if (root.exists() or root.is_relative_to(Path(__file__).resolve().parents[1])
@@ -62,15 +72,21 @@ def main():
             f.owner.call('configure_bot_runtime', {'bot_id':role,'version':1,'principal_id':role,
                          'enabled':True,'environment':environment_manifest(config)})
         cases = [SMOKE] if args.smoke else CASES
+        if args.handoff == 'pilot':
+            cases = [SMOKE]
+        policy = POLICY
+        if args.handoff == 'held-out' and not args.smoke:
+            cases = HELD_OUT
+            policy = {**POLICY,'allowed_values':['teal','white','violet']}
         states = {r[0]: checkpoint(f,fixture(r),r[2]) for r in cases}
         groups = [(SMOKE,False,0,True)] if args.smoke else list(itertools.product(cases,(False,True),range(2),(False,True)))
         random.Random(2531).shuffle(groups)
         manifest = {'commit':subprocess.check_output(['git','rev-parse','HEAD'],cwd=Path(__file__).parent,text=True).strip(),
-                    'model_load_seconds':load_seconds,'states':states,'groups':groups,'limits':{'requester':8,'peer':4}}
+                    'study':args.handoff or 'routing', 'model_load_seconds':load_seconds,'states':states,'groups':groups,'limits':{'requester':8,'peer':4}}
         (root/'manifest.json').write_text(json.dumps(manifest,indent=2))
         for i,(case,memory,rotation,routed) in enumerate(groups):
             n = len(model.transcript) if model else 0
-            spec = {'enabled':routed,'policy':POLICY,'require_peer':case[1]!='consistent'}
+            spec = {'enabled':routed or bool(args.handoff), 'handoff':routed and bool(args.handoff),'policy':policy,'require_peer':case[1]!='consistent'}
             row = run(f,model,root/str(i),fixture(case),states[case[0]],past,mid,memory,True,rotation,
                       smoke=args.smoke,guided=True,retry_aware=True,routing_study=spec)
             row.update(routed=routed,condition=case[1],model_calls=len(model.transcript)-n if model else 0)

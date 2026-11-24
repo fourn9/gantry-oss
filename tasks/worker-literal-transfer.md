@@ -1,0 +1,9 @@
+# Categorical evidence handoff
+
+Reference: addyosmani/agent-skills at 2686b620fc1fed2e8f60c704839c766b8594c6b6. Scope: the opted-in categorical file workflow.
+
+Acceptance before implementation:
+- A responding Bot can elect to report its exact saved observation. Bind the report to its own completed read, immutable source and current question. Reject fabricated or stale evidence.
+- A designer can elect to apply a saved, reviewed value to the declared literal candidate. Honor scope, expected hashes, evidence changes, explicit consultation and exact-revision checks. Preserve an escalation path.
+- Allow a Bot to request submission conditional on a specific installed check. Persist the intent; keep check and submission separate fenced operations, and discard the intent if state, review or evidence changes. Preserve the Bot's limitations. No formal adoption.
+- Compare identical eight-operation requester budgets including waiting and submission, four separate peer operations, same two local real models, same lesson/order settings. Keep six regression cases and six unused cases with varied conflicting/missing entries. Each pair starts from independent copies; freeze before scoring. Include all failures. Distinguish the model's decision from deterministic transport and conditional continuation.

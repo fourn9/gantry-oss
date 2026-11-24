@@ -21,7 +21,7 @@ from .development import in_scope
 from .model import Fault, canonical, digest, require
 from .project_files import read_file, write_file
 from .runner import persist
-from . import project_sandbox
+from . import project_sandbox, crew_literal
 
 SCHEMA = {'type': 'object', 'properties': {
     'action': {'enum': ['commitment', 'commitments', 'commitment_create', 'commitment_update', 'procedure_decision', 'observe', 'plan_verification', 'extract_evidence', 'issue_open', 'issue_review', 'issue', 'issues', 'requirements', 'propose_requirements', 'integrate', 'read', 'inspect_json', 'edit', 'replace', 'context', 'records', 'inspect', 'tool', 'publish_physical', 'ask', 'resolve', 'decision', 'remember', 'working_state', 'experience_use', 'team', 'stop', 'finish']},
@@ -219,6 +219,17 @@ def _routed_guide(full, workspace, config, files=None):
     return evidence_guide(full, inputs, guide, check_definition(config, guide['check_tool']))
 
 
+def _check_literal_write(context, workspace, config, path, raw):
+    role = config.get('evidence_guide') or {}
+    if path != role.get('candidate') or 'literal_source' not in role.get('consultation_policy',{}):
+        return
+    guide = _routed_guide(context,workspace,config)
+    if guide:
+        value = guide['literal']['value']
+        require(value is not None and raw == value.encode(), 'evidence_required',
+                'This target stores the agreed or reviewed literal verbatim; inspect the evidence or escalate')
+
+
 def _execute(client, context, ref, config, action, args, workspace, step, key):
     scope = context['task']['write_scope']
     if action == 'plan_verification':
@@ -293,6 +304,7 @@ def _execute(client, context, ref, config, action, args, workspace, step, key):
         validate(args, _schema({'path': S, 'content': {'type': 'string'}, 'expected_hash': S}))
         _path(workspace, args['path'], scope, create=True)
         raw = args['content'].encode()
+        _check_literal_write(context, workspace, config, args['path'], raw)
         changed = write_file(workspace, args['path'], raw, args['expected_hash'])
         return {'path': args['path'], 'hash': hashlib.sha256(raw).hexdigest(), 'changed': changed}
     if action == 'replace':
@@ -309,9 +321,17 @@ def _execute(client, context, ref, config, action, args, workspace, step, key):
         require(offset >= 0 and raw.find(old, offset+1) < 0, 'invalid_input',
                 'Replace needs exactly one matching old_text; read the target and include unique surrounding text')
         updated = clean_bytes(raw[:offset] + new + raw[offset+len(old):])
+        _check_literal_write(context, workspace, config, args['path'], updated)
         changed = write_file(workspace, args['path'], updated, args['expected_hash'])
         return {'path': args['path'], 'hash': hashlib.sha256(updated).hexdigest(), 'changed': changed}
-    if action == 'tool': return _tool(client, ref, config, args, workspace, step, scope, context['zone'])
+    if action == 'tool':
+        if 'submit_on_pass' in args:
+            validate(args,_schema({'name':S,'submit_on_pass':crew_literal.SUBMISSION}))
+            guide = _routed_guide(context,workspace,config)
+            require(guide and (guide.get('literal') or {}).get('matches') and args['name']==guide['check']['name'],
+                    'evidence_required','Conditional submission requires the bound candidate and its installed check')
+            args = {'name':args['name']}
+        return _tool(client, ref, config, args, workspace, step, scope, context['zone'])
     if action in API_ACTIONS:
         require(not set(args) & {'task_id', 'fence', 'basis', 'intent', 'consultation_basis'}, 'invalid_input', 'Task identity is supplied by the runtime')
         if action == 'ask':
@@ -456,8 +476,21 @@ def action_input(full, workspace, config, last_result, number):
         from .crew_progress import check_definition, evidence_guide
         role = config['evidence_guide']
         basis = check_definition(config, role['check_tool']) if 'check_tool' in role else None
-        guide = _routed_guide(full, workspace, config, context['files']) or evidence_guide(full, context['files'], role, basis)
+        files = context['files']
+        if crew_literal.publication_enabled(full,role):
+            files = crew_literal.publisher_files(full,workspace,role)
+        guide = _routed_guide(full, workspace, config, files) or evidence_guide(full, files, role, basis)
         if guide:
+            offer = crew_literal.offer(guide)
+            if offer and offer['action'] in context['action_schemas']:
+                guide['offer'] = offer
+            if 'literal' in guide:
+                context['action_schemas']['tool'] = _schema({'name':S,'submit_on_pass':crew_literal.SUBMISSION},['name'])
+                context['action_guide']['tool'] += (' Optional submit_on_pass carries summary, rationale and unverified. '
+                    'Choose it only when this check completes your work. A distinct fenced finish follows exact-state success.')
+                context['instruction'] += ' The bound literal carries the exact candidate bytes and expected hash. Escalate unresolved engineering tradeoffs.'
+            if guide.get('publication'):
+                context['instruction'] += ' To report the observed category, use the supplied publication summary and observation in finish. Retain limitations.'
             guide['focus_actions'] = [a for a in guide['focus_actions'] if a in context['action_schemas']]
             context['evidence_guide'] = guide
             original_instruction = context['instruction']
@@ -498,11 +531,23 @@ def run_actions(client, initial, ref, infer, config, root):
             with span(step, 'model'):
                 schema = json.loads(json.dumps(SCHEMA))
                 schema['properties']['action']['enum'] = [v for v in schema['properties']['action']['enum'] if v in context['action_schemas']]
-                receipt = infer(context, schema, step/'model'); validate(receipt['output'], schema)
+                intent = state.get('conditional_submit')
+                receipt = None
+                if intent and intent['round']==number:
+                    receipt = crew_literal.continuation(intent,full,_routed_guide(full,workspace,config),
+                        (full.get('personal_preferences') or {}).get('basis',digest([])))
+                    if receipt and safe_fingerprint(workspace)!=digest({p:v['hash'] for p,v in full['development']['manifest'].items()}):
+                        receipt = None
+                guard = {'action_id':intent['check'],'discussion_version':intent['discussion']} if receipt else None
+                if receipt is None:
+                    receipt = infer(context, schema, step/'model')
+                validate(receipt['output'], schema)
             saved = {'phase': 'prepared', 'receipt': receipt, 'before': safe_fingerprint(workspace),
                      'input_state': full['development']['state']['id'],
                      'discussion_version': context['task']['discussion_version'],
                      'preferences_basis': (context.get('personal_preferences') or {}).get('basis', digest([]))}
+            if guard:
+                saved['submission_guard'] = guard
             persist(marker, saved)
         output = saved['receipt']['output']; action = output['action']
         key = 'crew-action:' + digest([ref['task_id'], initial['task']['attempt'], number])
@@ -538,8 +583,19 @@ def run_actions(client, initial, ref, infer, config, root):
                     validate(args, BOT_ANSWER)
                     require(not args['edits'], 'invalid_input', 'Use edit actions to preserve intermediate work')
                     if args['status'] == 'completed':
+                        role = config.get('evidence_guide') or {}
+                        if crew_literal.publication_enabled(full,role):
+                            from .crew_progress import evidence_guide
+                            files = crew_literal.publisher_files(full,workspace,role)
+                            projected = evidence_guide(full,files,role,None)
+                            publication = (projected or {}).get('publication')
+                            require(publication and args.get('observation')==publication['observation']
+                                    and args['summary']==publication['summary'], 'evidence_required',
+                                    'Read the registered source and send its cited observation, or report a blocker')
                         guide = _routed_guide(full, workspace, config)
                         if guide:
+                            if 'literal' in guide:
+                                require(guide['literal']['matches'],'evidence_required','Candidate must match the current reviewed value')
                             route = guide['routing']
                             require(route['status'] == 'consistent' or route['consulted'], 'evidence_required',
                                     'Consult the responsible peer, inspect their report and cite their answer for this revision')
@@ -577,7 +633,7 @@ def run_actions(client, initial, ref, infer, config, root):
                 'provider': saved['receipt'].get('provider', {'kind': 'injected_test_inference'}), 'round': number}}
             persist(marker, saved)
         with span(step, 'record'):
-            _return_effect(client, saved, marker, 'record_args', 'record_bot_action', key + ':record', ref)
+            action_record = _return_effect(client, saved, marker, 'record_args', 'record_bot_action', key + ':record', ref)
         if action != 'integrate' and safe_fingerprint(workspace) != saved['before']:
             with span(step, 'checkpoint'):
                 if 'checkpoint_args' not in saved:
@@ -595,7 +651,7 @@ def run_actions(client, initial, ref, infer, config, root):
         if action == 'finish' and 'report' in saved['result']:
             report = saved['result']['report']
             if 'final_args' not in saved:
-                saved.update(final_args={**ref, 'preferences_basis':saved.get('preferences_basis',digest([])), 'report': {k: v for k, v in report.items() if k != 'edits'}},
+                saved.update(final_args={**ref, **({'checked_submission':saved['submission_guard']} if 'submission_guard' in saved else {}), 'preferences_basis':saved.get('preferences_basis',digest([])), 'report': {k: v for k, v in report.items() if k != 'edits'}},
                              phase='finalizing')
                 persist(marker, saved)
             try:
@@ -604,7 +660,7 @@ def run_actions(client, initial, ref, infer, config, root):
             except Fault as exc:
                 # Only definite contract rejections are correction requests. Transport
                 # uncertainty and changed authority/basis must not launch a new turn.
-                if exc.code not in {'invalid_input', 'invalid_state', 'dependency_pending', 'conflict', 'not_found', 'scope_denied'}:
+                if exc.code not in {'invalid_input', 'invalid_state', 'dependency_pending', 'evidence_required', 'conflict', 'not_found', 'scope_denied'}:
                     raise
                 client.call('check_bot_task', ref)
                 saved.update(phase='rejected', result={'error': exc.code, 'message': str(exc)[:500], 'details': exc.details})
@@ -618,6 +674,13 @@ def run_actions(client, initial, ref, infer, config, root):
                         'checkpoint_fingerprint': safe_fingerprint(workspace), 'final_result': result}
         if saved.get('feedback_args'):
             _return_effect(client, saved, marker, 'feedback_args', 'record_bot_action', key+':feedback', ref)
+        state.pop('conditional_submit',None)
+        if action=='tool' and not saved['result'].get('error') and saved['result'].get('exit_code')==0:
+            submission = json.loads(output['arguments_json']).get('submit_on_pass')
+            if submission and saved['result'].get('output_artifact') and not saved['result'].get('reason'):
+                state['conditional_submit'] = {'round':number+1, 'task':ref['task_id'], 'attempt':full['task']['attempt'],
+                    'state':saved['input_state'],'discussion':saved['discussion_version'],'preferences':saved['preferences_basis'],
+                    'check':action_record['id'],'report':submission}
         state.update(next=number+1, last_result=saved['result']); persist(state_path, state)
 
 

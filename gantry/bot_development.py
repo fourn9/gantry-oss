@@ -6,6 +6,7 @@ Assignments express delegated work, never formal adoption or a physical pass.
 import copy
 
 from .contracts import register, S, A, I
+from .crew_literal import OBSERVATION, verify_report, verify_submission
 from .development import in_scope
 from .development_contracts import CAPTURE
 from .continuity_contracts import CONTEXT
@@ -32,6 +33,7 @@ REPORT = {'summary': S, 'rationale': S, 'unverified': A,
               'type': 'object', 'properties': {'id': S, 'version': I},
               'required': ['id', 'version'], 'additionalProperties': False}}}
 REPORT_REQUIRED = list(REPORT)
+REPORT['observation'] = OBSERVATION
 REPORT['followups'] = FOLLOWUPS
 # Shared with the standalone endpoint; optional for saved reports/older clients.
 LEARNING_USE = {'memory_id': S,
@@ -63,7 +65,9 @@ register('check_bot_task', {'task_id': S, 'fence': S, 'preferences_basis': S}, [
 register('checkpoint_bot_task', {'task_id': S, 'fence': S, 'preferences_basis': S, 'snapshot': S, 'summary': S,
     'rationale': S, 'unfinished': A, 'capture': CAPTURE, 'context': CONTEXT},
     ['task_id', 'fence', 'snapshot', 'summary', 'rationale', 'unfinished', 'capture'])
-register('finish_bot_task', {'task_id': S, 'fence': S, 'preferences_basis': S, 'report': {
+register('finish_bot_task', {'task_id': S, 'fence': S, 'preferences_basis': S,
+    'checked_submission': {'type':'object','properties':{'action_id':S,'discussion_version':{'type':'integer','minimum':0}},
+                           'required':['action_id','discussion_version'],'additionalProperties':False}, 'report': {
     'type': 'object', 'properties': REPORT, 'required': REPORT_REQUIRED, 'additionalProperties': False}},
     ['task_id', 'fence', 'report'])
 register('hold_bot_task', {'task_id': S, 'fence': S, 'reason': S}, ['task_id', 'fence', 'reason'])
@@ -441,6 +445,9 @@ class BotDevelopmentMixin:
     def cmd_finish_bot_task(self, s, actor, a, fx, n, con):
         task = self._bd_checked(s, actor, a, con); self.allowed(actor, 'record')
         report = copy.deepcopy(a['report']); b = self._bd_binding(s, task['session_id'], task['bot_id'])
+        if 'checked_submission' in a:
+            verify_submission(s,task,report,a['checked_submission'])
+        verify_report(self, s, actor, task, report)
         validate_followups(self, s, actor, task, report)
         require(task.get('studio_mode') != 'ask' or (not report['assignments'] and not report['integrate_changes']),
                 'scope_denied', 'Ask cannot delegate edits or integrate candidates')

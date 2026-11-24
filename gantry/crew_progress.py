@@ -3,7 +3,7 @@ import hashlib
 import json
 
 from .connection_policy import clean_bytes, safe_path
-from . import crew_consultation
+from . import crew_consultation, crew_literal
 from .crew_json import pointer_value
 from .crew_observe import observation_actions
 from .development import in_scope
@@ -15,10 +15,12 @@ def validate_guide(config):
         return
     guide = config['evidence_guide']
     require(config.get('agent_loop') and config.get('workflow') == 'bot_development'
-            and isinstance(guide, dict) and set(guide) in ({'source'}, {'source','candidate','check_tool'},
+            and isinstance(guide, dict) and set(guide) in ({'source'}, {'source','publish_observed'}, {'source','candidate','check_tool'},
                 {'source','candidate','check_tool','consultation_policy'}),
             'invalid_input', 'An evidence guide needs a Bot action loop and a source, with optional candidate and check tool')
     crew_consultation.validate_source(guide['source'])
+    if 'publish_observed' in guide:
+        crew_literal.validate_publisher(guide['publish_observed'])
     if 'consultation_policy' in guide:
         crew_consultation.validate_policy(guide['consultation_policy'])
     if 'candidate' in guide:
@@ -157,7 +159,14 @@ def evidence_guide(full, files, config, check_basis):
         phase, focus = 'check_candidate',['tool']
     else:
         phase, focus = 'choose_candidate',(['edit','replace'] if route else ['edit','replace','ask'])
-    return {**({'routing':route} if route else {}), 'state_id':state,'source':source,'observed':observed,'candidate':candidate,'candidate_hash':manifest.get(candidate, {}).get('hash'),'edit_action_id':edit,
+    extra = {'routing':route} if route else {}
+    if route and 'literal_source' in config['consultation_policy']:
+        extra['literal'] = crew_literal.candidate(full,route,config)
+        if route['status']!='consistent' and not extra['literal']['value'] and not (consultation and consultation['status'] in {'open','answered'}):
+            phase, focus = 'consult_responsible_peer',['ask']
+    if crew_literal.publication_enabled(full,config):
+        extra['publication'] = crew_literal.publication(full,config,observed)
+    return {**extra, 'state_id':state,'source':source,'observed':observed,'candidate':candidate,'candidate_hash':manifest.get(candidate, {}).get('hash'),'edit_action_id':edit,
             'check':check,'previous_check':previous_check,'consultation':consultation,'phase':phase,'focus_actions':focus,
             'coverage':'Up to 64 recent task actions; missing receipts are unknown. The assigned contract still governs completion.'}
 
