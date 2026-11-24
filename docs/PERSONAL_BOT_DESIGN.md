@@ -10,7 +10,7 @@ model weights. Existing project requirements and human adoption remain canonical
 | --- | --- | --- |
 | commitments | Bot-owned durable responsibilities linked to existing tasks; outcome-aware continuation | Existing identity, tasks, standing delegation |
 | procedures | Conditional use/retirement of existing learned procedures with independent scoped evidence | Existing memories, peer checks, actual tool receipts |
-| preferences | Human-attributed feedback, explicit task/project scope, correction and withdrawal in future context | Existing project ownership, Bot identity and task context |
+| preferences | Human-attributed feedback, explicit task/phase/project scope, correction and withdrawal in future context | Existing project ownership, Bot identity and task context |
 | continuous-work | Restart, reassess, delegate, execute, learn and continue using the same records | All above; existing Worker and sandbox |
 
 Core validates identity, access, versions and evidence. Bots choose priorities,
@@ -153,9 +153,56 @@ engineering efficacy or a claim about Instinct's private implementation.
 | Personalization | Explicit owner feedback, scoped correction/withdrawal | Propose inferred organizational habits for review; do not silently convert observations to permanent rules |
 | Learning effectiveness | Existing paired evaluator, new functional lifecycle tests | Held-out, role-specific longitudinal evaluation before claiming cumulative improvement |
 | Efficiency | Indexed/paged responsibility retrieval; no new memory database | Reduce repeated context and idle bookkeeping; measure on the current performance branch separately |
-| Product integration | CLI/API/action-loop paths | Studio editing/review for duties, procedures and preferences; production integration after branch review |
+| Product integration | Studio Team guidance, linked lessons, standing delegation, CLI/API and worker paths | Production integration and longitudinal customer evaluation |
 
 Explicit limits: 20 active commitments in the initial context (more are paged),
 40 applicable preferences, existing bounded lexical memory retrieval. None of these
 is an all-project omniscient planner. The one-observation report is in
 [PERSONAL_BOT_VALIDATION.md](PERSONAL_BOT_VALIDATION.md).
+
+## Personal guidance in Studio
+
+Open **Team**, choose the named Bot, then **Guidance** as the project owner.
+Configure its standing responsibility, permitted paths, completion conditions and
+optional routine. A customer Worker with personal continuity enabled must be
+running for scheduled work. A routine becomes due at the next interval; an
+offline Worker can pick it up on reconnect.
+
+- **Owner guidance** records the author, reason, version and scope of an instruction.
+  Each topic resolves in order of specificity: task, phase, project. A phase is the
+  exact `context.environment.development_phase` on the task's pinned input state.
+  Withdrawing an exception reveals the applicable wider instruction. Edits require
+  the expected version. Existing unscoped legacy IDs keep their update path.
+- **Recent lessons** shows a lesson's hypothesis, conditions, evidence IDs and source
+  task. **Correct this lesson** attaches the owner's words to its immutable memory ID.
+  The scoped correction reaches both the ordinary Worker and its learning planner.
+  While it applies, the planner may recheck or reject the old procedure. Withdrawing
+  guidance never establishes that the old lesson was correct.
+- **Recent work** shows recorded actions, declared reasons and any explicit links
+  from a lesson to an action. A delivered preference snapshot records availability.
+  A Bot's report of using it is a separate observation.
+- Explicit guidance belongs to the development session, named Bot and bound executor. A separate project session needs its own owner guidance. Studio shows up to 10 recent
+  lessons plus accessible lessons used by the selected task, 20 recent tasks, up to 20 actions and use receipts per selected task,
+  and paginates instructions 40 at a time.
+
+**Skill.** A reusable procedure describes what to inspect, its applicability,
+disconfirming conditions and source observations. The Bot may propose and revise
+these procedures. Its own guesses about an owner's preferences stay provisional.
+
+**Harness.** The Worker binds the input state and effective owner guidance to
+prepared work. Core checks the guidance digest in the same transaction that saves
+a pinned checkpoint or terminal report. The iterative Worker reconsiders stale
+prepared actions; a single-response external bridge can be held for recovery when
+its previous side effects are uncertain. Independent peer evidence, required
+checks, tool permissions and formal adoption keep their existing contracts.
+
+**Background reflection.** After a reported attempt, the asynchronous Worker
+compares its plan, current owner guidance, action receipts and up to three earlier
+task outcomes from the same bound project and executor. It can retain a conditional
+lesson, link a contradiction, or extract nothing. The saved lesson identifies the
+guidance snapshot and previous reports supplied for comparison. A reference shows
+what was presented; the action-use receipt records what the Bot reports using.
+Lessons influenced by private guidance or earlier outcomes stay private on the
+automatic sharing path. Work continues with persistent memory across model calls;
+this does not update model weights. The design draws on [Anthropic's discussion of
+background memory consolidation](https://www.anthropic.com/research/components-of-agent-memory).

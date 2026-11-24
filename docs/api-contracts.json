@@ -1308,6 +1308,10 @@
         "intent": {
           "type": "object"
         },
+        "preferences_basis": {
+          "minLength": 1,
+          "type": "string"
+        },
         "rationale": {
           "minLength": 1,
           "type": "string"
@@ -1785,6 +1789,10 @@
         "basis": {
           "type": "object"
         },
+        "guidance_basis": {
+          "minLength": 1,
+          "type": "string"
+        },
         "intent": {
           "type": "object"
         },
@@ -1992,6 +2000,14 @@
             "unknowns"
           ],
           "type": "object"
+        },
+        "previous_outcome_ids": {
+          "items": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "maxItems": 3,
+          "type": "array"
         },
         "reflection_id": {
           "minLength": 1,
@@ -4721,6 +4737,10 @@
         },
         "intent": {
           "type": "object"
+        },
+        "preferences_basis": {
+          "minLength": 1,
+          "type": "string"
         },
         "report": {
           "additionalProperties": false,
@@ -11468,6 +11488,15 @@
           "minLength": 1,
           "type": "string"
         },
+        "memory_id": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "phase": {
+          "maxLength": 128,
+          "minLength": 1,
+          "type": "string"
+        },
         "reason": {
           "maxLength": 2000,
           "minLength": 1,
@@ -11476,6 +11505,7 @@
         "scope": {
           "enum": [
             "task",
+            "phase",
             "project"
           ]
         },
@@ -12029,6 +12059,41 @@
       },
       "required": [
         "notification_id"
+      ],
+      "type": "object"
+    }
+  },
+  "studio_bot_guidance": {
+    "description": "studio bot guidance",
+    "schema": {
+      "additionalProperties": false,
+      "properties": {
+        "after": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "basis": {
+          "type": "object"
+        },
+        "bot_id": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "intent": {
+          "type": "object"
+        },
+        "session_id": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "task_id": {
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "required": [
+        "session_id",
+        "bot_id"
       ],
       "type": "object"
     }

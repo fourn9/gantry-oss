@@ -119,4 +119,80 @@ was not demonstrated; the deterministic Worker test covers the later-use path.
 Further evidence needed: a held-out second engineering problem, larger concurrent
 responsibilities, long-lived memory consolidation, and role-specific quality/cost
 comparisons. Task/project feedback is implemented; inferred organizational habits
-and Studio controls are not added in this change.
+and Studio controls were outside that earlier observation. The follow-up below covers Studio controls.
+
+## Owner guidance and conditional experience, November 24–25
+
+Anonymous local experiments used MLX and
+`mlx-community/Qwen2.5-1.5B-Instruct-4bit` revision
+`8b403126fc14f14cfc99bb4cfa72ecbc129ea677`. Each decision started in a fresh
+model context with greedy selection from the stated choices. No customer data,
+remote inference API or physical robot was used.
+
+### Observed owner-specific decisions
+
+Two isolated teams faced the same three reversible guide changes. One owner
+delegated routine local checks, adding a one-task request to consult manufacturing
+on the middle task. The other owner specified consultation as the standing rule.
+Core reopened for each task.
+
+| Team | First task | One-task exception for team one | Next task |
+| --- | --- | --- | --- |
+| One | Run local check | Consult manufacturing | Run local check |
+| Two | Consult manufacturing | Consult manufacturing | Consult manufacturing |
+
+A separate ordinary Worker triage test used the same unseen idler case in three
+new copies of a seeded ledger. The model selected **amber guide** with the original
+lesson, **consult manufacturing** with an owner correction linked to that lesson,
+and **amber guide** after withdrawal. Core stored the three actual Worker reports.
+The model chose the first action only; it did not contact manufacturing. Restoring
+the original answer also restored its risk of using an outdated part.
+
+A headless Chrome session using a temporary local ledger signed in, opened the
+named Bot, inspected a lesson, saved a correction, reopened the panel, withdrew
+the correction, and verified that it was marked withdrawn.
+
+### Engineering pilot
+
+The baseline and intervention had independent copies of the same starting ledger,
+original fixture report, model, bounded action set, maximum of eight actions and
+acceptance check. The intervention additionally received a model-generated lesson
+through Core recall and planning. A trial passed only after saving the correct
+guide, resolving conflicting signatures when applicable, passing the byte check
+and submitting the candidate. Each case ran once per arm. Times include the
+active trial through the terminal Core report on the local machine.
+
+| Case | Original record | Original plus derived lesson |
+| --- | --- | --- |
+| Bracket, previous guide still applicable | Failed at limit, 1.096 s | Passed, 0.781 s |
+| Carrier, old guide superseded | Failed at limit, 1.048 s | Failed at limit, 1.550 s |
+| Sleeve, signed records disagreed | Failed at limit, 1.189 s | Failed at limit, 1.563 s |
+
+Generating the initial lesson took 1.412 s of model time outside those runs.
+Without the lesson the model looked up the register first in all three cases,
+then repeatedly saved the same guide. With the lesson it saved amber first in
+all three. That guide happened to be correct for the bracket. On the sleeve it
+did obtain a conflicting-record clarification, then failed to use the response.
+There was no pair of successful runs from which to estimate time saved.
+
+The test author supplied the synthetic history, available actions, typed execution
+bridge, acceptance oracle and case-specific fixture responses. The model generated
+the lesson and selected the actions. No mid-trial repair or parent intervention
+occurred. The file checkpoints and Core receipts are real; the engineering inputs
+and consultation service are fixtures. Real customer time, open-ended reasoning,
+role-wide improvement and field outcomes have not been measured.
+
+### Reproduce with existing local model weights
+
+From this source checkout with Python 3.11+ and MLX-LM on supported hardware,
+supply a readable local model directory and a new private output directory per run.
+
+```sh
+HF_HUB_OFFLINE=1 python examples/personal_guidance_trial.py --model /local/model --output /private/paired-run
+HF_HUB_OFFLINE=1 python examples/personal_guidance_trial.py --model /local/model --output /private/correction-run --correction-probe
+```
+
+Inspect `guidance.json`, `outcomes.json`, `correction.json` and the corresponding
+inference transcripts in those private directories. Their ledgers and journals
+are local-run artifacts and can contain fixture credentials. Do not publish the
+directories. Neither trial is a field benchmark.

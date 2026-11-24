@@ -1,10 +1,11 @@
 """Version-anchored Studio requests over the existing persistent Bot task queue."""
 import copy
 from .contracts import register, S, I, A
-from .model import require, uid, digest
+from .model import Fault, require, uid, digest
 from .development import in_scope
 from .studio_discussion import ANCHOR
 
+register('studio_bot_guidance', {'session_id':S, 'bot_id':S, 'task_id':S, 'after':S}, ['session_id','bot_id'])
 register('studio_team', {'project_id': S}, ['project_id'])
 register('studio_request_bot', {'work_id':S, 'project_id':S, 'version':I, 'state_id':S, 'anchor':ANCHOR,
     'mode':{'enum':['ask','assign']}, 'bot_id':S, 'body':{'type':'string','minLength':1,'maxLength':4000},
@@ -67,6 +68,8 @@ class StudioBotsMixin:
             'requirements':d['requirements'],'constraints':d['constraints'],'owner':d['owner'],
             'version':d['version'],'max_parallel':d['max_parallel'],'max_executions':d['max_executions'],
             'project':p,'bots':bots,'principals':principals,'configuration_token':digest(config),
+            'can_view_guidance':bool(p and self._bd_owner(actor,p) and
+                ('allowed_commands' not in actor or 'studio_bot_guidance' in actor['allowed_commands'])),
             'can_configure':actor['kind']=='human' and actor['id']==d['owner'] and
                 ('allowed_commands' not in actor or 'studio_setup_team' in actor['allowed_commands'])}
 
@@ -165,3 +168,67 @@ class StudioBotsMixin:
         self._dev_save(s,fx,'studio_notifications',dict(id=uid('mention'),session_id=task['session_id'],
             subject_id=r['requester'],work_id=r['work_id'],project_id=r.get('project_id'),state_id=r['state_id'],thread_id=r['thread_id'],
             message_id=message['id'],at=self.clock(),read=False))
+
+    def cmd_studio_bot_guidance(self, s, actor, a, fx, n, con):
+        project, session = self._bd_project(s, actor, a['session_id'], active=False)
+        require(self._bd_owner(actor, project), 'unauthorized', 'Project owner required')
+        binding = self._bd_binding(s, session['id'], a['bot_id'])
+        params = (session['id'], a['bot_id'], binding['principal_id'])
+        where = ("session_id=? AND subject_id=? AND "
+                 "COALESCE(json_extract(body,'$.value.principal_id'),json_extract(body,'$.principal_id'))=?")
+        def page(table, extra, args):
+            rows = con.execute("SELECT id FROM records WHERE collection=? AND " + where + extra,
+                               (table, *params, *args))
+            return [self._dev_get(s, table, row[0]) for row in rows]
+        rules = page('bot_preferences', ' AND id>? ORDER BY id LIMIT 41', [a.get('after', '')])
+        lessons = {}
+        def visible_lesson(memory):
+            if memory.get('source') != 'experience_reflection' or memory['id'] in lessons:
+                return
+            if (memory['session_id'], memory.get('bot_id'), memory['principal_id']) != params:
+                return
+            try:
+                reflection, _, _ = self._learning_reflection_access(s, actor, memory['reflection_id'])
+            except Fault as exc:
+                if exc.code in {'unauthorized','scope_denied','mode_disabled'}: return
+                raise
+            lesson = memory['lesson']
+            lessons[memory['id']] = {'id':memory['id'], 'source_task_id':reflection['task_id'],
+                                     'strategy':lesson['strategy'], 'when_to_use':lesson['when_to_use'],
+                                     'when_not_to_use':lesson['when_not_to_use'], 'evidence':memory['evidence']}
+        if self._binding_access(s, actor, binding) and s['persistent_bots'][a['bot_id']]['enabled']:
+            for memory in page('bot_memories', " AND COALESCE(json_extract(body,'$.value.source'),"
+                               "json_extract(body,'$.source'))='experience_reflection' "
+                               "ORDER BY created_seq DESC,id DESC LIMIT 10", []):
+                visible_lesson(memory)
+        tasks = page('bot_tasks', ' ORDER BY created_seq DESC,id DESC LIMIT 20', [])
+        tid = a.get('task_id') or (tasks[0]['id'] if tasks else None)
+        selected = None
+        if tid:
+            task = self._dev_get(s, 'bot_tasks', tid)
+            require((task['session_id'], task['bot_id'], task['principal_id']) == params,
+                    'scope_denied', 'Select work assigned to this bound Bot')
+            actions = [self._crew_action_view(s, actor, task, r, con)
+                       for r in self._crew_records(s, con, 'bot_actions', tid)]
+            uses = []
+            for use in self._crew_records(s, con, 'bot_learning_uses', tid):
+                try:
+                    source = self._learning_source(s, actor, task, use['memory_id'])
+                except Fault as exc:
+                    if exc.code in {'unauthorized','scope_denied','mode_disabled'}: continue
+                    raise
+                visible_lesson(source)
+                uses.append({k:use[k] for k in ('memory_id','change','condition_check','action_ids')})
+            selected = {'id':tid, 'title':task['title'], 'status':task['status'],
+                        'reason':task.get('hold_reason'), 'actions':[
+                            {'id':r['id'], 'kind':r['kind'], 'rationale':r['details'].get('rationale'),
+                             'guidance_basis':r['details'].get('guidance_basis')} for r in actions],
+                        'experience_uses':uses}
+        state = self._working_context(s, actor, {**a, 'principal_id':binding['principal_id']}, con)
+        return {'rules':rules[:40], 'lessons':list(lessons.values()), 'next_cursor':rules[39]['id'] if len(rules)>40 else None,
+                'tasks':[{k:r[k] for k in ('id','title','status')} for r in tasks], 'selected':selected,
+                'continuation':state['continuation'], 'commitments':state['commitments']['items'],
+                'phase':s['dev_states'][session['active_state']]['context']['environment'].get('development_phase'),
+                'can_edit':binding['enabled'] and project['enabled'] and
+                    ('allowed_commands' not in actor or 'set_bot_preference' in actor['allowed_commands']),
+                'can_delegate':'allowed_commands' not in actor or 'configure_bot_continuation' in actor['allowed_commands']}

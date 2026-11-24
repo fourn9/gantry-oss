@@ -68,7 +68,7 @@ class Service(BotCommitmentsMixin, BotProcedureMixin, BotPreferencesMixin, BotIs
     READS |= {'get_review_team', 'review_automation_status'}
     READS |= {'get_persistent_bot', 'list_organization_bots', 'list_persistent_memories', 'bot_inbox'}
     READS |= {'get_bot_learning_plan', 'get_bot_reflection', 'list_bot_reflections'}
-    READS.add('get_bot_working_state')
+    READS |= {'get_bot_working_state', 'studio_bot_guidance'}
     READS |= {'get_bot_commitment', 'list_bot_commitments'}
     READS |= {'get_bot_issue', 'list_bot_issues'}
     READS.add('render_evidence_view')

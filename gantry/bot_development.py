@@ -60,10 +60,10 @@ register('get_bot_task', {'task_id': S}, ['task_id'])
 register('get_bot_requirements', {'task_id': S, **PAGE}, ['task_id'])
 register('claim_bot_task', {'task_id': S, 'version': I, 'runtime_fence': S}, ['task_id', 'version', 'runtime_fence'])
 register('check_bot_task', {'task_id': S, 'fence': S, 'preferences_basis': S}, ['task_id', 'fence'])
-register('checkpoint_bot_task', {'task_id': S, 'fence': S, 'snapshot': S, 'summary': S,
+register('checkpoint_bot_task', {'task_id': S, 'fence': S, 'preferences_basis': S, 'snapshot': S, 'summary': S,
     'rationale': S, 'unfinished': A, 'capture': CAPTURE, 'context': CONTEXT},
     ['task_id', 'fence', 'snapshot', 'summary', 'rationale', 'unfinished', 'capture'])
-register('finish_bot_task', {'task_id': S, 'fence': S, 'report': {
+register('finish_bot_task', {'task_id': S, 'fence': S, 'preferences_basis': S, 'report': {
     'type': 'object', 'properties': REPORT, 'required': REPORT_REQUIRED, 'additionalProperties': False}},
     ['task_id', 'fence', 'report'])
 register('hold_bot_task', {'task_id': S, 'fence': S, 'reason': S}, ['task_id', 'fence', 'reason'])
@@ -279,6 +279,9 @@ class BotDevelopmentMixin:
         task = self._dev_get(s, 'bot_tasks', a['task_id'])
         require(task['status'] == 'running' and task.get('fence') == a['fence'], 'stale_basis', 'Task lease replaced or stopped')
         require(task['stamp'] == self._bd_stamp(s, actor, task, con), 'stale_basis', 'Task context changed')
+        if 'preferences_basis' in a:
+            require(a['preferences_basis'] == self._preference_context(s, actor, task, con)['basis'],
+                    'stale_basis', 'Human feedback changed; reconsider the prepared action')
         return task
 
     def _bd_messages(self, s, task, con):
@@ -327,13 +330,13 @@ class BotDevelopmentMixin:
         result.update(followup_view(s, task))
         result['issues'] = self._issue_context(s, actor, task, con)
         result['candidates_truncated'] = bool(pending)
+        result['personal_preferences'] = self._preference_context(s, actor, task, con)
         if self._binding_access(s, actor, self._bd_binding(s, task['session_id'], task['bot_id'])):
             result['memory'] = self._persistent_memory_page(s, actor, bot, org, {'limit': 30}, con, recent=True)
             from .bot_procedures import decorate
-            result['memory']['items'] = [decorate(self, s, actor, task, m, con) for m in result['memory']['items']]
+            result['memory']['items'] = [decorate(self, s, actor, task, m, con, result['personal_preferences']) for m in result['memory']['items']]
             result['learning_plan'] = self._learning_context(s, actor, task)
         result['working_state'] = self._working_context(s, actor, task, con)
-        result['personal_preferences'] = self._preference_context(s, actor, task, con)
         result['executor_commands'] = copy.deepcopy(actor.get('allowed_commands'))
         result.update(self._crew_context(s, actor, task, con))
         if task.get('experience_check'):
@@ -364,9 +367,6 @@ class BotDevelopmentMixin:
 
     def cmd_check_bot_task(self, s, actor, a, fx, n, con):
         task = self._bd_checked(s, actor, a, con)
-        if 'preferences_basis' in a:
-            require(a['preferences_basis'] == self._preference_context(s, actor, task, con)['basis'],
-                    'stale_basis', 'Human feedback changed; reconsider the prepared action')
         return {'allowed': True, 'task_id': task['id'], 'attempt': task['attempt']}
 
     def cmd_checkpoint_bot_task(self, s, actor, a, fx, n, con):
