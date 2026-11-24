@@ -140,3 +140,19 @@ class PublicationTests(unittest.TestCase):
         self.assertEqual(index['status'],'partial');self.assertEqual(len(index['pending']),1)
         self.assertEqual((workspace/'imports/cloud-part/payload/content.bin').read_bytes(),b'CAD\x00\x01\x02')
         self.assertTrue(self.call('replay')['matched'])
+
+    def test_recorded_robot_topics_publish_with_pinned_requirement(self):
+        from gantry.integrations.mcap_capture import capture_mcap
+        from test_robotics_connectors import recording
+        state, _, _, ref = self.prepare()
+        raw = recording()
+        (self.root/'session.mcap').write_bytes(raw)
+        bundle = capture_mcap(self.root, 'session.mcap', 'flight', [ref])
+        target = self.root/'recording'
+        write_bundle(target, bundle)
+        change = self.begin(state, ['imports/flight/'])
+        checkpoint = publish(self.client, state['id'], change['id'], change['version'], target, 'recording')
+        view = self.call('get_development_state', {'state_id': checkpoint['state']['id']})
+        self.assertEqual(view['state']['context']['environment']['external_sources']['flight']['requirement_refs'], [ref])
+        self.assertEqual(view['requirement_coverage']['items'][0]['status'], 'unverified')
+        self.assertEqual(view['manifest']['imports/flight/payload/recording/session.mcap']['size'], len(raw))

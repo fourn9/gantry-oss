@@ -80,7 +80,8 @@ class AllReadContracts(unittest.TestCase):
     def test_catalog_no_native_claim_for_exports(self):
         from gantry.integrations.catalog import catalog
         rows=catalog()
-        self.assertEqual(len(rows),35)
+        self.assertEqual(len([r for r in rows if r['reference_status'] != 'robotics']),35)
+        self.assertEqual({r['id'] for r in rows if r['reference_status']=='robotics'},{'kicad','mcap','freecad','onnx','mujoco'})
         self.assertEqual(sum(r['reference_status']=='listed' for r in rows),15)
         self.assertEqual(sum(r['reference_status']=='coming_soon' for r in rows),14)
         self.assertTrue(all(not r['live_account_verified'] for r in rows))

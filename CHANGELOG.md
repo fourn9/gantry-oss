@@ -1,5 +1,10 @@
 # Changelog
 
+## v3.5.0 — Local robotics connectors
+
+- Capture KiCad ERC/DRC, saved ROS 2 or Foxglove MCAPs, FreeCAD STEP imports on macOS and optional ONNX model interfaces in requirement-linked development states.
+- Inspect Windows host prerequisites with `gantry-native doctor`. See the [robotics connector guide](docs/ROBOTICS-CONNECTORS.md) for exact operations, component versions and transfer limits.
+
 ## v3.4.2 — 2026-11-13
 
 ### Headless CAD security

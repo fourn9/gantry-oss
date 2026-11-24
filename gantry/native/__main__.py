@@ -55,6 +55,7 @@ def main(argv=None):
         print(canonical(result));return 0
     p=argparse.ArgumentParser(description=__doc__);sub=p.add_subparsers(dest='command',required=True)
     sub.add_parser('catalog')
+    sub.add_parser('doctor', help='Read local host and COM registration prerequisites')
     for name in ['inspect','prepare','apply','reconcile']:
         q=sub.add_parser(name);q.add_argument('--root',required=True)
         q.add_argument('--credential-ref');q.add_argument('--timeout',type=int,default=120)
@@ -84,7 +85,10 @@ def main(argv=None):
     q.add_argument('--version',type=int,required=True)
     a=vars(p.parse_args(argv));command=a['command']
     try:
-        if command=='catalog':result=catalog()
+        if command=='doctor':
+            from .preflight import inspect_host
+            result=inspect_host()
+        elif command=='catalog':result=catalog()
         elif command in {'inspect','prepare','apply','reconcile'}:
             require(1<=a['timeout']<=300,'invalid_input','Native timeout must be 1–300 seconds')
             try:

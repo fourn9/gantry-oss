@@ -11,6 +11,8 @@ Selected native writes now have a separate prepare/apply/readback path; see
 [write operations, concurrency and limitations](EXTERNAL-WRITES.md). There is no
 always-on sync, webhook listener or provider OAuth onboarding application.
 
+Local robotics capture commands, supported formats and Windows host setup are in the [robotics connector guide](ROBOTICS-CONNECTORS.md).
+
 ## What can be used
 
 | Provider | Implemented acquisition | Limits |
