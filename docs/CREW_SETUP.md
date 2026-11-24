@@ -129,6 +129,36 @@ reviewed by the customer. See [Crew organization](CREW_ORGANIZATION.md) and
 [Persistent Bots](PERSISTENT_BOTS.md). For the customer-command backend, include
 its exact `command` and `executable_hash` in the runtime template as well.
 
+An optional `evidence_guide` in a role's runtime config or setup template exposes
+the current source observation, peer report and candidate check to the model.
+For example, a guide for a develop task can use the following fields alongside
+the role's existing, approved `local_tools` declaration.
+
+```json
+{
+  "evidence_guide": {
+    "source": {"path": "constraints.json", "pointer": "/mount/interface"},
+    "candidate": "mount.json",
+    "check_tool": "check_mount"
+  }
+}
+```
+
+Use just `source` for a peer whose task is to return a report. A value appears
+after a matching JSON inspection and a check against the available file preview.
+The initial implementation supports small scalar values in plain JSON and an
+existing candidate in the task's write scope. The Worker scans up to 64 recent
+task actions; a missing receipt means unknown. The check outcome describes
+the configured tool's reported exit on the exact state. Evaluate all assigned
+completion conditions before submitting. Existing evaluation and adoption
+rules still apply. Roles sharing a template share its configuration; use a
+role-specific Worker config when the source or check differs.
+
+The Worker includes suggested action kinds in provider input. Choice-based
+customer bridges can use `gantry.crew_progress.choose_focused` to show a short
+menu with an escape to the original options. The menu is advisory and carries
+no extra permissions. Changing the guide changes the environment manifest.
+
 The template must not contain a token, token path, server URL or Bot ID. The setup
 adds `workflow: bot_development`, `agent_loop: true`, `experience_learning: true`,
 `learning_mode: selective` and `personal_continuity: true`. It preserves the supplied
@@ -227,3 +257,30 @@ quality, native tool compatibility or engineering speed improvements. Subscripti
 model smoke evidence must be recorded separately.
 
 See [acceptance results and remaining boundaries](CREW_SETUP_ACCEPTANCE.md).
+
+For a decision on a categorical value, the owner may add a consultation policy to the developer's `evidence_guide` alongside its source, candidate and check tool:
+
+```json
+{
+  "consultation_policy": {
+    "peer": "integration",
+    "sources": [
+      {"path":"assembly.json","pointer":"/connector/key"},
+      {"path":"wiring.json","pointer":"/connector/key"}
+    ],
+    "allowed_values":["A","B"]
+  }
+}
+```
+
+The action-loop Worker reads these fields on the assigned saved revision and reports their values, file hashes and comparison to the provider. Matching values prioritize independent work. Missing, ambiguous, unsupported or conflicting values prioritize a question to the registered peer. The normal submission path requires a completed response, an inspection of the linked report and a resolution citing its answer. A new source basis requires fresh review. Unrelated open reviews still block completion. A passing configured check on the submitted state is required in either path. These checks apply to participating Workers; project-wide completion rules belong in the Core contract.
+
+Select sources that represent the same claim in the same units and frame. This policy supports two to four JSON pointers and an explicit vocabulary of string values, with a 64 KiB limit per source file. The owner defines the source coverage; more complex engineering judgments remain with the assigned Bots.
+
+For a task whose candidate file is exactly one categorical UTF-8 value, the owner can set `consultation_policy.literal_source` to the manufacturing source, e.g. `{"path":"releases.json","pointer":"/key"}`. The reporting role opts in with `evidence_guide.source` pointing to that field and `publish_observed: {"requester":"designer","allowed_values":["A","B"]}`. The reporting Bot can accept the report fields in `evidence_guide.offer`, or report a blocker. Core checks the cited read against the saved artifact. A reviewed response supplies the value for the developer's edit. A change in the signed sources or the release file invalidates that handoff.
+
+If the Bot judges the configured check sufficient for its assigned work, it can attach `submit_on_pass: {summary,rationale,unverified}` to the tool action. The Worker records the check and the subsequent submission as separate operations. Changed inputs, a new discussion, a failed check, or a different attempt cancel the conditional submission. Normal completion and review gates still apply. Use ordinary edits for designs whose content requires engineering judgment or contains multiple fields.
+
+When the saved literal still differs from the reviewed value, the installed acceptance check is deferred. A Bot may run the same tool intentionally on the old candidate by supplying a `diagnostic_reason`. The reason and diagnostic result are retained. That measurement cannot satisfy the submission condition.
+
+The Bot can also authorize the sequence while making the scoped literal edit using `check_after_save: {name,submit_on_pass:{summary,rationale,unverified}}`. The following check is bound to that edit receipt and saved checkpoint. Edit, check and submission keep separate receipts and consume separate operations. A failed check or a change to the evidence, task, human feedback, or discussion prevents the conditional finish. The Bot can instead edit alone, request another review, or run a diagnostic.

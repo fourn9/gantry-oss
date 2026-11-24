@@ -25,6 +25,34 @@ class CrewCoordinationTests(BotDevelopmentTests):
         self.assertTrue(any(m.get('reply_to') == request['message']['id'] for m in view['messages']))
         self.assertEqual(len(view['consultations']), 1)
 
+    def test_cancelled_consultation_does_not_return_an_earlier_waiting_report(self):
+        task = self.task('designer')
+        with self.worker('designer') as worker:
+            claim = self.claim(worker, task, 'designer')
+            request = self.clients['designer'].call('ask_bot', {
+                'task_id': task['id'], 'fence': claim['task']['fence'], 'to_bot_id': 'control',
+                'question': 'Which interface was checked?', 'evidence': []})
+        response = request['response_task']
+        view = self.clients['designer'].call('get_bot_task', {'task_id': task['id']})
+        self.assertNotIn('response_report', view['consultations'][0])
+        with self.worker('control') as worker:
+            claim = self.claim(worker, response, 'control')
+            self.clients['control'].call('ask_bot', {'task_id': response['id'],
+                'fence': claim['task']['fence'], 'to_bot_id': 'mechanical',
+                'question': 'Which fixture is current?', 'evidence': []})
+            report = self.answer(status='waiting', summary='An interface check is in progress')
+            report.pop('edits')
+            waiting = self.clients['control'].call('finish_bot_task', {
+                'task_id': response['id'], 'fence': claim['task']['fence'], 'report': report})['task']
+        self.owner.call('cancel_bot_task', {'task_id': response['id'], 'version': waiting['version'],
+                                            'reason': 'The check was withdrawn'})
+        view = self.clients['designer'].call('get_bot_task', {'task_id': task['id']})
+        question = view['consultations'][0]
+        self.assertEqual(question['status'], 'answered')
+        self.assertNotIn('response_report', question)
+        answer = next(m for m in view['messages'] if m['id'] == question['answer_id'])
+        self.assertEqual(answer['body'], 'The check was withdrawn')
+
     def test_decisions_are_attributed_and_cannot_grant_authority(self):
         task = self.task('lead'); child = self.task('designer')
         with self.worker('lead') as worker:

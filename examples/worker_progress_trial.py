@@ -1,0 +1,409 @@
+"""Paired local model experiments on the normal Crew Worker. Run from a source checkout."""
+import argparse
+import hashlib
+import itertools
+import json
+import random
+import shutil
+import subprocess
+import sys
+import time
+from pathlib import Path
+
+from personal_guidance_trial import BotLearningTests, LocalClient, LocalModel, Service, seed
+from gantry.bot_worker import BotWorker, environment_manifest
+from gantry.project_sandbox import backend, runtime_roots
+from gantry.crew_progress import choose_focused
+
+CASES = [('yoke', 'amber', 'amber'), ('retainer', 'blue', 'blue'),
+         ('sled', 'amber and blue; current signatures disagree', 'blue')]
+PREPARED = [('collar', 'amber', 'amber'), ('spacer', 'blue', 'blue'),
+            ('link', 'amber and blue; current signatures disagree', 'blue')]
+SMOKE = ('smoke', 'amber and blue; current signatures disagree', 'amber')
+CHECK = ("from pathlib import Path; import json,sys; "
+         "ok=Path('mechanical.txt').read_text()==json.loads(Path('control.txt').read_text())['release']; "
+         "print('PASS' if ok else 'FAIL'); sys.exit(0 if ok else 1)")
+# Exact (truncated) model-generated lesson used by the prior source-checkout experiment.
+LESSON = """**Conditional Procedure:**
+
+**When to Apply:**
+- When the assembly drawing shows the blue guide, design copied it, and the release check failed.
+
+**When to Ask:**
+- When the fixture register identifies the amber guide for station T17, and Manufacturing states the drawing persists across fixture replacements.
+
+**Action:**
+1. **Review the Assembly Drawing:**
+   - Ensure that the blue guide is no longer present in the current assembly"""
+READ = 'Look up the current signed register'
+ASK = 'Ask manufacturing which guide this revision releases'
+INSPECT = 'Read the exact manufacturing response report'
+RESOLVE = 'Resolve the consultation citing the received answer'
+CHECK_ACTION = 'Run the release check on the current saved candidate'
+SUBMIT = 'Submit the candidate'
+BLUE, AMBER = ('Save blue guide', 'Save amber guide')
+PEEK = 'Read the manufacturing release for this revision'
+REPORTS = ['Report release: blue', 'Report release: amber', 'Report release: unknown']
+ACTION_KINDS = {READ:'inspect_json', PEEK:'inspect_json', ASK:'ask', INSPECT:'inspect', RESOLVE:'resolve',
+                CHECK_ACTION:'tool', SUBMIT:'finish', BLUE:'edit', AMBER:'edit', **dict.fromkeys(REPORTS,'finish')}
+TRANSFER = [('idler', 'amber', 'amber'), ('brace', 'blue', 'blue'),
+            ('hub', 'blue and amber; current signatures disagree', 'blue')]
+RETRY_CASES = [('saddle','blue','blue'), ('carriage','amber','amber'),
+               ('elbow','amber and blue; current signatures disagree','amber')]
+DEV = [('setup-plate', 'amber', 'amber'), ('setup-wheel','amber and blue; current signatures disagree','amber')]
+
+
+class FrozenLesson:
+    def text(self, _):
+        return LESSON
+
+
+def checkpoint(f, case, signed=None):
+    part, register, release = case
+    change = f.owner.call('begin_change', {'state_id': f.base['id'], 'title': part, 'purpose': 'Select guide',
+        'dependencies': [], 'write_scope': ['mechanical.txt', 'control.txt'], 'assignee': 'admin'})
+    snapshot = f.artifact({'mechanical.txt': 'undecided',
+                           'control.txt': json.dumps({'register': register, 'release': release, **({'signed': signed} if signed is not None else {})})})
+    result = f.owner.call('checkpoint_change', {'change_id': change['id'], 'version': change['version'],
+        'snapshot': snapshot, 'summary': 'New fixture register', 'rationale': 'Independent exercise',
+        'unfinished': ['Select and test the guide'], 'capture': {'scope': 'saved fixtures', 'missing': []},
+        'work_status': 'paused'})
+    return result['state']['id']
+
+
+def actions(client, task_id):
+    return client.call('get_bot_records', {'task_id': task_id, 'kind': 'actions', 'limit': 100})['items']
+
+
+def score(owner, view, case, final_state, task_actions, require_peer=None):
+    expected = case[2]
+    verified = [a['id'] for a in task_actions if a['kind'] == 'tool' and a['input_state'] == final_state
+                and a['details']['result'].get('exit_code') == 0 and a['details']['result'].get('output_artifact')
+                and not a['details']['result'].get('error')]
+    actual = view['development']['manifest']['mechanical.txt']['hash']
+    consultations = []
+    for question in view['consultations']:
+        report = question.get('response_report') or {}
+        peer_id = report.get('request', {}).get('task_id')
+        if not peer_id:
+            continue
+        peer = owner.call('get_bot_task', {'task_id': peer_id})
+        read = any(a['kind'] == 'inspect_json' and a['details']['result'].get('pointer') == '/release'
+                   and a['details']['result'].get('value') == expected for a in actions(owner, peer_id))
+        inspected = any(a['kind'] == 'inspect' and json.loads(a['details']['arguments']) == report['request']
+                        and a['details']['result'].get('value', {}).get('summary') == 'Report release: '+expected
+                        for a in task_actions)
+        cited = any(a['kind'] == 'resolve' and question.get('answer_id') in json.loads(a['details']['arguments']).get('evidence', [])
+                    and not a['details']['result'].get('error') for a in task_actions)
+        consultations.append({'peer_task': peer_id, 'peer_checked_source': read, 'read_exact_report': inspected,
+            'cited': cited, 'status': question['status'], 'peer_status': peer['task']['status'],
+            'wrong_report':peer['task']['status']=='completed' and peer['task']['reports'][-1]['report']['summary']!='Report release: '+expected})
+    consulted = any(c['cited'] and c['read_exact_report'] and c['peer_checked_source']
+                    and c['status'] == 'resolved' and c['peer_status'] == 'completed' for c in consultations)
+    right = actual == hashlib.sha256(expected.encode()).hexdigest()
+    if require_peer is None:
+        require_peer = 'disagree' in case[1]
+    accepted = view['task']['status'] == 'completed' and right and bool(verified) and (not require_peer or consulted)
+    return {'passed': accepted, 'status': view['task']['status'], 'correct_file': right, 'peer_chain': consulted, 'questions': len(view['consultations']),
+            'check_receipts': verified, 'consultations': consultations, 'expected_digest': hashlib.sha256(expected.encode()).hexdigest(),
+            'actual_digest': actual}
+
+
+def run(f, model, home, case, state_id, past, mid, memory, feedback, rotation, smoke=False, prefix=(), guided=False, retry_aware=False, routing_study=None):
+    setup = time.perf_counter()
+    shutil.copytree(f.root/'ledger', home/'ledger')
+    service = Service(home/'ledger')
+    owner = LocalClient(service, f.token)
+    clients = {k: LocalClient(service, f.tokens[k]) for k in ('designer', 'control')}
+    history = next(a['details']['rationale'] for a in actions(clients['designer'], past) if a['kind'] == 'review_feedback')
+    decisions = {'designer': [], 'control': []}
+    wait_reports = 0
+    design_config = f.configs['designer']
+    peer_config = f.configs['control']
+    handoff = (routing_study or {}).get('handoff',False)
+    policy = (routing_study or {}).get('policy',{})
+    colors = policy.get('allowed_values',['blue','amber'])
+    saves = {'Save '+v+' guide':v for v in colors}
+    reports = ['Report release: '+v for v in [*colors,'unknown']]
+    kinds = {**ACTION_KINDS, **dict.fromkeys(saves,'edit'), **dict.fromkeys(reports,'finish')}
+    send_read = 'Report the value from my cited read'
+    use_review = 'Save the value from the signed records or reviewed answer'
+    save_check_submit = 'Save the referenced value, run the release check, and submit on success'
+    check_submit = 'Run the check and submit this candidate on success'
+    diagnose = 'Measure the pre-edit baseline as a diagnostic'
+    pause = 'Block this task for further review'
+    if handoff:
+        peer_guide = {**peer_config['evidence_guide'],'publish_observed':{'requester':'designer','allowed_values':colors}}
+        peer_config = {**peer_config,'evidence_guide':peer_guide}
+        owner.call('configure_bot_runtime',{'bot_id':'control','version':2,'principal_id':'control','enabled':True,
+                                          'environment':environment_manifest(peer_config)})
+    if routing_study is not None:
+        spec = dict(design_config['evidence_guide'])
+        if routing_study['enabled']:
+            spec['consultation_policy'] = {**policy, **({'literal_source':peer_config['evidence_guide']['source']} if handoff else {})}
+        design_config = {**design_config, 'evidence_guide': spec}
+        owner.call('configure_bot_runtime', {'bot_id':'designer', 'version':2, 'principal_id':'designer',
+                                            'enabled':True, 'environment':environment_manifest(design_config)})
+    receipts = []
+    snapshot_seconds = time.perf_counter()-setup
+
+    def infer(ctx, schema, directory):
+        nonlocal wait_reports
+        role = ctx['bot']['id']
+        peer = role == 'control'
+        log = decisions[role]
+        last = ctx.get('last_result') or {}
+        if last and log:
+            if 'exit_code' in last:
+                outcome = 'Check exit code '+str(last['exit_code'])+' '+last.get('output', '').strip()
+            elif 'changed' in last:
+                outcome = 'Saved digest '+last['hash'][:12]
+                if feedback:
+                    assert last['saved_state_id'] == ctx['development']['state']['id']
+                    outcome += (' (content changed)' if last['changed'] else ' (unchanged; same saved state)')
+                    outcome += '; recorded evaluation: '+last['recorded_verification']
+            elif 'value' in last:
+                value = last['value']
+                outcome = str(value.get('summary', value) if isinstance(value, dict) else value)
+            else:
+                outcome = str(last.get('error') or ('Acknowledged' if not last.get('reason') else last['reason']))
+            log[-1]['result'] = outcome
+        q = next(iter(ctx.get('consultations', [])), {})
+        automatic = 0
+        if handoff and not peer and any(r['choice']==save_check_submit for r in log):
+            automatic = sum(a['details'].get('provider',{}).get('kind') in {'conditional_check','conditional_submission'}
+                            for a in actions(clients['designer'],ctx['task']['id']))
+        consumed = len(log) + (wait_reports + automatic if routing_study and not peer else 0)
+        limit = 4 if peer else 8+len(prefix)
+        if not peer and q.get('status') == 'open' and (not routing_study or consumed < limit):
+            wait_reports += 1
+            kind, args = 'finish', f.answer(status='waiting', summary='Await manufacturing')
+        elif consumed >= limit:
+            kind, args = 'finish', f.answer(status='failed', summary='Decision budget exhausted')
+        else:
+            if peer:
+                options = [PEEK, *reports]
+                prompt = 'Manufacturing reviewer. Identify the effective released guide for this revision. Report your finding to the requester.'
+            else:
+                prompt = (ctx['task']['title']+'. Drawing shows blue. Deliver the correct saved guide after a passing release check. '
+                    'If signatures disagree, obtain the effective release from manufacturing, read the report and resolve with evidence. '
+                    'A saved design still needs a check. Submit when done. Historical record: '+history)
+                if routing_study is not None:
+                    prompt += (' Signed design and integration records must agree. If either is missing or they differ, '
+                               'ask manufacturing. When both agree, use that value and check the saved candidate.')
+                if memory:
+                    lesson = next(m for m in ctx['memory']['items'] if m['id'] == mid)
+                    prompt += '\nRecalled conditional lesson (one source): '+lesson['lesson']['strategy']
+                prompt += '\nCurrent guide file: '+ctx['files']['mechanical.txt']+'; consultation: '+q.get('status', 'none')
+                options = [READ]
+                if not q: options.append(ASK)
+                if q.get('status') == 'answered': options.extend([INSPECT, RESOLVE])
+                options.extend([*saves, CHECK_ACTION, SUBMIT])
+            options = options[rotation:]+options[:rotation]
+            prompt += '\nYour previous actions and observations: '+json.dumps([(row['choice'], row.get('result')) for row in log])
+            stamp = time.perf_counter()
+            primed = not peer and len(log) < len(prefix)
+            guide = ctx.get('evidence_guide') if guided else None
+            suggested = None
+            offer = (guide or {}).get('offer') if handoff else None
+            if offer:
+                if offer['action']=='finish':
+                    suggested = send_read if peer else SUBMIT
+                elif offer['action']=='edit':
+                    suggested = save_check_submit if consumed+3<=limit else use_review
+                elif offer['action']=='tool' and consumed+2<=limit:
+                    suggested = check_submit
+            if primed:
+                choice = prefix[len(log)]
+                assert choice in options
+            elif smoke:
+                order = [PEEK, REPORTS[1]] if peer else [READ, ASK, INSPECT, RESOLVE, AMBER, CHECK_ACTION, SUBMIT]
+                choice = order[len(log)]
+                assert choice in options, (choice, options, q)
+                if handoff and suggested:
+                    choice = suggested
+            else:
+                guide = ctx.get('evidence_guide') if guided else None
+                if guided:
+                    assert guide is not None, 'Guide missing from ordinary Worker provider input'
+                    observed = guide['observed']
+                    peer_report = (guide['consultation'] or {}).get('report')
+                    prompt += ('\nCurrent source '+guide['source']['pointer']+': '+
+                        (json.dumps(observed['value']) if observed else 'not yet read')+
+                        '\nManufacturing report: '+json.dumps(peer_report and {k:peer_report.get(k) for k in ('status','summary','unverified')})+
+                        '\nCheck on the saved version: '+guide['check']['status']+
+                        '\nCurrent decision: '+guide['phase']+
+                        '. Use the latest source or the resolved answer to choose the guide. A checked, correct candidate is ready to submit.')
+                    if guide.get('routing'):
+                        route = guide['routing']
+                        prompt += ('\nSigned records: '+json.dumps([claim['value'] for claim in route['sources']])
+                                   +'. Comparison: '+route['status']+'. Responsible peer: '+route['peer']+'.')
+                    if guide.get('literal'):
+                        literal = guide['literal']
+                        prompt += ('\nValue for the candidate from the recorded evidence: '+json.dumps(literal['value'])
+                                   +'. Saved candidate matches: '+str(literal['matches'])+
+                                   '. Save the bound value before release checking. A pre-edit diagnostic checks only the old candidate.')
+                writes = None
+                if retry_aware and not peer:
+                    writes = {o:hashlib.sha256(color.encode()).hexdigest() for o,color in saves.items()}
+                if suggested:
+                    # Present the reference once; moving between the focused and full menu remains a model choice.
+                    if suggested == send_read:
+                        alternatives = [PEEK,send_read,pause]
+                    elif suggested in (use_review,save_check_submit):
+                        alternatives = [READ,suggested,diagnose,pause]
+                        if suggested==save_check_submit:
+                            alternatives.append(use_review)
+                    elif suggested == check_submit:
+                        alternatives = [READ,CHECK_ACTION,check_submit,SUBMIT,pause]
+                    else:
+                        alternatives = [READ,CHECK_ACTION,SUBMIT,pause]
+                    alternatives = alternatives[rotation:]+alternatives[:rotation]
+                    labels = {o:('offered' if o==suggested else 'other') for o in alternatives}
+                    choice = choose_focused(model.choose,prompt,alternatives,labels,{'focus_actions':['offered']})
+                else:
+                    choice = choose_focused(model.choose, prompt, options, kinds, guide, writes)
+            log.append({'choice': choice, 'source': 'fixture' if smoke or primed else 'model', 'decision_seconds': time.perf_counter()-stamp,
+                        'input_state': ctx['development']['state']['id']})
+            if choice in (READ, PEEK):
+                kind, args = 'inspect_json', {'path': 'control.txt', 'pointer': '/release' if peer else '/register'}
+            elif choice == ASK:
+                kind, args = 'ask', {'to_bot_id': 'control', 'question': 'Which guide is effective for this fixture revision?',
+                                     'evidence': [ctx['development']['state']['id']]}
+            elif choice == INSPECT:
+                kind, args = 'inspect', q['response_report']['request']
+            elif choice == RESOLVE:
+                kind, args = 'resolve', {'message_id': q['id'], 'reason': 'Reviewed this fixture question', 'evidence': [q['answer_id']]}
+            elif choice == send_read:
+                kind, args = 'finish', f.answer(**offer['arguments'])
+            elif choice in (use_review,save_check_submit):
+                kind,args = 'edit',dict(offer['arguments'])
+                if choice==save_check_submit:
+                    report = f.answer(summary='Submitted after the saved candidate passed its release check')
+                    args['check_after_save'] = {'name':guide['check']['name'],
+                        'submit_on_pass':{k:report[k] for k in ('summary','rationale','unverified')}}
+            elif choice == diagnose:
+                kind,args = 'tool',{'name':'release_check','diagnostic_reason':'Measure the pre-edit baseline'}
+            elif choice == check_submit:
+                report = f.answer(summary='Submitted after the saved candidate passed its release check')
+                kind,args = 'tool',{'name':'release_check','submit_on_pass':{k:report[k] for k in ('summary','rationale','unverified')}}
+            elif choice == pause:
+                kind,args = 'finish',f.answer(status='blocked',summary='Request further review of this step')
+            elif choice in saves:
+                kind, args = 'edit', {'path': 'mechanical.txt', 'content': saves[choice],
+                                      'expected_hash': hashlib.sha256(ctx['files']['mechanical.txt'].encode()).hexdigest()}
+            elif choice == CHECK_ACTION:
+                kind, args = 'tool', {'name': 'release_check'}
+            else:
+                kind, args = 'finish', f.answer(summary=choice)
+        return {'output': {'action': kind, 'arguments_json': json.dumps(args), 'rationale': args.get('summary', kind)},
+                'provider': {'kind': 'instrument_smoke' if smoke else 'local_model_constrained_choice'}}
+
+    start = time.perf_counter()
+    task = owner.call('assign_bot_task', {**f.assignment('designer', title='Select fixture guide for '+case[0], state_id=state_id),
+                                          'session_id': f.sid})
+    with BotWorker(clients['designer'], design_config, home/'runtime', infer) as designer, \
+            BotWorker(clients['control'], peer_config, home/'runtime', infer) as control:
+        for worker in (designer, control, designer):
+            results = worker.tick()
+            receipts.extend([{'task_id': r.get('task', {}).get('id'), 'status': r.get('status') or r.get('task', {}).get('status'),
+                              'reason': r.get('reason')} for r in results])
+            view = owner.call('get_bot_task', {'task_id': task['id']})
+            if view['task']['status'] in {'completed','failed','blocked'}: break
+    task_actions = actions(owner, task['id'])
+    final_state = view['development']['state']['id']
+    elapsed = time.perf_counter()-start
+    result = score(owner, view, case, final_state, task_actions,
+                   routing_study['require_peer'] if routing_study is not None else None)
+    if smoke:
+        assert not score(owner, view, case, 'different-state', task_actions)['passed']
+        assert not score(owner, view, case, final_state, [a for a in task_actions if a['kind'] != 'inspect'])['passed']
+        assert not score(owner, view, (case[0], case[1], 'blue'), final_state, task_actions)['passed']
+    edits = [a for a in task_actions if a['kind'] == 'edit']
+    rounds = [a for a in task_actions if isinstance(a['details'].get('round'),int)
+              and a['details'].get('stage')!='core_validation']
+    counted = [a for a in rounds if not (a['kind']=='finish' and
+               json.loads(a['details']['arguments']).get('summary')=='Decision budget exhausted')]
+    return {**result, 'case': case[0], 'memory': memory, 'feedback': feedback, 'rotation': rotation, 'task_id': task['id'],
+        'base_state': state_id, 'final_state': final_state, 'seconds': elapsed, 'clone_seconds': snapshot_seconds,
+        'duplicate_saves': sum(a['details']['result'].get('changed') is False for a in edits),
+        'checks': sum(a['kind']=='tool' for a in task_actions), 'receipts': receipts, 'decisions': decisions,
+        'parent_interventions': 0, 'wait_reports': wait_reports,
+        'auto_checks':sum(a['details'].get('provider',{}).get('kind')=='conditional_check' for a in task_actions),
+        'auto_submits':sum(a['details'].get('provider',{}).get('kind')=='conditional_submission' for a in task_actions),
+        'recorded_operations':len(counted),
+        'wrong_peer_reports':sum(q['wrong_report'] for q in result['consultations']),
+        'wrong_edits':sum(a['details']['result'].get('hash') not in (None,result['expected_digest']) for a in edits)}
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('--model', type=Path)
+    parser.add_argument('--output', required=True, type=Path)
+    modes = parser.add_mutually_exclusive_group()
+    modes.add_argument('--smoke', action='store_true')
+    modes.add_argument('--compare-guide',action='store_true',help='Paired flat and guided choices on fresh cases')
+    modes.add_argument('--compare-retry',action='store_true',help='Compare the full evidence guide with flat choices on a fresh fixture set')
+    modes.add_argument('--guide-pilot',action='store_true',help='Separate development fixtures for the guided bridge')
+    modes.add_argument('--prepared-start', action='store_true', help='Separate diagnostic with a recorded, fixture-driven prefix')
+    args = parser.parse_args()
+    root = args.output.resolve()
+    if root.exists() or root.is_relative_to(Path(__file__).resolve().parents[1]):
+        parser.error('Specify a new private output directory outside the checkout')
+    root.mkdir(mode=0o700, parents=True)
+    if not args.smoke and not args.model: parser.error('Specify local model directory')
+    t = time.perf_counter()
+    model = None if args.smoke else LocalModel(args.model.resolve())
+    model_load = time.perf_counter()-t
+    t = time.perf_counter()
+    f = BotLearningTests()
+    f.setUp()
+    try:
+        past, mid, _ = seed(f, FrozenLesson())
+        for role in ('designer','control'):
+            config = f.configs[role]
+            config.update(agent_loop=True)
+            if role == 'designer':
+                config.update(local_tools={'release_check': {'argv': [str(Path(sys.base_prefix)/'bin'/'python3'), '-c', CHECK],
+                    'timeout_seconds': 10}}, sandbox=backend(), tool_runtime=runtime_roots())
+            if args.compare_guide or args.compare_retry or args.guide_pilot:
+                config['evidence_guide'] = {'source':{'path':'control.txt','pointer':'/release' if role=='control' else '/register'}}
+                if role == 'designer':
+                    config['evidence_guide'].update(candidate='mechanical.txt',check_tool='release_check')
+            f.owner.call('configure_bot_runtime', {'bot_id': role,'version': 1, 'principal_id': role,
+                'enabled': True, 'environment': environment_manifest(config)})
+        cases = [SMOKE] if args.smoke else PREPARED if args.prepared_start else CASES
+        if args.compare_guide: cases = TRANSFER
+        if args.compare_retry: cases = RETRY_CASES
+        if args.guide_pilot: cases = DEV
+        states = {case[0]: checkpoint(f, case) for case in cases}
+        groups = [(SMOKE, True, True, 0)] if args.smoke else list(itertools.product(cases, [False,True], [False,True], range(2)))
+        if args.compare_guide or args.compare_retry:
+            groups = list(itertools.product(cases, [False,True], [True], range(2), [False,True]))
+        elif args.guide_pilot:
+            groups = [(case, True, True, 0, True) for case in cases]
+        else:
+            groups = [(*g,False) for g in groups]
+        random.Random(9091).shuffle(groups)
+        freeze = {'commit': subprocess.check_output(['git','rev-parse','HEAD'],cwd=Path(__file__).parent,text=True).strip(),
+                  'model_load_seconds': model_load, 'fixture_seconds': time.perf_counter()-t, 'states':states,
+                  'groups':groups if args.compare_guide or args.compare_retry or args.guide_pilot else [g[:4] for g in groups], 'smoke':args.smoke, 'prepared_start':args.prepared_start}
+        (root/'manifest.json').write_text(json.dumps(freeze,indent=2))
+        for i, (case, memory, feedback, rotation, guided) in enumerate(groups):
+            n = len(model.transcript) if model else 0
+            prefix = ()
+            if args.prepared_start:
+                prefix = (READ, ASK) if 'disagree' in case[1] else (READ, AMBER, AMBER)
+            row = run(f, model, root/str(i), case, states[case[0]], past, mid, memory, feedback, rotation, args.smoke, prefix, guided, args.compare_retry and guided)
+            row.update(guided=guided, model_calls=len(model.transcript)-n if model else 0, fixture_prefix=prefix)
+            with (root/'runs.jsonl').open('a') as out: print(json.dumps(row),file=out)
+            if model: (root/str(i)/'inference.json').write_text(json.dumps(model.transcript[n:]))
+            print(i, row['case'], row['passed'], row['status'], round(row['seconds'],2),flush=True)
+            if args.smoke:
+                assert row['passed'], row
+    finally:
+        f.tearDown()
+
+
+if __name__ == '__main__':
+    main()
