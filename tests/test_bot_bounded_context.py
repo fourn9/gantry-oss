@@ -5,7 +5,7 @@ from pathlib import Path
 import unittest
 from unittest.mock import patch
 
-from gantry.bot_execution import _input
+from gantry.bot_execution import _fit_optional_previews, _input
 from gantry.crew_runtime import _execute
 from gantry.model import canonical, digest, Fault
 import test_bot_development as fixtures
@@ -132,3 +132,17 @@ class BotBoundedContextTests(unittest.TestCase):
         omitted = result['context_observations']['coverage']['omitted_by_total_budget']
         self.assertEqual(len(retained) + omitted, 4)
         self.assertGreater(omitted, 0)
+
+    def test_repeated_budget_trimming_accounts_for_all_evictions(self):
+        context = {'files': {}, 'capture': {}, 'context_capture': {}, 'authority': 'fixed'}
+        for key in ('context_observations', 'read_observations'):
+            context[key] = {'items': [{'id': i, 'value': 'x'*1000} for i in range(3)], 'coverage': {}}
+        _fit_optional_previews(context, [], limit=2700)
+        for key in ('context_observations', 'read_observations'):
+            self.assertEqual([r['id'] for r in context[key]['items']], [2])
+            self.assertEqual(context[key]['coverage']['omitted_by_total_budget'], 2)
+        _fit_optional_previews(context, [], limit=600)
+        for key in ('context_observations', 'read_observations'):
+            self.assertEqual(context[key]['items'], [])
+            self.assertEqual(context[key]['coverage']['omitted_by_total_budget'], 3)
+        self.assertEqual(context['authority'], 'fixed')

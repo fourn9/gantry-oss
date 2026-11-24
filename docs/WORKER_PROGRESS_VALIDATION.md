@@ -48,6 +48,10 @@ The experimenter supplied the anonymous project, the archived lesson, role permi
 
 The highest-priority follow-up is the transition from evidence to action. Supply each role with the evidence it already obtained on the exact input state and the work still outstanding under the assigned completion conditions. Keep a legitimate re-read available after a state change. For an unchanged state, test whether the model can use the current signed value, change the file, validate it, and submit once. For consultations, test whether the receiving Bot applies the peer's exact evidence to the pending decision. Compare the same decision projection with a stronger tool-using model; count working submissions and unsuccessful stops separately. No comparison in this study tests the benefit of training model weights or weeks of personalized use.
 
+## Integration checks after measurement
+
+The complete regression run uncovered a context-budget boundary. With a large compulsory contract, trimming could remove every receipt of one observation type while retaining several older receipts of another. The Worker now preserves each type's most recent observation while earlier ones can be evicted, and accumulates eviction counts across trimming passes. Mandatory contract content and the hard byte limit retain priority. The targeted regressions and the scripted smoke scenario passed after the fix. None of the 1,090 saved model action contexts from the 96 measured runs had entered this trimming path. The original frozen measurements are retained.
+
 ## Reproduction
 
 The per-run anonymous metrics are in [worker-progress-study.csv](evidence/worker-progress-study.csv). Full Worker journals and inference transcripts stay local. Model revisions and the original acceptance protocol are in [the study plan](../tasks/worker-progress-study.md).
