@@ -129,6 +129,7 @@ def run(f, model, home, case, state_id, past, mid, memory, feedback, rotation, s
     send_read = 'Report the value from my cited read'
     use_review = 'Save the value from the signed records or reviewed answer'
     check_submit = 'Run the check and submit this candidate on success'
+    diagnose = 'Measure the pre-edit baseline as a diagnostic'
     pause = 'Block this task for further review'
     if handoff:
         peer_guide = {**peer_config['evidence_guide'],'publish_observed':{'requester':'designer','allowed_values':colors}}
@@ -232,6 +233,11 @@ def run(f, model, home, case, state_id, past, mid, memory, feedback, rotation, s
                         route = guide['routing']
                         prompt += ('\nSigned records: '+json.dumps([claim['value'] for claim in route['sources']])
                                    +'. Comparison: '+route['status']+'. Responsible peer: '+route['peer']+'.')
+                    if guide.get('literal'):
+                        literal = guide['literal']
+                        prompt += ('\nValue for the candidate from the recorded evidence: '+json.dumps(literal['value'])
+                                   +'. Saved candidate matches: '+str(literal['matches'])+
+                                   '. Save the bound value before release checking. A pre-edit diagnostic checks only the old candidate.')
                 writes = None
                 if retry_aware and not peer:
                     writes = {o:hashlib.sha256(color.encode()).hexdigest() for o,color in saves.items()}
@@ -240,7 +246,7 @@ def run(f, model, home, case, state_id, past, mid, memory, feedback, rotation, s
                     if suggested == send_read:
                         alternatives = [PEEK,send_read,pause]
                     elif suggested == use_review:
-                        alternatives = [READ,use_review,CHECK_ACTION,SUBMIT,pause]
+                        alternatives = [READ,use_review,diagnose,pause]
                     elif suggested == check_submit:
                         alternatives = [READ,CHECK_ACTION,check_submit,SUBMIT,pause]
                     else:
@@ -265,6 +271,8 @@ def run(f, model, home, case, state_id, past, mid, memory, feedback, rotation, s
                 kind, args = 'finish', f.answer(**offer['arguments'])
             elif choice == use_review:
                 kind,args = 'edit',offer['arguments']
+            elif choice == diagnose:
+                kind,args = 'tool',{'name':'release_check','diagnostic_reason':'Measure the pre-edit baseline'}
             elif choice == check_submit:
                 report = f.answer(summary='Submitted after the saved candidate passed its release check')
                 kind,args = 'tool',{'name':'release_check','submit_on_pass':{k:report[k] for k in ('summary','rationale','unverified')}}

@@ -325,13 +325,14 @@ def _execute(client, context, ref, config, action, args, workspace, step, key):
         changed = write_file(workspace, args['path'], updated, args['expected_hash'])
         return {'path': args['path'], 'hash': hashlib.sha256(updated).hexdigest(), 'changed': changed}
     if action == 'tool':
-        if 'submit_on_pass' in args:
-            validate(args,_schema({'name':S,'submit_on_pass':crew_literal.SUBMISSION}))
-            guide = _routed_guide(context,workspace,config)
-            require(guide and (guide.get('literal') or {}).get('matches') and args['name']==guide['check']['name'],
-                    'evidence_required','Conditional submission requires the bound candidate and its installed check')
-            args = {'name':args['name']}
-        return _tool(client, ref, config, args, workspace, step, scope, context['zone'])
+        role = config.get('evidence_guide') or {}
+        guide = (_routed_guide(context, workspace, config)
+                 if 'literal_source' in role.get('consultation_policy',{}) and args.get('name')==role['check_tool'] else None)
+        tool_args, diagnostic = crew_literal.check_arguments(args,guide)
+        result = _tool(client,ref,config,tool_args,workspace,step,scope,context['zone'])
+        if diagnostic:
+            result['diagnostic'] = True
+        return result
     if action in API_ACTIONS:
         require(not set(args) & {'task_id', 'fence', 'basis', 'intent', 'consultation_basis'}, 'invalid_input', 'Task identity is supplied by the runtime')
         if action == 'ask':
@@ -485,9 +486,10 @@ def action_input(full, workspace, config, last_result, number):
             if offer and offer['action'] in context['action_schemas']:
                 guide['offer'] = offer
             if 'literal' in guide:
-                context['action_schemas']['tool'] = _schema({'name':S,'submit_on_pass':crew_literal.SUBMISSION},['name'])
+                context['action_schemas']['tool'] = _schema({'name':S,'submit_on_pass':crew_literal.SUBMISSION,'diagnostic_reason':S},['name'])
                 context['action_guide']['tool'] += (' Optional submit_on_pass carries summary, rationale and unverified. '
-                    'Choose it only when this check completes your work. A distinct fenced finish follows exact-state success.')
+                    'Choose it only when this check completes your work. A distinct fenced finish follows exact-state success. '
+                    'Save the required literal before this check. Supply diagnostic_reason to measure an earlier candidate; diagnostic checks cannot submit.')
                 context['instruction'] += ' The bound literal carries the exact candidate bytes and expected hash. Escalate unresolved engineering tradeoffs.'
             if guide.get('publication'):
                 context['instruction'] += ' To report the observed category, use the supplied publication summary and observation in finish. Retain limitations.'

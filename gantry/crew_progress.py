@@ -129,7 +129,7 @@ def evidence_guide(full, files, config, check_basis):
         if (candidate and not edit and action['kind'] in {'edit','replace'} and result.get('path') == candidate
                 and not result.get('error') and result.get('hash') == manifest.get(candidate, {}).get('hash') and candidate in manifest):
             edit = action['id']
-        if candidate and action['kind'] == 'tool' and args.get('name') == check['name']:
+        if candidate and action['kind'] == 'tool' and args.get('name') == check['name'] and not result.get('diagnostic'):
             if action.get('input_state') != state or not check_basis or result.get('check_definition') != check_basis:
                 if previous_check is None:
                     previous_check = {'state_id':action.get('input_state'),'action_id':action['id'],

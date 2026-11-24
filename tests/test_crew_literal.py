@@ -68,3 +68,61 @@ class HandoffTests(unittest.TestCase):
         state['bot_actions']['read']['task_id']='stranger'
         with self.assertRaises(Fault):
             verify_report(service,state,{},task,report)
+
+    def test_atomic_finish_rechecks_original_intent_state_and_attempt(self):
+        import json
+        from gantry.crew_literal import verify_submission
+        fields={'summary':'tested','rationale':'within allowed load','unverified':['lifetime']}
+        actual={**fields,'status':'completed','assignments':[],'integrate_changes':[]}
+        task={'id':'t','attempt':1,'state_id':'state','discussion_version':2}
+        receipt={'kind':'tool','task_id':'t','attempt':1,'input_state':'state','details':{
+            'arguments':json.dumps({'name':'check','submit_on_pass':fields}),'result':{
+            'exit_code':0,'output_artifact':'art','check_definition':'definition'}}}
+        state={'bot_actions':{'check':receipt}}
+        guard={'action_id':'check','discussion_version':2}
+        verify_submission(state,task,actual,guard)
+        for changed in ({'output_state':'other'},{'attempt':2},{'discussion_version':3}):
+            with self.assertRaises(Fault):
+                verify_submission(state,{**task,**changed},actual,guard)
+        with self.assertRaises(Fault):
+            verify_submission(state,task,{**actual,'unverified':[]},guard)
+        receipt['details']['result']['exit_code']=1
+        with self.assertRaises(Fault):
+            verify_submission(state,task,actual,guard)
+
+    def test_literal_guard_checks_raw_edit_and_replace_bytes_before_write(self):
+        import hashlib
+        import tempfile
+        from pathlib import Path
+        from gantry.crew_runtime import _execute
+        from gantry.service import Service  # Loads the command schemas used by a running Worker.
+        with tempfile.TemporaryDirectory() as temp:
+            work=Path(temp).resolve()
+            h=lambda b:hashlib.sha256(b).hexdigest()
+            saved={'register.json':b'{"a":"north","b":"north"}','candidate.txt':b'old'}
+            for path,raw in saved.items():
+                (work/path).write_bytes(raw)
+            full={'task':{'id':'task','kind':'develop','write_scope':['candidate.txt']},
+                  'development':{'state':{'id':'state'},'manifest':{p:{'hash':h(v),'size':len(v)} for p,v in saved.items()}},
+                  'consultations':[],'actions':[]}
+            src=lambda key:{'path':'register.json','pointer':'/'+key}
+            cfg={'evidence_guide':{'source':src('a'),'candidate':'candidate.txt','check_tool':'test',
+                'consultation_policy':{'peer':'peer','sources':[src('a'),src('b')],
+                                       'allowed_values':['north','south'],'literal_source':src('release')}}}
+            for action, fields in [('edit',{'content':'south'}),('replace',{'old_text':'old','new_text':'south'})]:
+                with self.assertRaises(Fault) as ctx:
+                    _execute(None,full,{},cfg,action,{'path':'candidate.txt','expected_hash':h(b'old'),**fields},work,None,'key')
+                self.assertEqual(ctx.exception.code,'evidence_required')
+                self.assertEqual((work/'candidate.txt').read_bytes(),b'old')
+
+    def test_unapplied_candidate_defers_acceptance_but_allows_explicit_diagnosis(self):
+        from gantry.crew_literal import check_arguments
+        guide={'literal':{'matches':False},'check':{'name':'release'}}
+        with self.assertRaises(Fault) as failure:
+            check_arguments({'name':'release'},guide)
+        self.assertEqual(failure.exception.code,'evidence_required')
+        self.assertEqual(check_arguments({'name':'release','diagnostic_reason':'Measure the original baseline'},guide),
+                         ({'name':'release'},True))
+        self.assertEqual(check_arguments({'name':'other'},guide),({'name':'other'},False))
+        with self.assertRaises(Fault):
+            check_arguments({'name':'release','diagnostic_reason':'Inspect','submit_on_pass':{}},guide)

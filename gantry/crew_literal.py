@@ -3,7 +3,7 @@ import hashlib
 import json
 
 from .connection_policy import clean_bytes
-from .contracts import A, S
+from .contracts import A, S, validate
 from .crew_consultation import MAX_SOURCE, distinct_keys, validate_source
 from .crew_json import pointer_value
 from .crew_observe import observation_actions
@@ -132,6 +132,19 @@ def candidate(full, route, config):
             'matches':value is not None and hashlib.sha256(value.encode()).hexdigest()==current}
 
 
+def check_arguments(args, guide):
+    """Keep exploratory measurement available while requiring a saved literal for acceptance."""
+    if not guide or not guide.get('literal') or args.get('name')!=guide['check']['name']:
+        return args, False
+    fields = {'name':S,'submit_on_pass':SUBMISSION,'diagnostic_reason':S}
+    validate(args,{'type':'object','properties':fields,'required':['name'],'additionalProperties':False})
+    diagnostic = 'diagnostic_reason' in args
+    require(not (diagnostic and 'submit_on_pass' in args), 'invalid_input','A diagnostic cannot authorize submission')
+    require(diagnostic or guide['literal']['matches'], 'evidence_required',
+            'Save the reviewed value before its acceptance check. For a baseline measurement, provide diagnostic_reason.')
+    return {'name':args['name']}, diagnostic
+
+
 def continuation(token, full, guide, preferences):
     if not token or not guide or not (guide.get('literal') or {}).get('matches'):
         return None
@@ -180,5 +193,5 @@ def verify_submission(state, task, report, guard):
             and report=={**args['submit_on_pass'],'status':'completed','assignments':[],'integrate_changes':[]}
             and isinstance(result,dict) and type(result.get('exit_code')) is int and result['exit_code']==0
             and result.get('output_artifact') and result.get('check_definition')
-            and not result.get('reason') and not result.get('error'), 'evidence_required',
+            and not result.get('reason') and not result.get('error') and not result.get('diagnostic'), 'evidence_required',
             'A completed installed check and its exact conditional report are required')
