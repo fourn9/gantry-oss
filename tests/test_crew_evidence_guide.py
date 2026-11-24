@@ -182,3 +182,35 @@ class EvidenceGuideTests(unittest.TestCase):
         self.assertTrue(self.route()['routing']['consulted'])
         self.register({'name':'south','approved':'north'})
         self.assertFalse(self.route()['routing']['consulted'])
+
+    def test_unreadable_bytes_and_ambiguous_json_are_not_agreement(self):
+        self.register({'name':'north','approved':'north'})
+        self.files['register.json']='{"name":"south","approved":"south"}'
+        self.assertEqual(self.route()['routing']['status'],'missing')
+        text='{"name":"south","name":"north","approved":"north"}'
+        self.files['register.json']=text
+        self.full['development']['manifest']['register.json']['hash']=self.hash(text)
+        self.assertEqual(self.route()['routing']['status'],'missing')
+
+    def test_duplicate_references_cannot_vote_as_independent_records(self):
+        from gantry.crew_consultation import validate_policy
+        self.route()
+        policy=self.cfg['consultation_policy']
+        policy['sources']=[self.cfg['source'],self.cfg['source']]
+        with self.assertRaises(Fault):
+            validate_policy(policy)
+
+    def test_receipt_for_wrong_report_or_other_task_is_not_a_review(self):
+        from gantry.crew_coordination import CrewCoordinationMixin
+        report={'status':'completed','summary':'north'}
+        request={'task_id':'peer','pointer':'/task/reports/0/report'}
+        self.add('inspect',request,{**request,'next_offset':None,'value':report})
+        action=self.full['actions'][0]
+        state={'bot_tasks':{'peer':{'reports':[{'report':report}]}},'bot_actions':{'read':action}}
+        check=CrewCoordinationMixin._cited_report_read
+        self.assertTrue(check(state,self.full['task'],request,['read']))
+        self.assertFalse(check(state,{'id':'another'},request,['read']))
+        action['details']['result']['value']={'status':'completed','summary':'south'}
+        self.assertFalse(check(state,self.full['task'],request,['read']))
+        action['details']['arguments']='incomplete JSON'
+        self.assertFalse(check(state,self.full['task'],request,['read']))

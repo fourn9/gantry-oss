@@ -13,6 +13,31 @@ class CrewRuntimeTests(CrewCoordinationTests):
         self.owner.call('configure_bot_runtime', {'bot_id': name, 'version': 1, 'principal_id': name,
             'enabled': True, 'environment': environment_manifest(self.configs[name])})
 
+    def test_passing_tool_cannot_complete_with_missing_required_peer_evidence(self):
+        from gantry.project_sandbox import backend, runtime_roots
+        if backend() == 'unavailable': self.skipTest('OS sandbox unavailable')
+        source = {'path':'control.txt', 'pointer':'/design'}
+        guide = {'candidate':'mechanical.txt','source':source,'check_tool':'check',
+                 'consultation_policy':{'peer':'control','sources':[source, {**source, 'pointer':'/integration'}],
+                                        'allowed_values':['blue','amber']}}
+        self.enable_loop('designer', evidence_guide=guide, sandbox=backend(), tool_runtime=runtime_roots(),
+                         local_tools={'check':{'argv':[str(Path(sys.executable).resolve()),'-c','print("ok")'],
+                                               'timeout_seconds':10}})
+        self.task('designer')
+        observed = []
+        def infer(ctx, schema, directory):
+            observed.append(ctx)
+            if len(observed) == 1:
+                return self.action('tool', {'name':'check'})
+            if len(observed) == 2:
+                return self.action('finish', self.answer())
+            return self.action('finish', self.answer(status='blocked', summary='Peer input needed'))
+        with self.worker('designer', infer) as worker:
+            result = worker.tick()[0]
+        self.assertEqual(observed[1]['evidence_guide']['check']['status'], 'passed')
+        self.assertEqual(observed[2]['last_result']['error'], 'evidence_required')
+        self.assertEqual(result['task']['status'], 'blocked')
+
     def test_model_revises_after_actual_tool_failure(self):
         from gantry.project_sandbox import backend, runtime_roots
         if backend() == 'unavailable': self.skipTest('OS sandbox unavailable')
