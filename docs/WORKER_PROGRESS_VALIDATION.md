@@ -2,6 +2,8 @@
 
 On 2026-11-25 we observed **zero accepted tasks across 48 ordinary starts**. A separate set of **48 prepared-state diagnostic runs also yielded zero accepted tasks**. A source-linked past lesson and an explicit receipt for unchanged edits were both available for testing. Neither increased completed work on this fixture. There are no matched successful durations from which to estimate a speedup.
 
+A subsequent independent experiment measured the effect of showing the Worker’s current evidence and remaining work. See [the evidence-guide results](WORKER_EVIDENCE_GUIDE_VALIDATION.md).
+
 ## What ran
 
 - Two separate local model families, Qwen2.5-1.5B-Instruct and Llama-3.2-1B-Instruct (4-bit), selected from permitted actions. Both used greedy single-letter choice with two predetermined option orderings. The models used fresh prompts and separate designer and manufacturing histories. The bridge projected role-relevant observations and dispatched typed actions to the ordinary Gantry Worker. This tests constrained decisions on small models. It does not measure a general coding agent.
