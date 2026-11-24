@@ -1,0 +1,91 @@
+import hashlib
+import json
+import unittest
+
+from gantry.bot_worker import environment_manifest
+from gantry.model import Fault
+
+
+class EvidenceGuideTests(unittest.TestCase):
+    def setUp(self):
+        self.cfg = {'source': {'path':'register.json','pointer':'/name'}, 'candidate':'part.txt','check_tool':'test'}
+        self.raw = '{"name":"north"}'
+        self.files = {'register.json': self.raw,'part.txt':'pending'}
+        self.full = {'task':{'id':'task1','kind':'develop','write_scope':['part.txt'],'completion':['Check the selected guide']},
+                     'development':{'state':{'id':'s1'},'manifest':{p:{'hash':self.hash(s)} for p,s in self.files.items()}},
+                     'consultations':[],'actions':[]}
+    def hash(self, s):
+        return hashlib.sha256(s.encode()).hexdigest()
+    def add(self, kind, args, result, state='s1'):
+        self.full['actions'].insert(0, {'id':'r'+str(len(self.full['actions'])), 'kind':kind,'task_id':'task1','input_state':state,
+            'details':{'arguments':json.dumps(args),'result':result}})
+    def guide(self):
+        from gantry.crew_progress import evidence_guide
+        return evidence_guide(self.full,self.files,self.cfg)
+    def read(self, value):
+        self.add('inspect_json',self.cfg['source'],{'source':{'sha256':self.hash(self.raw),'path':'register.json'},
+            'pointer':'/name','value':value,'next_offset':None})
+    def test_read_requires_exact_authorized_bytes_and_survives_unrelated_checkpoint(self):
+        self.read('invented')
+        self.assertIsNone(self.guide()['observed'])
+        self.read('north')
+        self.assertEqual(self.guide()['observed']['value'],'north')
+        self.full['development']['state']['id']='s2'
+        self.assertEqual(self.guide()['observed']['value'],'north')
+        self.files['register.json']='{"name":"south"}'
+        self.assertIsNone(self.guide()['observed'])
+    def test_newer_failure_and_changed_state_do_not_inherit_success(self):
+        self.read('north')
+        self.add('tool',{'name':'test'},{'exit_code':0,'output_artifact':'a'})
+        self.assertEqual(self.guide()['check']['status'],'passed')
+        self.add('tool',{'name':'test'},{'exit_code':1,'output_artifact':'b'})
+        self.assertEqual(self.guide()['check']['status'],'failed')
+        self.full['development']['state']['id']='s2'
+        self.assertEqual(self.guide()['check']['status'],'not_observed')
+    def test_workflow_is_pinned_and_never_selects_a_design(self):
+        cfg={'backend':'external_agent','name':'fixture','agent_loop':True}
+        self.assertNotEqual(environment_manifest(cfg),environment_manifest({**cfg,'evidence_guide':self.cfg}))
+        self.read('north')
+        self.assertIn('edit',self.guide()['focus_actions'])
+        self.assertIn('ask',self.guide()['focus_actions'])
+        self.assertNotIn('content',self.guide())
+        self.full['task']['write_scope']=[]
+        self.assertIsNone(self.guide())
+    def test_peer_report_requires_exact_request_and_preserves_limitations(self):
+        request={'task_id':'other','pointer':'/task/reports/1/report'}
+        self.full['consultations']=[{'id':'q','blocking':True,'status':'answered','response_report':{'request':request,'state_id':'s1'}}]
+        self.add('inspect',{**request,'pointer':'/task/reports/0/report'},{'value':{'summary':'wrong'}})
+        self.assertEqual(self.guide()['focus_actions'],['inspect'])
+        self.add('inspect',request,{**request,'next_offset':None,'value':{'status':'completed','summary':'north','unverified':['load']}})
+        guide=self.guide()
+        self.assertEqual(guide['consultation']['report']['unverified'],['load'])
+        self.assertEqual(guide['focus_actions'],['resolve'])
+
+    def test_menu_escape_keeps_every_original_action_and_order(self):
+        from gantry.crew_progress import choose_focused
+        menus = []
+        def choose(prompt, options):
+            menus.append(options)
+            return options[-1]
+        options = ['Save north','Ask a peer','Reread']
+        selected = choose_focused(choose, 'fixture', options, dict(zip(options,['edit','ask','inspect_json'])),
+                                  {'focus_actions':['edit','ask']})
+        self.assertEqual((menus[0][:-1],menus[1],selected),(options[:2],options,'Reread'))
+    def test_guide_rejects_undeclared_tool_and_unsafe_paths(self):
+        from gantry.crew_progress import validate_guide
+        config = {'workflow':'bot_development','agent_loop':True,'evidence_guide':self.cfg,'local_tools':{}}
+        with self.assertRaises(Fault):
+            validate_guide(config)
+        config['local_tools']['test']={}
+        validate_guide(config)
+        self.cfg['source']['path']='../private.json'
+        with self.assertRaises(Fault):
+            validate_guide(config)
+    def test_large_edit_and_stale_check_keep_latest_candidate_unverified(self):
+        self.read('north')
+        self.add('edit',{'content':'x'*20000},{'path':'part.txt','hash':self.hash('pending')})
+        self.add('tool',{'name':'test'},{'exit_code':0,'output_artifact':'r'},state='older')
+        guide=self.guide()
+        self.assertEqual(guide['focus_actions'],['tool'])
+        self.assertEqual(guide['check']['status'],'not_observed')
+        self.assertEqual(guide['previous_check']['state_id'],'older')

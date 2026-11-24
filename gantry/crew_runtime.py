@@ -430,6 +430,19 @@ def action_input(full, workspace, config, last_result, number):
         for action, command in direct.items():
             if command not in commands:
                 context['action_guide'].pop(action, None); context['action_schemas'].pop(action, None)
+    if config.get('evidence_guide'):
+        from .crew_progress import evidence_guide
+        guide = evidence_guide(full, context['files'], config['evidence_guide'])
+        if guide:
+            guide['focus_actions'] = [a for a in guide['focus_actions'] if a in context['action_schemas']]
+            context['evidence_guide'] = guide
+            original_instruction = context['instruction']
+            context['instruction'] += (' Use evidence_guide for a current source observation, peer conditions and check receipt. '
+                'Consider its suggested actions first; choose any other permitted action when appropriate. '
+                'Compare evidence with the candidate. A passed tool alone does not satisfy all completion conditions.')
+            if len(canonical(context).encode()) > 480000:
+                del context['evidence_guide']
+                context['instruction'] = original_instruction
     _fit_optional_previews(context, list(full['development']['manifest']), limit=480000)
     if len(canonical(context).encode()) > 480000 and last_result is not None:
         context['last_result'] = {'truncated': True, 'sha256': digest(last_result),

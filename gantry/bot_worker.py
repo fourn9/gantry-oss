@@ -27,6 +27,7 @@ def environment_manifest(config):
     if 'learning_mode' in config: fields += ('learning_mode',)
     if config.get('personal_continuity'): fields += ('personal_continuity',)
     if config.get('agent_loop'): fields += ('agent_loop', 'local_tools', 'tool_runtime', 'sandbox')
+    if 'evidence_guide' in config: fields += ('evidence_guide',)
     if 'tool_evidence' in config: fields += ('tool_evidence',)
     if 'recovery_policy' in config: fields += ('recovery_policy',)
     return {'name': config['name'], 'backend': config['backend'], 'tools': config.get('tools', []),
@@ -83,6 +84,8 @@ class BotWorker:
         require(isinstance(config.get('personal_continuity', False), bool), 'invalid_input', 'personal_continuity must be boolean')
         require(not config.get('personal_continuity') or config.get('workflow') == 'bot_development',
                 'invalid_input', 'Personal continuity belongs to independent Bot development')
+        from .crew_progress import validate_guide
+        validate_guide(config)
         self.client, self.config = client, config
         from .bot_auto_recovery import policy
         self.recovery_policy = policy(config)
