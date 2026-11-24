@@ -16,6 +16,8 @@ from gantry.project_sandbox import backend, runtime_roots
 
 CASES = [('yoke', 'amber', 'amber'), ('retainer', 'blue', 'blue'),
          ('sled', 'amber and blue; current signatures disagree', 'blue')]
+PREPARED = [('collar', 'amber', 'amber'), ('spacer', 'blue', 'blue'),
+            ('link', 'amber and blue; current signatures disagree', 'blue')]
 SMOKE = ('smoke', 'amber and blue; current signatures disagree', 'amber')
 CHECK = ("from pathlib import Path; import json,sys; "
          "ok=Path('mechanical.txt').read_text()==json.loads(Path('control.txt').read_text())['release']; "
@@ -96,7 +98,7 @@ def score(owner, view, case, final_state, task_actions):
             'actual_digest': actual}
 
 
-def run(f, model, home, case, state_id, past, mid, memory, feedback, rotation, smoke=False):
+def run(f, model, home, case, state_id, past, mid, memory, feedback, rotation, smoke=False, prefix=()):
     setup = time.perf_counter()
     shutil.copytree(f.root/'ledger', home/'ledger')
     service = Service(home/'ledger')
@@ -130,7 +132,7 @@ def run(f, model, home, case, state_id, past, mid, memory, feedback, rotation, s
         q = next(iter(ctx.get('consultations', [])), {})
         if not peer and q.get('status') == 'open':
             kind, args = 'finish', f.answer(status='waiting', summary='Await manufacturing')
-        elif len(log) >= (4 if peer else 8):
+        elif len(log) >= (4 if peer else 8+len(prefix)):
             kind, args = 'finish', f.answer(status='failed', summary='Decision budget exhausted')
         else:
             if peer:
@@ -151,13 +153,17 @@ def run(f, model, home, case, state_id, past, mid, memory, feedback, rotation, s
             options = options[rotation:]+options[:rotation]
             prompt += '\nYour previous actions and observations: '+json.dumps([(row['choice'], row.get('result')) for row in log])
             stamp = time.perf_counter()
-            if smoke:
+            primed = not peer and len(log) < len(prefix)
+            if primed:
+                choice = prefix[len(log)]
+                assert choice in options
+            elif smoke:
                 order = [PEEK, REPORTS[1]] if peer else [READ, ASK, INSPECT, RESOLVE, AMBER, CHECK_ACTION, SUBMIT]
                 choice = order[len(log)]
                 assert choice in options, (choice, options, q)
             else:
                 choice = model.choose(prompt, options)
-            log.append({'choice': choice, 'decision_seconds': time.perf_counter()-stamp,
+            log.append({'choice': choice, 'source': 'fixture' if smoke or primed else 'model', 'decision_seconds': time.perf_counter()-stamp,
                         'input_state': ctx['development']['state']['id']})
             if choice in (READ, PEEK):
                 kind, args = 'inspect_json', {'path': 'control.txt', 'pointer': '/release' if peer else '/register'}
@@ -209,7 +215,9 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--model', type=Path)
     parser.add_argument('--output', required=True, type=Path)
-    parser.add_argument('--smoke', action='store_true')
+    modes = parser.add_mutually_exclusive_group()
+    modes.add_argument('--smoke', action='store_true')
+    modes.add_argument('--prepared-start', action='store_true', help='Separate diagnostic with a recorded, fixture-driven prefix')
     args = parser.parse_args()
     root = args.output.resolve()
     if root.exists() or root.is_relative_to(Path(__file__).resolve().parents[1]):
@@ -232,17 +240,21 @@ def main():
                     'timeout_seconds': 10}}, sandbox=backend(), tool_runtime=runtime_roots())
             f.owner.call('configure_bot_runtime', {'bot_id': role,'version': 1, 'principal_id': role,
                 'enabled': True, 'environment': environment_manifest(config)})
-        cases = [SMOKE] if args.smoke else CASES
+        cases = [SMOKE] if args.smoke else PREPARED if args.prepared_start else CASES
         states = {case[0]: checkpoint(f, case) for case in cases}
         groups = [(SMOKE, True, True, 0)] if args.smoke else list(itertools.product(cases, [False,True], [False,True], range(2)))
         random.Random(9091).shuffle(groups)
         freeze = {'commit': subprocess.check_output(['git','rev-parse','HEAD'],cwd=Path(__file__).parent,text=True).strip(),
                   'model_load_seconds': model_load, 'fixture_seconds': time.perf_counter()-t, 'states':states,
-                  'groups':groups, 'smoke':args.smoke}
+                  'groups':groups, 'smoke':args.smoke, 'prepared_start':args.prepared_start}
         (root/'manifest.json').write_text(json.dumps(freeze,indent=2))
         for i, (case, memory, feedback, rotation) in enumerate(groups):
             n = len(model.transcript) if model else 0
-            row = run(f, model, root/str(i), case, states[case[0]], past, mid, memory, feedback, rotation, args.smoke)
+            prefix = ()
+            if args.prepared_start:
+                prefix = (READ, ASK) if 'disagree' in case[1] else (READ, AMBER, AMBER)
+            row = run(f, model, root/str(i), case, states[case[0]], past, mid, memory, feedback, rotation, args.smoke, prefix)
+            row['fixture_prefix'] = prefix
             with (root/'runs.jsonl').open('a') as out: print(json.dumps(row),file=out)
             if model: (root/str(i)/'inference.json').write_text(json.dumps(model.transcript[n:]))
             print(i, row['case'], row['passed'], row['status'], round(row['seconds'],2),flush=True)
