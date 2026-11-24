@@ -1,0 +1,11 @@
+{
+  "autodeskProduct": "Fusion360",
+  "type": "addin",
+  "author": "Gantry contributors",
+  "description": {
+    "": "Queue completed versions of one enrolled design for Gantry."
+  },
+  "supportedOS": "mac",
+  "runOnStartup": false,
+  "editEnabled": true
+}

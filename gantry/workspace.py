@@ -108,20 +108,44 @@ class Workspace:
                 'work_id':obj['work_id'],'state_id':obj['state_id'],'version':obj['version'],
                 'cleanup_pending':bool(obj.get('cleanup_stage'))}
 
-    def sync(self,summary='Saved external edits',rationale='External tool save; intent not inferred',unfinished=None,context=None):
+    def sync(self,summary='Saved external edits',rationale='External tool save; intent not inferred',unfinished=None,context=None,*,event=None):
         with locked(self.meta/'studio.lock'):
             obj=self.saved()
             from .workspace_stream import recover_staging
             recover_staging(self.meta,'workspace-sync',[(obj.get('pending') or {}).get('stage'),obj.get('cleanup_stage')])
-            if obj['pending']: return self._send(obj)
+            if obj['pending']:
+                if event is not None:
+                    require(obj['pending'].get('source_event') == event, 'conflict',
+                            'Finish the pending workspace operation before processing another event')
+                delivery = self._send(obj)
+                return delivery
             self._cleanup(obj)
             require(not obj.get('cleanup_stage'),'cleanup_pending','Retry sync after local staging can be safely removed')
-            files,hashes,missing=scan(self.root,obj['scope'])
-            _,second,_=scan(self.root,obj['scope'])
-            require(hashes==second,'capture_incomplete','Workspace is still being saved; retry')
+            scopes = obj['scope']
+            if event is not None:
+                from .workspace_events import source_event, check_saved_bytes, event_context
+                event = source_event(event['kind'],event['path'],event['source_revision'],event['sha256'])
+                require(covered(event['path'],obj['write_scope']),'scope_denied','Event path outside bound work')
+                scopes = [event['path']]
+            files,selected_hashes,missing=scan(self.root,scopes)
+            _,second,_=scan(self.root,scopes)
+            require(selected_hashes==second,'capture_incomplete','Workspace is still being saved; retry')
+            hashes = selected_hashes
+            if event is not None:
+                check_saved_bytes(self.root,event,selected_hashes)
+                hashes = {**obj['hashes'], **selected_hashes}
             view=self.client.call('studio_work',{'work_id':obj['work_id']})
             require(view['work']['head']==obj['state_id'],'stale_basis','Remote work changed; inspect or continue in a new folder')
             require(view['can_update'],'unauthorized','Work is no longer writable')
+            if event is not None:
+                from .workspace_stream import MAX_FILES, MAX_TOTAL
+                manifest = view['selected']['manifest']
+                saved_size = sum(info['size'] for name,info in manifest.items() if name != event['path'])
+                require(len(hashes) <= MAX_FILES and saved_size + (self.root / event['path']).stat().st_size <= MAX_TOTAL,
+                        'capture_incomplete','Workspace limit: 10000 files / 1 GiB')
+                context = event_context(view['selected']['state']['context'],event)
+                summary = 'Capture '+event['kind']+' '+event['path']
+                rationale = 'Producer completion at '+event['source_revision']
             # Sharing the same immutable head does not invalidate local inputs.
             obj['version']=view['work']['version']
             delta=changes(obj['hashes'],hashes)
@@ -137,10 +161,12 @@ class Workspace:
             from .contracts import CONTRACTS, validate
             validate(args,CONTRACTS['studio_sync_update']['schema'])
             obj['pending']={'command':'studio_sync_update','args':args,'key':uid('workspace-sync'),'hashes':hashes}
-            if files is None:
+            if event is not None:
+                obj['pending']['source_event'] = event
+            if files is None and delta:
                 from .workspace_stream import freeze
                 pending=obj['pending'];args['deleted']=[]
-                pending.update(stage=freeze(self.root,obj['scope'],hashes,self.meta/'uploads'/pending['key'],
+                pending.update(stage=freeze(self.root,scopes,selected_hashes,self.meta/'uploads'/pending['key'],
                     {d['path'] for d in delta if d['kind']!='deleted'}),
                     base={'snapshot':view['selected']['state']['snapshot'],'manifest':view['selected']['manifest']},
                     zone=self.client.call('development_state',{'session_id':view['work']['session_id']})['session']['zone'])
