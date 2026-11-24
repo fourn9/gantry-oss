@@ -54,6 +54,8 @@ The native CLI is separate from the POSIX-specific scoped project Runner. Import
 tests check that it does not load `fcntl` or that Runner. This is not evidence that
 the full Gantry `connect` sandbox or server is Windows-qualified.
 
+Run `gantry-native doctor` on the proposed host to inspect OS and COM registration without opening an editor. A registration observed in the current Python registry view still requires a licensed runtime and a document round trip. The [Mac workflow](ROBOTICS-CONNECTORS.md#use-windows-cad-from-a-mac) also covers neutral STEP handoff.
+
 ## Windows prerequisites
 
 - Python 3.11+ with current security fixes, matching vendor SDK architecture.

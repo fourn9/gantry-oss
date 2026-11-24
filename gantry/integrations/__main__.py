@@ -26,7 +26,22 @@ def main(argv=None):
     local=sub.add_parser('capture',help='Preserve explicitly selected saved files')
     local.add_argument('--provider',required=True); local.add_argument('--root',required=True)
     local.add_argument('--path',action='append',required=True); local.add_argument('--cells',help='JSON worksheet -> cell addresses')
-    for cmd in (pull,local,related,binary):
+    kicad=sub.add_parser('check-kicad', help='Run KiCad ERC/DRC on a scratch copy of a trusted local design')
+    kicad.add_argument('--root', required=True)
+    kicad.add_argument('--document', required=True)
+    kicad.add_argument('--dependency', action='append', default=[])
+    kicad.add_argument('--executable', required=True, help='Absolute path to installed kicad-cli')
+    mcap=sub.add_parser('capture-mcap', help='Capture a saved recording and its recorder-reported index')
+    mcap.add_argument('--root', required=True)
+    mcap.add_argument('--path', required=True)
+    step=sub.add_parser('capture-step', help='Import a trusted STEP and reopen it in macOS FreeCAD')
+    step.add_argument('--root', required=True)
+    step.add_argument('--path', required=True)
+    step.add_argument('--freecad-app', default='/Applications/FreeCAD.app')
+    onnx=sub.add_parser('capture-onnx', help='Inspect the interface and preserve a selected ONNX model')
+    onnx.add_argument('--root', required=True)
+    onnx.add_argument('--path', required=True)
+    for cmd in (pull,local,related,binary,kicad,mcap,step,onnx):
         cmd.add_argument('--source-id',required=True); cmd.add_argument('--output',required=True)
         cmd.add_argument('--requirements',help='JSON array of requirement_id/revision_id references')
         if cmd in (pull,local):
@@ -77,7 +92,19 @@ def main(argv=None):
                            args.version,args.bundle,args.key)
         else:
             refs=load(args.requirements,[]); selectors=load(getattr(args,'select',None),{})
-            if args.action=='pull-file':
+            if args.action=='capture-onnx':
+                from .onnx_capture import capture_onnx
+                bundle=capture_onnx(args.root,args.path,args.source_id,refs)
+            elif args.action=='capture-step':
+                from .freecad_step import capture_step
+                bundle=capture_step(args.root,args.path,args.freecad_app,args.source_id,refs)
+            elif args.action=='check-kicad':
+                from .kicad import check_kicad
+                bundle=check_kicad(args.root,args.document,args.dependency,args.executable,args.source_id,refs)
+            elif args.action=='capture-mcap':
+                from .mcap_capture import capture_mcap
+                bundle=capture_mcap(args.root,args.path,args.source_id,refs)
+            elif args.action=='pull-file':
                 from .files import capture_file
                 bundle=capture_file(load(args.config),args.source_id,refs)
             elif args.action=='pull-related':

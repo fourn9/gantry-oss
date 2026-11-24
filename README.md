@@ -112,7 +112,7 @@ Gantry preserves original captured data. It does not infer complete cross-tool d
 | Strength, tolerance and prototype results | Evidence capture against a frozen acceptance plan | Requires an actual evaluator or measured input |
 | Commercial CAD / ECAD | Experimental desktop operations and generated editor scripts | No verified live run for the eight listed vendor products; Zuken and Capital SDK implementations remain blocked |
 
-[Integration coverage](docs/EXTERNAL-INTEGRATIONS.md) · [Native desktop support](docs/NATIVE-DESKTOP.md) · [Hardware adapter](docs/HARDWARE-ADAPTER.md)
+[Integration coverage](docs/EXTERNAL-INTEGRATIONS.md) · [Native desktop support](docs/NATIVE-DESKTOP.md) · [Hardware adapter](docs/HARDWARE-ADAPTER.md) · [Robotics connectors for Mac and Windows](docs/ROBOTICS-CONNECTORS.md)
 
 <details>
 <summary>Limits, execution and recovery</summary>

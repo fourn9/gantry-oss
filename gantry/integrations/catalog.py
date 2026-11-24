@@ -17,6 +17,20 @@ API = {'confluence','excel','github','gitlab','google-drive','google-sheets','ji
        'linear','notion','onshape','sharepoint','slack'}
 
 
+ROBOTICS = {
+    'onnx': ('ONNX', 'saved_model_interface', 'https://onnx.ai/onnx/api/serialization.html',
+             'Saved model and declared tensor interface. External weights, training and inference are separate.'),
+    'mujoco': ('MuJoCo', 'existing_runtime_checkpoint', 'https://mujoco.readthedocs.io/',
+               'Python checkpoint API plus operator-selected saved files; no live simulator subscription.'),
+    'freecad': ('FreeCAD', 'mac_step_import_and_reopen', 'https://www.freecad.org/',
+                'Selected STEP imported as a static shape in macOS FreeCAD. Native vendor constraints are unavailable.'),
+    'kicad': ('KiCad', 'local_erc_drc', 'https://docs.kicad.org/10.0/en/cli/cli.html',
+              'Operator-local checks on selected saved designs; missing project dependencies can affect results.'),
+    'mcap': ('MCAP (ROS 2 / Foxglove)', 'recording_index', 'https://mcap.dev/spec',
+             'Selected saved MCAP and recorder index only. Live ROS subscriptions and cloud accounts are separate.'),
+}
+
+
 def catalog():
     from .write_recipes import OPERATIONS, ATOMIC
     rows=[]
@@ -38,9 +52,14 @@ def catalog():
                     'Saved export capture is not native synchronization or native editing.'),
                 'source':SOURCE if group!='home_logo_only' else 'https://www.flowengineering.com/',
                 'reviewed_at':REVIEWED})
+    for ident, (name, route, source, limitation) in ROBOTICS.items():
+        rows.append({'id': ident, 'name': name, 'reference_status': 'robotics',
+                     'routes': ['saved_export', route], 'source': source, 'reviewed_at': '2026-11-24',
+                     'native_write': False, 'native_write_operations': [], 'write_concurrency': {},
+                     'live_account_verified': False, 'limitation': limitation})
     return rows
 
 
 def known(provider):
     from ..native.catalog import PRODUCTS
-    return provider in CURRENT or provider in COMING or provider in HOME_ONLY or provider in PRODUCTS
+    return provider in CURRENT or provider in COMING or provider in HOME_ONLY or provider in PRODUCTS or provider in ROBOTICS
