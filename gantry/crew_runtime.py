@@ -87,7 +87,7 @@ def action_schemas():
                      'records': 'get_bot_records', 'requirements': 'get_bot_requirements', 'issue': 'get_bot_issue', 'issues': 'list_bot_issues',
                      'extract_evidence': 'extract_json_evidence'}.items():
         schema = json.loads(json.dumps(CONTRACTS[op]['schema']))
-        for key in ('task_id', 'fence', 'basis', 'intent'):
+        for key in ('task_id', 'fence', 'basis', 'intent', 'consultation_basis'):
             schema['properties'].pop(key, None)
             if key in schema['required']: schema['required'].remove(key)
         if name == 'records':
@@ -209,6 +209,16 @@ def _api_effect(client, operation, args, step, key):
     return client.call(operation, args, key)
 
 
+def _routed_guide(full, workspace, config, files=None):
+    from . import crew_consultation
+    from .crew_progress import check_definition, evidence_guide
+    guide = config.get('evidence_guide') or {}
+    if not crew_consultation.applies(full, guide):
+        return None
+    inputs = {**(files or {}), **crew_consultation.saved_sources(full, workspace, guide)}
+    return evidence_guide(full, inputs, guide, check_definition(config, guide['check_tool']))
+
+
 def _execute(client, context, ref, config, action, args, workspace, step, key):
     scope = context['task']['write_scope']
     if action == 'plan_verification':
@@ -303,10 +313,19 @@ def _execute(client, context, ref, config, action, args, workspace, step, key):
         return {'path': args['path'], 'hash': hashlib.sha256(updated).hexdigest(), 'changed': changed}
     if action == 'tool': return _tool(client, ref, config, args, workspace, step, scope, context['zone'])
     if action in API_ACTIONS:
-        require(not set(args) & {'task_id', 'fence', 'basis', 'intent'}, 'invalid_input', 'Task identity is supplied by the runtime')
+        require(not set(args) & {'task_id', 'fence', 'basis', 'intent', 'consultation_basis'}, 'invalid_input', 'Task identity is supplied by the runtime')
+        if action == 'ask':
+            guide = _routed_guide(context, workspace, config)
+            if guide and args.get('to_bot_id') == guide['routing']['peer'] and guide['routing']['status'] != 'consistent':
+                args = {**args, 'consultation_basis': guide['routing']['basis']}
         return _api_effect(client, API_ACTIONS[action], {**args, **ref}, step, key)
     if action == 'resolve':
         require(not set(args) & set(ref), 'invalid_input', 'Task identity is supplied by the runtime')
+        validate(args, action_schemas()['resolve'])
+        guide = _routed_guide(context, workspace, config)
+        question = (guide or {}).get('consultation') or {}
+        if question.get('id') == args.get('message_id') and question.get('report'):
+            args = {**args, 'evidence': [*args['evidence'], question['report']['action_id']]}
         return _api_effect(client, 'resolve_bot_question', {**args, **ref}, step, key)
     if action == 'team':
         require(args.get('session_id') == context['task']['session_id'] and args.get('organization_id') == context['organization']['id'],
@@ -437,7 +456,7 @@ def action_input(full, workspace, config, last_result, number):
         from .crew_progress import check_definition, evidence_guide
         role = config['evidence_guide']
         basis = check_definition(config, role['check_tool']) if 'check_tool' in role else None
-        guide = evidence_guide(full, context['files'], role, basis)
+        guide = _routed_guide(full, workspace, config, context['files']) or evidence_guide(full, context['files'], role, basis)
         if guide:
             guide['focus_actions'] = [a for a in guide['focus_actions'] if a in context['action_schemas']]
             context['evidence_guide'] = guide
@@ -519,6 +538,13 @@ def run_actions(client, initial, ref, infer, config, root):
                     validate(args, BOT_ANSWER)
                     require(not args['edits'], 'invalid_input', 'Use edit actions to preserve intermediate work')
                     if args['status'] == 'completed':
+                        guide = _routed_guide(full, workspace, config)
+                        if guide:
+                            route = guide['routing']
+                            require(route['status'] == 'consistent' or route['consulted'], 'evidence_required',
+                                    'Consult the responsible peer, inspect their report and cite their answer for this revision')
+                            require(guide['check']['status'] == 'passed', 'evidence_required',
+                                    'Run the installed check successfully on the saved candidate before submitting')
                         require(not any(m['blocking'] and m['status'] != 'resolved' for m in full['messages']),
                                 'dependency_pending', 'Resolve blocking questions before completion')
                     saved.update(phase='completed', result={'report': args}); persist(marker, saved)

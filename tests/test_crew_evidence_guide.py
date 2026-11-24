@@ -131,3 +131,54 @@ class EvidenceGuideTests(unittest.TestCase):
         self.full['development']['manifest']['register.json']['hash']=self.hash(self.raw)
         self.read(marker)
         self.assertIsNone(self.guide()['observed'])
+
+    def route(self):
+        self.cfg['consultation_policy'] = {'peer':'control','sources':[self.cfg['source'],{'path':'register.json','pointer':'/approved'}],
+                                           'allowed_values':['north','south']}
+        return self.guide()
+
+    def register(self, obj):
+        self.raw=json.dumps(obj)
+        self.files['register.json']=self.raw
+        self.full['development']['manifest']['register.json']['hash']=self.hash(self.raw)
+
+    def test_route_reads_saved_values_and_preserves_explicit_reviews(self):
+        self.register({'name':'north','approved':'north'})
+        guide=self.route()
+        self.assertEqual(guide['routing']['status'],'consistent')
+        self.assertNotIn('ask',guide['focus_actions'])
+        self.full['consultations']=[{'id':'other','blocking':True,'status':'open'}]
+        self.assertEqual(self.route()['phase'],'await_answer')
+
+    def test_contradictory_missing_and_untrusted_sources_require_peer(self):
+        for data, status in [({'name':'north','approved':'south'},'conflict'),({'name':'north'},'missing'),
+                             ({'name':'new','approved':'new'},'missing')]:
+            self.register(data)
+            guide=self.route()
+            self.assertEqual(guide['routing']['status'],status)
+            self.assertEqual(guide['focus_actions'],['ask'])
+        del self.files['register.json']
+        self.assertEqual(self.route()['routing']['status'],'missing')
+        del self.full['development']['manifest']['register.json']
+        self.assertEqual(self.route()['focus_actions'],['ask'])
+
+    def test_resolved_question_only_counts_for_current_peer_basis_and_answer(self):
+        self.register({'name':'north','approved':'south'})
+        basis=self.route()['routing']['basis']
+        request={'task_id':'other','pointer':'/task/reports/0/report'}
+        question={'id':'q','blocking':True,'status':'resolved','to_bot_id':'wrong','consultation_basis':basis,
+                  'answer_id':'a','resolution':{'evidence':['a']},'response_report':{'request':request,'state_id':'s1'}}
+        self.full['consultations']=[question]
+        self.add('inspect',request,{**request,'value':{'status':'completed','summary':'south'}})
+        self.assertEqual(self.route()['focus_actions'],['ask'])
+        question['to_bot_id']='control'
+        question['resolution']['evidence']=[]
+        self.assertEqual(self.route()['focus_actions'],['ask'])
+        question['resolution']['evidence']=['a']
+        self.assertFalse(self.route()['routing']['consulted'])
+        question['reviewed_basis']=basis
+        self.assertTrue(self.route()['routing']['consulted'])
+        self.full['development']['state']['id']='candidate-only'
+        self.assertTrue(self.route()['routing']['consulted'])
+        self.register({'name':'south','approved':'north'})
+        self.assertFalse(self.route()['routing']['consulted'])

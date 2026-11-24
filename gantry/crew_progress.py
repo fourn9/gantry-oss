@@ -3,6 +3,7 @@ import hashlib
 import json
 
 from .connection_policy import clean_bytes, safe_path
+from . import crew_consultation
 from .crew_json import pointer_value
 from .crew_observe import observation_actions
 from .development import in_scope
@@ -14,13 +15,12 @@ def validate_guide(config):
         return
     guide = config['evidence_guide']
     require(config.get('agent_loop') and config.get('workflow') == 'bot_development'
-            and isinstance(guide, dict) and set(guide) in ({'source'}, {'source','candidate','check_tool'}),
+            and isinstance(guide, dict) and set(guide) in ({'source'}, {'source','candidate','check_tool'},
+                {'source','candidate','check_tool','consultation_policy'}),
             'invalid_input', 'An evidence guide needs a Bot action loop and a source, with optional candidate and check tool')
-    source = guide['source']
-    require(isinstance(source, dict) and set(source) == {'path','pointer'} and isinstance(source['pointer'], str)
-            and (not source['pointer'] or source['pointer'].startswith('/')) and len(source['pointer']) <= 512,
-            'invalid_input', 'Specify a file and a JSON pointer')
-    safe_path(source['path'])
+    crew_consultation.validate_source(guide['source'])
+    if 'consultation_policy' in guide:
+        crew_consultation.validate_policy(guide['consultation_policy'])
     if 'candidate' in guide:
         safe_path(guide['candidate'])
         require(isinstance(guide['check_tool'], str) and guide['check_tool'] in config.get('local_tools', {}),
@@ -58,7 +58,7 @@ def _receipts(full):
 def _observed(receipts, source, files, manifest):
     path = source['path']
     text = files.get(path)
-    if not isinstance(text, str) or hashlib.sha256(text.encode()).hexdigest() != manifest[path]['hash']:
+    if path not in manifest or not isinstance(text, str) or hashlib.sha256(text.encode()).hexdigest() != manifest[path]['hash']:
         return None
     for action, args, result in receipts:
         if (action['kind'] != 'inspect_json' or args != source or result.get('error')
@@ -109,10 +109,12 @@ def evidence_guide(full, files, config, check_basis):
     task, dev = full['task'], full['development']
     state, manifest = dev['state']['id'], dev['manifest']
     source, candidate = config['source'], config.get('candidate')
-    if source['path'] not in manifest or source['path'] not in files:
+    route = (crew_consultation.compare(full, files, config['consultation_policy'])
+             if crew_consultation.applies(full, config) else None)
+    if not route and (source['path'] not in manifest or source['path'] not in files):
         return None
     if candidate:
-        if task['kind'] != 'develop' or candidate not in manifest or not in_scope(candidate,task['write_scope']):
+        if task['kind'] != 'develop' or (not route and candidate not in manifest) or not in_scope(candidate,task['write_scope']):
             return None
     elif task['kind'] != 'report' or not full.get('response_request'):
         return None
@@ -123,7 +125,7 @@ def evidence_guide(full, files, config, check_basis):
     edit = previous_check = None
     for action, args, result in receipts:
         if (candidate and not edit and action['kind'] in {'edit','replace'} and result.get('path') == candidate
-                and not result.get('error') and result.get('hash') == manifest[candidate]['hash']):
+                and not result.get('error') and result.get('hash') == manifest.get(candidate, {}).get('hash') and candidate in manifest):
             edit = action['id']
         if candidate and action['kind'] == 'tool' and args.get('name') == check['name']:
             if action.get('input_state') != state or not check_basis or result.get('check_definition') != check_basis:
@@ -143,7 +145,9 @@ def evidence_guide(full, files, config, check_basis):
         phase, focus = ('review_answer',['inspect']) if not consultation['report'] else ('assess_answer',['resolve'])
     elif consultation and consultation['status'] == 'open':
         phase, focus = 'await_answer',['finish']
-    elif not observed:
+    elif route and route['status'] != 'consistent' and not route['consulted']:
+        phase, focus = 'consult_responsible_peer',['ask']
+    elif not observed and not route:
         phase, focus = 'inspect_source',['inspect_json']
     elif not candidate:
         phase, focus = 'report_evidence',['finish']
@@ -152,8 +156,8 @@ def evidence_guide(full, files, config, check_basis):
     elif edit and check['status'] == 'not_observed':
         phase, focus = 'check_candidate',['tool']
     else:
-        phase, focus = 'choose_candidate',['edit','replace','ask']
-    return {'state_id':state,'source':source,'observed':observed,'candidate':candidate,'candidate_hash':manifest[candidate]['hash'] if candidate else None,'edit_action_id':edit,
+        phase, focus = 'choose_candidate',(['edit','replace'] if route else ['edit','replace','ask'])
+    return {**({'routing':route} if route else {}), 'state_id':state,'source':source,'observed':observed,'candidate':candidate,'candidate_hash':manifest.get(candidate, {}).get('hash'),'edit_action_id':edit,
             'check':check,'previous_check':previous_check,'consultation':consultation,'phase':phase,'focus_actions':focus,
             'coverage':'Up to 64 recent task actions; missing receipts are unknown. The assigned contract still governs completion.'}
 

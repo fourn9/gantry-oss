@@ -257,3 +257,22 @@ quality, native tool compatibility or engineering speed improvements. Subscripti
 model smoke evidence must be recorded separately.
 
 See [acceptance results and remaining boundaries](CREW_SETUP_ACCEPTANCE.md).
+
+For a decision on a categorical value, the owner may add a consultation policy to the developer's `evidence_guide` alongside its source, candidate and check tool:
+
+```json
+{
+  "consultation_policy": {
+    "peer": "integration",
+    "sources": [
+      {"path":"assembly.json","pointer":"/connector/key"},
+      {"path":"wiring.json","pointer":"/connector/key"}
+    ],
+    "allowed_values":["A","B"]
+  }
+}
+```
+
+The action-loop Worker reads these fields on the assigned saved revision and reports their values, file hashes and comparison to the provider. Matching values prioritize independent work. Missing, ambiguous, unsupported or conflicting values prioritize a question to the registered peer. The normal submission path requires a completed response, an inspection of the linked report and a resolution citing its answer. A new source basis requires fresh review. Unrelated open reviews still block completion. A passing configured check on the submitted state is required in either path. These checks apply to participating Workers; project-wide completion rules belong in the Core contract.
+
+Select sources that represent the same claim in the same units and frame. This policy supports two to four JSON pointers and an explicit vocabulary of string values, with a 64 KiB limit per source file. The owner defines the source coverage; more complex engineering judgments remain with the assigned Bots.

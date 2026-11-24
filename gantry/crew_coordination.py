@@ -1,6 +1,9 @@
 """Bot-authored consultation, decisions and experience; no engineering policy."""
 import copy
+import json
+import re
 
+from .crew_observe import observation_actions
 from .contracts import register, S, A, I
 from .bot_development import PAGE
 from .model import require, uid
@@ -11,7 +14,7 @@ register('stop_bot_task', {**REF, 'target_task_id': S, 'version': I, 'reason': S
 register('get_bot_records', {'task_id': S, 'kind': {'enum': ['actions', 'decisions', 'learning_uses']}, **PAGE}, ['task_id', 'kind'])
 register('resolve_bot_question', {**REF, 'message_id': S, 'reason': S, 'evidence': A},
          [*REF, 'message_id', 'reason', 'evidence'])
-register('ask_bot', {**REF, 'to_bot_id': S, 'question': S, 'evidence': A, 'memory_id': S},
+register('ask_bot', {**REF, 'to_bot_id': S, 'question': S, 'evidence': A, 'memory_id': S, 'consultation_basis': S},
          [*REF, 'to_bot_id', 'question', 'evidence'])
 register('record_bot_decision', {**REF, 'verdict': {'enum': [
     'authorize', 'revise', 'select', 'continue', 'stop', 'escalate']},
@@ -37,9 +40,40 @@ class CrewCoordinationMixin:
         message = self._dev_get(s, 'bot_task_messages', a['message_id'])
         require(message['task_id'] == task['id'], 'scope_denied', 'Question belongs to another task')
         result = self.cmd_resolve_bot_message(s, actor, {k: a[k] for k in ('message_id', 'reason', 'evidence')}, fx, n, con)
+        if message.get('consultation_basis') and message.get('answer_id') in a['evidence']:
+            response = self._crew_response_report(s, message, task['session_id']) or {}
+            request = response.get('request')
+            if request and self._cited_report_read(s, task, request, a['evidence']):
+                result['reviewed_basis'] = message['consultation_basis']
+                self._dev_save(s, fx, 'bot_task_messages', result)
         task['stamp'] = self._bd_stamp(s, actor, task, con)
         self._dev_save(s, fx, 'bot_tasks', task)
         return result
+
+    @staticmethod
+    def _cited_report_read(state, task, request, evidence):
+        peer = state['bot_tasks'][request['task_id']]
+        report = peer['reports'][int(request['pointer'].split('/')[3])]['report']
+        if report.get('status') != 'completed':
+            return False
+        for ident in evidence:
+            record = state.get('bot_actions', {}).get(ident)
+            if not record or record.get('task_id') != task['id']:
+                continue
+            for action in observation_actions([record]):
+                if action.get('kind') != 'inspect':
+                    continue
+                details = action.get('details', {})
+                receipt = details.get('result')
+                try:
+                    args = json.loads(details.get('arguments', ''))
+                except (TypeError, ValueError, RecursionError):
+                    continue
+                if (args == request and isinstance(receipt, dict) and not receipt.get('error')
+                        and receipt.get('next_offset') is None and receipt.get('task_id') == request['task_id']
+                        and receipt.get('pointer') == request['pointer'] and receipt.get('value') == report):
+                    return True
+        return False
 
     def cmd_get_bot_records(self, s, actor, a, fx, n, con):
         task = self._dev_get(s, 'bot_tasks', a['task_id'])
@@ -151,6 +185,10 @@ class CrewCoordinationMixin:
             session_id=task['session_id'], from_bot_id=task['bot_id'], to_bot_id=a['to_bot_id'],
             principal_id=actor['id'], body=a['question'], kind='question', blocking=True,
             evidence=a['evidence'], status='open', response_task_id=response['id'], created_seq=s['seq'] + 1)
+        if 'consultation_basis' in a:
+            require(isinstance(a['consultation_basis'], str) and re.fullmatch('[a-f0-9]{64}', a['consultation_basis']),
+                    'invalid_input', 'Invalid saved consultation basis')
+            msg['consultation_basis'] = a['consultation_basis']
         self._dev_save(s, fx, 'bot_task_messages', msg)
         self._inherit_continuation(task, response)
         response['reply_request_id'] = msg['id']; self._dev_save(s, fx, 'bot_tasks', response)

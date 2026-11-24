@@ -58,12 +58,12 @@ class FrozenLesson:
         return LESSON
 
 
-def checkpoint(f, case):
+def checkpoint(f, case, signed=None):
     part, register, release = case
     change = f.owner.call('begin_change', {'state_id': f.base['id'], 'title': part, 'purpose': 'Select guide',
         'dependencies': [], 'write_scope': ['mechanical.txt', 'control.txt'], 'assignee': 'admin'})
     snapshot = f.artifact({'mechanical.txt': 'undecided',
-                           'control.txt': json.dumps({'register': register, 'release': release})})
+                           'control.txt': json.dumps({'register': register, 'release': release, **({'signed': signed} if signed is not None else {})})})
     result = f.owner.call('checkpoint_change', {'change_id': change['id'], 'version': change['version'],
         'snapshot': snapshot, 'summary': 'New fixture register', 'rationale': 'Independent exercise',
         'unfinished': ['Select and test the guide'], 'capture': {'scope': 'saved fixtures', 'missing': []},
@@ -75,7 +75,7 @@ def actions(client, task_id):
     return client.call('get_bot_records', {'task_id': task_id, 'kind': 'actions', 'limit': 100})['items']
 
 
-def score(owner, view, case, final_state, task_actions):
+def score(owner, view, case, final_state, task_actions, require_peer=None):
     expected = case[2]
     verified = [a['id'] for a in task_actions if a['kind'] == 'tool' and a['input_state'] == final_state
                 and a['details']['result'].get('exit_code') == 0 and a['details']['result'].get('output_artifact')
@@ -100,13 +100,15 @@ def score(owner, view, case, final_state, task_actions):
     consulted = any(c['cited'] and c['read_exact_report'] and c['peer_checked_source']
                     and c['status'] == 'resolved' and c['peer_status'] == 'completed' for c in consultations)
     right = actual == hashlib.sha256(expected.encode()).hexdigest()
-    accepted = view['task']['status'] == 'completed' and right and bool(verified) and ('disagree' not in case[1] or consulted)
-    return {'passed': accepted, 'status': view['task']['status'], 'correct_file': right,
+    if require_peer is None:
+        require_peer = 'disagree' in case[1]
+    accepted = view['task']['status'] == 'completed' and right and bool(verified) and (not require_peer or consulted)
+    return {'passed': accepted, 'status': view['task']['status'], 'correct_file': right, 'peer_chain': consulted, 'questions': len(view['consultations']),
             'check_receipts': verified, 'consultations': consultations, 'expected_digest': hashlib.sha256(expected.encode()).hexdigest(),
             'actual_digest': actual}
 
 
-def run(f, model, home, case, state_id, past, mid, memory, feedback, rotation, smoke=False, prefix=(), guided=False, retry_aware=False):
+def run(f, model, home, case, state_id, past, mid, memory, feedback, rotation, smoke=False, prefix=(), guided=False, retry_aware=False, routing_study=None):
     setup = time.perf_counter()
     shutil.copytree(f.root/'ledger', home/'ledger')
     service = Service(home/'ledger')
@@ -114,10 +116,20 @@ def run(f, model, home, case, state_id, past, mid, memory, feedback, rotation, s
     clients = {k: LocalClient(service, f.tokens[k]) for k in ('designer', 'control')}
     history = next(a['details']['rationale'] for a in actions(clients['designer'], past) if a['kind'] == 'review_feedback')
     decisions = {'designer': [], 'control': []}
+    wait_reports = 0
+    design_config = f.configs['designer']
+    if routing_study is not None:
+        spec = dict(design_config['evidence_guide'])
+        if routing_study['enabled']:
+            spec['consultation_policy'] = routing_study['policy']
+        design_config = {**design_config, 'evidence_guide': spec}
+        owner.call('configure_bot_runtime', {'bot_id':'designer', 'version':2, 'principal_id':'designer',
+                                            'enabled':True, 'environment':environment_manifest(design_config)})
     receipts = []
     snapshot_seconds = time.perf_counter()-setup
 
     def infer(ctx, schema, directory):
+        nonlocal wait_reports
         role = ctx['bot']['id']
         peer = role == 'control'
         log = decisions[role]
@@ -138,9 +150,12 @@ def run(f, model, home, case, state_id, past, mid, memory, feedback, rotation, s
                 outcome = str(last.get('error') or ('Acknowledged' if not last.get('reason') else last['reason']))
             log[-1]['result'] = outcome
         q = next(iter(ctx.get('consultations', [])), {})
-        if not peer and q.get('status') == 'open':
+        consumed = len(log) + (wait_reports if routing_study and not peer else 0)
+        limit = 4 if peer else 8+len(prefix)
+        if not peer and q.get('status') == 'open' and (not routing_study or consumed < limit):
+            wait_reports += 1
             kind, args = 'finish', f.answer(status='waiting', summary='Await manufacturing')
-        elif len(log) >= (4 if peer else 8+len(prefix)):
+        elif consumed >= limit:
             kind, args = 'finish', f.answer(status='failed', summary='Decision budget exhausted')
         else:
             if peer:
@@ -150,6 +165,9 @@ def run(f, model, home, case, state_id, past, mid, memory, feedback, rotation, s
                 prompt = (ctx['task']['title']+'. Drawing shows blue. Deliver the correct saved guide after a passing release check. '
                     'If signatures disagree, obtain the effective release from manufacturing, read the report and resolve with evidence. '
                     'A saved design still needs a check. Submit when done. Historical record: '+history)
+                if routing_study is not None:
+                    prompt += (' Signed design and integration records must agree. If either is missing or they differ, '
+                               'ask manufacturing. When both agree, use that value and check the saved candidate.')
                 if memory:
                     lesson = next(m for m in ctx['memory']['items'] if m['id'] == mid)
                     prompt += '\nRecalled conditional lesson (one source): '+lesson['lesson']['strategy']
@@ -181,6 +199,10 @@ def run(f, model, home, case, state_id, past, mid, memory, feedback, rotation, s
                         '\nCheck on the saved version: '+guide['check']['status']+
                         '\nCurrent decision: '+guide['phase']+
                         '. Use the latest source or the resolved answer to choose the guide. A checked, correct candidate is ready to submit.')
+                    if guide.get('routing'):
+                        route = guide['routing']
+                        prompt += ('\nSigned records: '+json.dumps([claim['value'] for claim in route['sources']])
+                                   +'. Comparison: '+route['status']+'. Responsible peer: '+route['peer']+'.')
                 writes = None
                 if retry_aware and not peer:
                     writes = {o:hashlib.sha256(color.encode()).hexdigest() for o,color in [(BLUE,'blue'),(AMBER,'amber')]}
@@ -209,7 +231,7 @@ def run(f, model, home, case, state_id, past, mid, memory, feedback, rotation, s
     start = time.perf_counter()
     task = owner.call('assign_bot_task', {**f.assignment('designer', title='Select fixture guide for '+case[0], state_id=state_id),
                                           'session_id': f.sid})
-    with BotWorker(clients['designer'], f.configs['designer'], home/'runtime', infer) as designer, \
+    with BotWorker(clients['designer'], design_config, home/'runtime', infer) as designer, \
             BotWorker(clients['control'], f.configs['control'], home/'runtime', infer) as control:
         for worker in (designer, control, designer):
             results = worker.tick()
@@ -219,8 +241,9 @@ def run(f, model, home, case, state_id, past, mid, memory, feedback, rotation, s
             if view['task']['status'] in {'completed','failed','blocked'}: break
     task_actions = actions(owner, task['id'])
     final_state = view['development']['state']['id']
-    result = score(owner, view, case, final_state, task_actions)
     elapsed = time.perf_counter()-start
+    result = score(owner, view, case, final_state, task_actions,
+                   routing_study['require_peer'] if routing_study is not None else None)
     if smoke:
         assert not score(owner, view, case, 'different-state', task_actions)['passed']
         assert not score(owner, view, case, final_state, [a for a in task_actions if a['kind'] != 'inspect'])['passed']
@@ -230,7 +253,7 @@ def run(f, model, home, case, state_id, past, mid, memory, feedback, rotation, s
         'base_state': state_id, 'final_state': final_state, 'seconds': elapsed, 'clone_seconds': snapshot_seconds,
         'duplicate_saves': sum(a['details']['result'].get('changed') is False for a in edits),
         'checks': sum(a['kind']=='tool' for a in task_actions), 'receipts': receipts, 'decisions': decisions,
-        'parent_interventions': 0}
+        'parent_interventions': 0, 'wait_reports': wait_reports}
 
 
 def main():
