@@ -11,12 +11,12 @@ def metrics(model, directory):
     runs = [json.loads(line) for line in (directory/'runs.jsonl').read_text().splitlines()]
     if len(runs) != len(manifest['groups']) or len(runs) != 48:
         raise ValueError('Cohort is incomplete')
-    handoff = manifest.get('study') in ('regression','held-out')
+    handoff = manifest.get('study') in ('regression','held-out','transfer')
     pairs = {}
     for row, (case, memory, rotation, routed) in zip(runs, manifest['groups']):
         if (row['case'],row['memory'],row['rotation'],row['routed']) != (case[0], memory, rotation, routed):
             raise ValueError('Run differs from the frozen trial order')
-        requester = len(row['decisions']['designer']) + row['wait_reports'] + row.get('auto_submits',0)
+        requester = len(row['decisions']['designer']) + row['wait_reports'] + row.get('auto_submits',0) + row.get('auto_checks',0)
         if handoff and requester != row['recorded_operations']:
             raise ValueError('Model choices, waits and conditional submissions must reconcile with durable operations')
         peer = len(row['decisions']['control'])
@@ -35,7 +35,7 @@ def metrics(model, directory):
         arm = 'routed' if routed else 'prior'
         if handoff:
             arm = 'bound' if routed else 'routed'
-            extras = {'cohort':manifest['study'], 'wrong_peer_reports':row['wrong_peer_reports'],
+            extras = {'cohort':manifest['study'], 'frozen_commit':manifest['commit'], 'conditional_checks':row.get('auto_checks',0), 'wrong_peer_reports':row['wrong_peer_reports'],
                       'wrong_edits':row['wrong_edits'], 'conditional_submits':row['auto_submits']}
         yield {**extras, 'model':model,'case':row['case'],'condition':row['condition'],'memory':int(memory),'rotation':rotation,
                'arm':arm,'status':row['status'],'accepted':int(accepted),

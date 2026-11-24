@@ -34,6 +34,15 @@ HELD_OUT = [
     ('spindle','missing',{},'white')]
 
 
+TRANSFER = [
+    ('shuttle','consistent',{'design':'left','integration':'left'},'left'),
+    ('latch','consistent',{'design':'center','integration':'center'},'center'),
+    ('rocker','conflict',{'design':'left','integration':'right'},'center'),
+    ('cap','conflict',{'design':'center','integration':'left'},'left'),
+    ('slider','missing',{'design':'center'},'right'),
+    ('pivot','missing',{'integration':'right'},'left')]
+
+
 def fixture(row):
     name, condition, signed, release = row
     summary = release if condition == 'consistent' else '; '.join(field+' '+signed.get(field,'missing') for field in ('design','integration'))
@@ -47,7 +56,7 @@ def main():
     parser.add_argument('--model', type=Path)
     parser.add_argument('--output', required=True, type=Path)
     parser.add_argument('--smoke', action='store_true')
-    parser.add_argument('--handoff',choices=['pilot','regression','held-out'],help='Compare the routed baseline with evidence-bound handoff')
+    parser.add_argument('--handoff',choices=['pilot','regression','held-out','transfer'],help='Compare the routed baseline with evidence-bound handoff')
     args = parser.parse_args()
     root = args.output.resolve()
     if (root.exists() or root.is_relative_to(Path(__file__).resolve().parents[1])
@@ -78,6 +87,9 @@ def main():
         if args.handoff == 'held-out' and not args.smoke:
             cases = HELD_OUT
             policy = {**POLICY,'allowed_values':['teal','white','violet']}
+        if args.handoff == 'transfer' and not args.smoke:
+            cases = TRANSFER
+            policy = {**POLICY,'allowed_values':['left','center','right']}
         states = {r[0]: checkpoint(f,fixture(r),r[2]) for r in cases}
         groups = [(SMOKE,False,0,True)] if args.smoke else list(itertools.product(cases,(False,True),range(2),(False,True)))
         random.Random(2531).shuffle(groups)
@@ -97,6 +109,8 @@ def main():
             print(i,case[0],routed,row['status'],row['passed'],round(row['seconds'],2),flush=True)
             if args.smoke:
                 assert row['passed'] and row['peer_chain'],row
+                if args.handoff:
+                    assert row['auto_checks']==row['auto_submits']==1 and row['recorded_operations']<=8,row
     finally:
         f.tearDown()
 

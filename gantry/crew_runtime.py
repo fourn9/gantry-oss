@@ -301,7 +301,15 @@ def _execute(client, context, ref, config, action, args, workspace, step, key):
         return {**data, 'hash': hashlib.sha256(raw).hexdigest(), 'size': len(raw),
                 'next_offset': start+len(value) if start+len(value) < len(raw) else None}
     if action == 'edit':
-        validate(args, _schema({'path': S, 'content': {'type': 'string'}, 'expected_hash': S}))
+        fields = {'path':S,'content':{'type':'string'},'expected_hash':S}
+        if 'check_after_save' in args:
+            guide = _routed_guide(context,workspace,config)
+            require(guide and guide.get('literal') and guide['literal']['path']==args.get('path'),
+                    'scope_denied','Conditional checking requires the declared literal target')
+            validate(args,_schema({**fields,'check_after_save':crew_literal.AFTER_EDIT}))
+            require(args['check_after_save']['name']==guide['check']['name'],'scope_denied','Use the registered acceptance check')
+        else:
+            validate(args,_schema(fields))
         _path(workspace, args['path'], scope, create=True)
         raw = args['content'].encode()
         _check_literal_write(context, workspace, config, args['path'], raw)
@@ -486,6 +494,9 @@ def action_input(full, workspace, config, last_result, number):
             if offer and offer['action'] in context['action_schemas']:
                 guide['offer'] = offer
             if 'literal' in guide:
+                context['action_schemas']['edit']['properties']['check_after_save'] = crew_literal.AFTER_EDIT
+                context['action_guide']['edit'] += (' Optional check_after_save: {name,submit_on_pass:{summary,rationale,unverified}}. '
+                    'Authorize the named check on this checkpoint and submit on success. Edit, check and submission are recorded separately.')
                 context['action_schemas']['tool'] = _schema({'name':S,'submit_on_pass':crew_literal.SUBMISSION,'diagnostic_reason':S},['name'])
                 context['action_guide']['tool'] += (' Optional submit_on_pass carries summary, rationale and unverified. '
                     'Choose it only when this check completes your work. A distinct fenced finish follows exact-state success. '
@@ -540,7 +551,8 @@ def run_actions(client, initial, ref, infer, config, root):
                         (full.get('personal_preferences') or {}).get('basis',digest([])))
                     if receipt and safe_fingerprint(workspace)!=digest({p:v['hash'] for p,v in full['development']['manifest'].items()}):
                         receipt = None
-                guard = {'action_id':intent['check'],'discussion_version':intent['discussion']} if receipt else None
+                guard = ({'action_id':intent['check'],'discussion_version':intent['discussion']}
+                         if receipt and receipt['output']['action']=='finish' else None)
                 if receipt is None:
                     receipt = infer(context, schema, step/'model')
                 validate(receipt['output'], schema)
@@ -636,6 +648,7 @@ def run_actions(client, initial, ref, infer, config, root):
             persist(marker, saved)
         with span(step, 'record'):
             action_record = _return_effect(client, saved, marker, 'record_args', 'record_bot_action', key + ':record', ref)
+        checkpoint_state = saved['input_state']
         if action != 'integrate' and safe_fingerprint(workspace) != saved['before']:
             with span(step, 'checkpoint'):
                 if 'checkpoint_args' not in saved:
@@ -644,7 +657,8 @@ def run_actions(client, initial, ref, infer, config, root):
                         'rationale': output['rationale'], 'unfinished': ['Intermediate Bot action; not adopted'],
                         'capture': {'scope': 'Brokered action and saved workspace', 'missing': missing}}
                     persist(marker, saved)
-                _return_effect(client, saved, marker, 'checkpoint_args', 'checkpoint_bot_task', key + ':checkpoint', ref)
+                checkpoint = _return_effect(client, saved, marker, 'checkpoint_args', 'checkpoint_bot_task', key + ':checkpoint', ref)
+                checkpoint_state = checkpoint['state']['id']
         if action == 'tool' and 'error' not in saved.get('tool_result', saved['result']):
             with span(step, 'record'):
                 _publish_tool_evidence(client, ref, config, workspace, saved, marker, key)
@@ -677,12 +691,17 @@ def run_actions(client, initial, ref, infer, config, root):
         if saved.get('feedback_args'):
             _return_effect(client, saved, marker, 'feedback_args', 'record_bot_action', key+':feedback', ref)
         state.pop('conditional_submit',None)
+        base = {'round':number+1,'task':ref['task_id'],'attempt':full['task']['attempt'],
+                'discussion':saved['discussion_version'],'preferences':saved['preferences_basis']}
+        if action=='edit' and not saved['result'].get('error'):
+            plan = json.loads(output['arguments_json']).get('check_after_save')
+            if plan:
+                state['conditional_submit'] = {**base,'state':checkpoint_state,'edit':action_record['id'],
+                                               'name':plan['name'],'report':plan['submit_on_pass']}
         if action=='tool' and not saved['result'].get('error') and saved['result'].get('exit_code')==0:
             submission = json.loads(output['arguments_json']).get('submit_on_pass')
             if submission and saved['result'].get('output_artifact') and not saved['result'].get('reason'):
-                state['conditional_submit'] = {'round':number+1, 'task':ref['task_id'], 'attempt':full['task']['attempt'],
-                    'state':saved['input_state'],'discussion':saved['discussion_version'],'preferences':saved['preferences_basis'],
-                    'check':action_record['id'],'report':submission}
+                state['conditional_submit'] = {**base,'state':saved['input_state'],'check':action_record['id'],'report':submission}
         state.update(next=number+1, last_result=saved['result']); persist(state_path, state)
 
 

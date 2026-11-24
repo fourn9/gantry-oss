@@ -126,3 +126,14 @@ class HandoffTests(unittest.TestCase):
         self.assertEqual(check_arguments({'name':'other'},guide),({'name':'other'},False))
         with self.assertRaises(Fault):
             check_arguments({'name':'release','diagnostic_reason':'Inspect','submit_on_pass':{}},guide)
+
+    def test_check_after_edit_requires_the_exact_checkpoint_and_edit(self):
+        from gantry.crew_literal import continuation
+        full={'task':{'id':'t','attempt':1,'discussion_version':2},'development':{'state':{'id':'new'}},'messages':[]}
+        guide={'check':{'status':'not_observed','name':'check'},'literal':{'matches':True},'edit_action_id':'e'}
+        token={'task':'t','attempt':1,'state':'new','discussion':2,'preferences':'p','edit':'e',
+               'name':'check','report':{'summary':'done','rationale':'bound','unverified':['wear']}}
+        self.assertEqual(continuation(token,full,guide,'p')['output']['action'],'tool')
+        for field in ('state','edit','name','attempt','discussion','preferences'):
+            self.assertIsNone(continuation({**token,field:'changed'},full,guide,'p'))
+        self.assertIsNone(continuation(token,full,{**guide,'literal':{'matches':False}},'p'))

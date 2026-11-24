@@ -18,6 +18,10 @@ SUBMISSION = {'type':'object','properties':{'summary':S,'rationale':S,'unverifie
               'required':['summary','rationale','unverified'],'additionalProperties':False}
 
 
+AFTER_EDIT = {'type':'object','properties':{'name':S,'submit_on_pass':SUBMISSION},
+              'required':['name','submit_on_pass'],'additionalProperties':False}
+
+
 def validate_publisher(policy):
     require(isinstance(policy,dict) and set(policy)=={'requester','allowed_values'}, 'invalid_input',
             'Declare the requesting Bot and values approved for sharing')
@@ -151,8 +155,15 @@ def continuation(token, full, guide, preferences):
     task = full['task']
     if (token['task']!=task['id'] or token['attempt']!=task['attempt'] or token['discussion']!=task['discussion_version']
             or token['state']!=full['development']['state']['id'] or token['preferences']!=preferences
-            or guide['check'].get('action_id')!=token['check'] or guide['check']['status']!='passed'
             or any(m['blocking'] and m['status']!='resolved' for m in full['messages'])):
+        return None
+    if 'edit' in token:
+        if token['edit']!=guide.get('edit_action_id') or token['name']!=guide['check']['name']:
+            return None
+        return {'output':{'action':'tool','arguments_json':canonical({'name':token['name'],'submit_on_pass':token['report']}),
+                          'rationale':token['report']['rationale']},
+                'provider':{'kind':'conditional_check','edit_action_id':token['edit']}}
+    if guide['check'].get('action_id')!=token['check'] or guide['check']['status']!='passed':
         return None
     args = {**token['report'],'status':'completed','assignments':[],'integrate_changes':[],'edits':[]}
     return {'output':{'action':'finish','arguments_json':canonical(args),'rationale':args['rationale']},

@@ -128,6 +128,7 @@ def run(f, model, home, case, state_id, past, mid, memory, feedback, rotation, s
     kinds = {**ACTION_KINDS, **dict.fromkeys(saves,'edit'), **dict.fromkeys(reports,'finish')}
     send_read = 'Report the value from my cited read'
     use_review = 'Save the value from the signed records or reviewed answer'
+    save_check_submit = 'Save the referenced value, run the release check, and submit on success'
     check_submit = 'Run the check and submit this candidate on success'
     diagnose = 'Measure the pre-edit baseline as a diagnostic'
     pause = 'Block this task for further review'
@@ -168,7 +169,11 @@ def run(f, model, home, case, state_id, past, mid, memory, feedback, rotation, s
                 outcome = str(last.get('error') or ('Acknowledged' if not last.get('reason') else last['reason']))
             log[-1]['result'] = outcome
         q = next(iter(ctx.get('consultations', [])), {})
-        consumed = len(log) + (wait_reports if routing_study and not peer else 0)
+        automatic = 0
+        if handoff and not peer and any(r['choice']==save_check_submit for r in log):
+            automatic = sum(a['details'].get('provider',{}).get('kind') in {'conditional_check','conditional_submission'}
+                            for a in actions(clients['designer'],ctx['task']['id']))
+        consumed = len(log) + (wait_reports + automatic if routing_study and not peer else 0)
         limit = 4 if peer else 8+len(prefix)
         if not peer and q.get('status') == 'open' and (not routing_study or consumed < limit):
             wait_reports += 1
@@ -205,7 +210,7 @@ def run(f, model, home, case, state_id, past, mid, memory, feedback, rotation, s
                 if offer['action']=='finish':
                     suggested = send_read if peer else SUBMIT
                 elif offer['action']=='edit':
-                    suggested = use_review
+                    suggested = save_check_submit if consumed+3<=limit else use_review
                 elif offer['action']=='tool' and consumed+2<=limit:
                     suggested = check_submit
             if primed:
@@ -245,8 +250,10 @@ def run(f, model, home, case, state_id, past, mid, memory, feedback, rotation, s
                     # Present the reference once; moving between the focused and full menu remains a model choice.
                     if suggested == send_read:
                         alternatives = [PEEK,send_read,pause]
-                    elif suggested == use_review:
-                        alternatives = [READ,use_review,diagnose,pause]
+                    elif suggested in (use_review,save_check_submit):
+                        alternatives = [READ,suggested,diagnose,pause]
+                        if suggested==save_check_submit:
+                            alternatives.append(use_review)
                     elif suggested == check_submit:
                         alternatives = [READ,CHECK_ACTION,check_submit,SUBMIT,pause]
                     else:
@@ -269,8 +276,12 @@ def run(f, model, home, case, state_id, past, mid, memory, feedback, rotation, s
                 kind, args = 'resolve', {'message_id': q['id'], 'reason': 'Reviewed this fixture question', 'evidence': [q['answer_id']]}
             elif choice == send_read:
                 kind, args = 'finish', f.answer(**offer['arguments'])
-            elif choice == use_review:
-                kind,args = 'edit',offer['arguments']
+            elif choice in (use_review,save_check_submit):
+                kind,args = 'edit',dict(offer['arguments'])
+                if choice==save_check_submit:
+                    report = f.answer(summary='Submitted after the saved candidate passed its release check')
+                    args['check_after_save'] = {'name':guide['check']['name'],
+                        'submit_on_pass':{k:report[k] for k in ('summary','rationale','unverified')}}
             elif choice == diagnose:
                 kind,args = 'tool',{'name':'release_check','diagnostic_reason':'Measure the pre-edit baseline'}
             elif choice == check_submit:
@@ -318,6 +329,7 @@ def run(f, model, home, case, state_id, past, mid, memory, feedback, rotation, s
         'duplicate_saves': sum(a['details']['result'].get('changed') is False for a in edits),
         'checks': sum(a['kind']=='tool' for a in task_actions), 'receipts': receipts, 'decisions': decisions,
         'parent_interventions': 0, 'wait_reports': wait_reports,
+        'auto_checks':sum(a['details'].get('provider',{}).get('kind')=='conditional_check' for a in task_actions),
         'auto_submits':sum(a['details'].get('provider',{}).get('kind')=='conditional_submission' for a in task_actions),
         'recorded_operations':len(counted),
         'wrong_peer_reports':sum(q['wrong_report'] for q in result['consultations']),
