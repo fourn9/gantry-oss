@@ -167,6 +167,11 @@ class CrewRuntimeTests(CrewCoordinationTests):
             question = ctx['consultations'][0]
             if question['status'] == 'open': return self.action('finish', self.answer(status='waiting'))
             if question['status'] == 'answered':
+                if not ctx.get('last_result'):
+                    return self.action('inspect', question['response_report']['request'])
+                answer = ctx['last_result']['value']
+                self.assertEqual(answer['summary'], 'Compatible at this saved interface only')
+                self.assertEqual(answer['unverified'], ['Physical behavior'])
                 return self.action('resolve', {'message_id': question['id'], 'reason': 'Read peer limitations', 'evidence': [question['answer_id']]})
             return self.action('finish', self.answer(summary='Continued after peer answer; physical behavior unverified'))
         with self.worker('designer', requester) as worker: self.assertEqual(worker.tick()[0]['task']['status'], 'waiting')

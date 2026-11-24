@@ -83,7 +83,13 @@ class CrewCoordinationMixin:
 
 
     def _crew_context(self, s, actor, task, con):
-        consultations = [self._dev_get(s, 'bot_task_messages', i) for i in task.get('consultations', [])]
+        consultations = []
+        for ident in task.get('consultations', []):
+            question = copy.deepcopy(self._dev_get(s, 'bot_task_messages', ident))
+            report = self._crew_response_report(s, question, task['session_id'])
+            if report is not None:
+                question['response_report'] = report
+            consultations.append(question)
         request = self._dev_get(s, 'bot_task_messages', task['reply_request_id']) if task.get('reply_request_id') else None
         return {'consultations': consultations, 'response_request': copy.deepcopy(request),
                 'decisions': [self._crew_check_record(s, actor, task, v, con) for v in self._crew_records(s, con, 'bot_decisions', task['id'])],
@@ -91,6 +97,28 @@ class CrewCoordinationMixin:
                 'action_history': {'total': con.execute('SELECT count(*) FROM records WHERE collection=? AND subject_id=?',
                     ('bot_actions', task['id'])).fetchone()[0], 'retrieval': 'get_bot_records', 'kind': 'actions', 'recent_limit': 20},
                 'decision_history': {'retrieval': 'get_bot_records', 'kind': 'decisions', 'recent_limit': 20}}
+
+    @staticmethod
+    def _crew_response_report(s, question, session_id):
+        """Navigate to the report linked to the answer, without copying its body."""
+        if question['status'] not in {'answered', 'resolved'}:
+            return None
+        response = s.get('bot_tasks', {}).get(question.get('response_task_id'))
+        answer = s.get('bot_task_messages', {}).get(question.get('answer_id'))
+        if (not response or not answer or response['session_id'] != session_id
+                or answer['session_id'] != session_id or response.get('reply_request_id') != question['id']
+                or answer.get('task_id') != question['task_id'] or answer.get('reply_to') != question['id']
+                or answer.get('evidence') != [response['id']]):
+            return None
+        # Report and answer are written by the same completion event. A
+        # cancellation can return an answer message without a fresh report.
+        reports = response.get('reports', [])
+        for index in range(len(reports) - 1, -1, -1):
+            saved = reports[index]
+            if saved['seq'] == answer['created_seq']:
+                return {'request': {'task_id': response['id'], 'pointer': f'/task/reports/{index}/report'},
+                        'evidence_id': answer['id'], 'report_seq': saved['seq'], 'state_id': saved['state_id']}
+        return None
 
     def cmd_refresh_bot_task(self, s, actor, a, fx, n, con):
         task = self._dev_get(s, 'bot_tasks', a['task_id'])
@@ -137,10 +165,13 @@ class CrewCoordinationMixin:
         request = self._dev_get(s, 'bot_task_messages', mid)
         if request['status'] != 'open': return
         source = self._dev_get(s, 'bot_tasks', request['task_id'])
-        report = task['reports'][-1]['report'] if task['reports'] else {'summary': task.get('cancellation', task['status'])}
+        if task['status'] == 'cancelled':
+            summary = task['cancellation']
+        else:
+            summary = task['reports'][-1]['report']['summary'] if task['reports'] else task['status']
         answer = dict(id=uid('bmessage'), subject_id=source['id'], task_id=source['id'],
             session_id=source['session_id'], from_bot_id=task['bot_id'], to_bot_id=source['bot_id'],
-            principal_id=task['principal_id'], body=report['summary'], kind='answer', blocking=False,
+            principal_id=task['principal_id'], body=summary, kind='answer', blocking=False,
             reply_to=mid, evidence=[task['id']], status='open', created_seq=s['seq'] + 1)
         self._dev_save(s, fx, 'bot_task_messages', answer)
         request.update(status='answered', answer_id=answer['id']); self._dev_save(s, fx, 'bot_task_messages', request)
