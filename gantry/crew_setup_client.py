@@ -16,7 +16,7 @@ from .project_connect import private_dir, save, load, locked
 
 BACKENDS = {'codex-subscription': 'codex_subscription', 'customer-command': 'external_agent'}
 RUNTIME_FIELDS = {'name', 'tools', 'command', 'executable_hash', 'cad_python', 'verification',
-                  'environment_definition', 'local_tools', 'tool_runtime', 'sandbox'}
+                  'environment_definition', 'local_tools', 'tool_runtime', 'sandbox', 'evidence_guide'}
 WORKFLOW = {'workflow': 'bot_development', 'agent_loop': True, 'experience_learning': True,
             'learning_mode': 'selective', 'personal_continuity': True}
 
@@ -105,6 +105,8 @@ def _runtime_template(backend, template):
     else:
         require('command' not in template and 'executable_hash' not in template, 'invalid_input', 'Subscription inference does not use a customer command')
     config = {**copy.deepcopy(template), 'backend': BACKENDS[backend], **WORKFLOW}
+    from .crew_progress import validate_guide
+    validate_guide(config)
     validate(environment_manifest(config), ENVIRONMENT)
     return config
 

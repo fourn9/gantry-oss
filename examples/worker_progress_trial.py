@@ -48,6 +48,8 @@ ACTION_KINDS = {READ:'inspect_json', PEEK:'inspect_json', ASK:'ask', INSPECT:'in
                 CHECK_ACTION:'tool', SUBMIT:'finish', BLUE:'edit', AMBER:'edit', **dict.fromkeys(REPORTS,'finish')}
 TRANSFER = [('idler', 'amber', 'amber'), ('brace', 'blue', 'blue'),
             ('hub', 'blue and amber; current signatures disagree', 'blue')]
+RETRY_CASES = [('saddle','blue','blue'), ('carriage','amber','amber'),
+               ('elbow','amber and blue; current signatures disagree','amber')]
 DEV = [('setup-plate', 'amber', 'amber'), ('setup-wheel','amber and blue; current signatures disagree','amber')]
 
 
@@ -104,7 +106,7 @@ def score(owner, view, case, final_state, task_actions):
             'actual_digest': actual}
 
 
-def run(f, model, home, case, state_id, past, mid, memory, feedback, rotation, smoke=False, prefix=(), guided=False):
+def run(f, model, home, case, state_id, past, mid, memory, feedback, rotation, smoke=False, prefix=(), guided=False, retry_aware=False):
     setup = time.perf_counter()
     shutil.copytree(f.root/'ledger', home/'ledger')
     service = Service(home/'ledger')
@@ -179,7 +181,10 @@ def run(f, model, home, case, state_id, past, mid, memory, feedback, rotation, s
                         '\nCheck on the saved version: '+guide['check']['status']+
                         '\nCurrent decision: '+guide['phase']+
                         '. Use the latest source or the resolved answer to choose the guide. A checked, correct candidate is ready to submit.')
-                choice = choose_focused(model.choose, prompt, options, ACTION_KINDS, guide)
+                writes = None
+                if retry_aware and not peer:
+                    writes = {o:hashlib.sha256(color.encode()).hexdigest() for o,color in [(BLUE,'blue'),(AMBER,'amber')]}
+                choice = choose_focused(model.choose, prompt, options, ACTION_KINDS, guide, writes)
             log.append({'choice': choice, 'source': 'fixture' if smoke or primed else 'model', 'decision_seconds': time.perf_counter()-stamp,
                         'input_state': ctx['development']['state']['id']})
             if choice in (READ, PEEK):
@@ -235,6 +240,7 @@ def main():
     modes = parser.add_mutually_exclusive_group()
     modes.add_argument('--smoke', action='store_true')
     modes.add_argument('--compare-guide',action='store_true',help='Paired flat and guided choices on fresh cases')
+    modes.add_argument('--compare-retry',action='store_true',help='Compare the full evidence guide with flat choices on a fresh fixture set')
     modes.add_argument('--guide-pilot',action='store_true',help='Separate development fixtures for the guided bridge')
     modes.add_argument('--prepared-start', action='store_true', help='Separate diagnostic with a recorded, fixture-driven prefix')
     args = parser.parse_args()
@@ -257,7 +263,7 @@ def main():
             if role == 'designer':
                 config.update(local_tools={'release_check': {'argv': [str(Path(sys.base_prefix)/'bin'/'python3'), '-c', CHECK],
                     'timeout_seconds': 10}}, sandbox=backend(), tool_runtime=runtime_roots())
-            if args.compare_guide or args.guide_pilot:
+            if args.compare_guide or args.compare_retry or args.guide_pilot:
                 config['evidence_guide'] = {'source':{'path':'control.txt','pointer':'/release' if role=='control' else '/register'}}
                 if role == 'designer':
                     config['evidence_guide'].update(candidate='mechanical.txt',check_tool='release_check')
@@ -265,10 +271,11 @@ def main():
                 'enabled': True, 'environment': environment_manifest(config)})
         cases = [SMOKE] if args.smoke else PREPARED if args.prepared_start else CASES
         if args.compare_guide: cases = TRANSFER
+        if args.compare_retry: cases = RETRY_CASES
         if args.guide_pilot: cases = DEV
         states = {case[0]: checkpoint(f, case) for case in cases}
         groups = [(SMOKE, True, True, 0)] if args.smoke else list(itertools.product(cases, [False,True], [False,True], range(2)))
-        if args.compare_guide:
+        if args.compare_guide or args.compare_retry:
             groups = list(itertools.product(cases, [False,True], [True], range(2), [False,True]))
         elif args.guide_pilot:
             groups = [(case, True, True, 0, True) for case in cases]
@@ -277,14 +284,14 @@ def main():
         random.Random(9091).shuffle(groups)
         freeze = {'commit': subprocess.check_output(['git','rev-parse','HEAD'],cwd=Path(__file__).parent,text=True).strip(),
                   'model_load_seconds': model_load, 'fixture_seconds': time.perf_counter()-t, 'states':states,
-                  'groups':groups if args.compare_guide or args.guide_pilot else [g[:4] for g in groups], 'smoke':args.smoke, 'prepared_start':args.prepared_start}
+                  'groups':groups if args.compare_guide or args.compare_retry or args.guide_pilot else [g[:4] for g in groups], 'smoke':args.smoke, 'prepared_start':args.prepared_start}
         (root/'manifest.json').write_text(json.dumps(freeze,indent=2))
         for i, (case, memory, feedback, rotation, guided) in enumerate(groups):
             n = len(model.transcript) if model else 0
             prefix = ()
             if args.prepared_start:
                 prefix = (READ, ASK) if 'disagree' in case[1] else (READ, AMBER, AMBER)
-            row = run(f, model, root/str(i), case, states[case[0]], past, mid, memory, feedback, rotation, args.smoke, prefix, guided)
+            row = run(f, model, root/str(i), case, states[case[0]], past, mid, memory, feedback, rotation, args.smoke, prefix, guided, args.compare_retry and guided)
             row.update(guided=guided, model_calls=len(model.transcript)-n if model else 0, fixture_prefix=prefix)
             with (root/'runs.jsonl').open('a') as out: print(json.dumps(row),file=out)
             if model: (root/str(i)/'inference.json').write_text(json.dumps(model.transcript[n:]))

@@ -166,6 +166,9 @@ def _tool(client, ref, config, args, workspace, step, scope, zone):
                            'crew-tool-output:' + digest([ref['task_id'], str(step), output.hex()]))
     result.update(output=result['output'][:32000], output_artifact=artifact['revision_id'],
                   output_truncated=len(result['output']) > 32000)
+    if (config.get('evidence_guide') or {}).get('check_tool') == args['name']:
+        from .crew_progress import check_definition
+        result['check_definition'] = check_definition(config, args['name'])
     # Execution happened even if later file validation rejects the entire import.
     # Keep its sanitized receipt separately; an error must not become test evidence.
     persist(step/'tool-execution.json', result)
@@ -431,14 +434,17 @@ def action_input(full, workspace, config, last_result, number):
             if command not in commands:
                 context['action_guide'].pop(action, None); context['action_schemas'].pop(action, None)
     if config.get('evidence_guide'):
-        from .crew_progress import evidence_guide
-        guide = evidence_guide(full, context['files'], config['evidence_guide'])
+        from .crew_progress import check_definition, evidence_guide
+        role = config['evidence_guide']
+        basis = check_definition(config, role['check_tool']) if 'check_tool' in role else None
+        guide = evidence_guide(full, context['files'], role, basis)
         if guide:
             guide['focus_actions'] = [a for a in guide['focus_actions'] if a in context['action_schemas']]
             context['evidence_guide'] = guide
             original_instruction = context['instruction']
             context['instruction'] += (' Use evidence_guide for a current source observation, peer conditions and check receipt. '
                 'Consider its suggested actions first; choose any other permitted action when appropriate. '
+                'After a failed check, compare current candidate bytes before retrying a write. '
                 'Compare evidence with the candidate. A passed tool alone does not satisfy all completion conditions.')
             if len(canonical(context).encode()) > 480000:
                 del context['evidence_guide']

@@ -6,7 +6,7 @@ from .connection_policy import safe_path
 from .crew_json import pointer_value
 from .crew_observe import observation_actions
 from .development import in_scope
-from .model import Fault, canonical, require
+from .model import Fault, canonical, digest, require
 
 
 def validate_guide(config):
@@ -25,6 +25,11 @@ def validate_guide(config):
         safe_path(guide['candidate'])
         require(isinstance(guide['check_tool'], str) and guide['check_tool'] in config.get('local_tools', {}),
                 'invalid_input', 'Choose an installed check tool')
+
+
+def check_definition(config, tool):
+    return digest([tool, config.get('local_tools', {}).get(tool), config.get('sandbox'),
+                   config.get('tool_runtime'), config.get('tool_evidence', {}).get(tool)])
 
 
 def _receipts(full):
@@ -95,7 +100,7 @@ def _consultation(full, receipts):
     return view
 
 
-def evidence_guide(full, files, config):
+def evidence_guide(full, files, config, check_basis):
     task, dev = full['task'], full['development']
     state, manifest = dev['state']['id'], dev['manifest']
     source, candidate = config['source'], config.get('candidate')
@@ -116,9 +121,10 @@ def evidence_guide(full, files, config):
                 and not result.get('error') and result.get('hash') == manifest[candidate]['hash']):
             edit = action['id']
         if candidate and action['kind'] == 'tool' and args.get('name') == check['name']:
-            if action.get('input_state') != state:
+            if action.get('input_state') != state or not check_basis or result.get('check_definition') != check_basis:
                 if previous_check is None:
-                    previous_check = {'state_id':action.get('input_state'),'action_id':action['id']}
+                    previous_check = {'state_id':action.get('input_state'),'action_id':action['id'],
+                                      'same_definition':bool(check_basis and result.get('check_definition') == check_basis)}
                 continue
             if check['status'] != 'not_observed':
                 continue
@@ -142,16 +148,21 @@ def evidence_guide(full, files, config):
         phase, focus = 'check_candidate',['tool']
     else:
         phase, focus = 'choose_candidate',['edit','replace','ask']
-    return {'state_id':state,'source':source,'observed':observed,'candidate':candidate,'edit_action_id':edit,
+    return {'state_id':state,'source':source,'observed':observed,'candidate':candidate,'candidate_hash':manifest[candidate]['hash'] if candidate else None,'edit_action_id':edit,
             'check':check,'previous_check':previous_check,'consultation':consultation,'phase':phase,'focus_actions':focus,
             'coverage':'Up to 64 recent task actions; missing receipts are unknown. The assigned contract still governs completion.'}
 
 
-def choose_focused(choose, prompt, options, kinds, guide):
+def choose_focused(choose, prompt, options, kinds, guide, candidate_write_hashes=None):
     """Optional bridge for choice-based providers. Keep every original action reachable."""
     if not guide:
         return choose(prompt, options)
     focus = [o for o in options if kinds[o] in guide['focus_actions']]
+    if candidate_write_hashes and guide['check']['status'] == 'failed':
+        # Only literals guaranteed to write the same bytes to the guided target
+        # are redundant. A changed state, another file or new check clears this.
+        focus = [o for o in focus if o not in candidate_write_hashes or
+                 candidate_write_hashes[o] != guide['candidate_hash']]
     if not focus or len(focus) == len(options):
         return choose(prompt, options)
     escape = 'Show the full action menu'

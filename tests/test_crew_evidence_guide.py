@@ -17,11 +17,13 @@ class EvidenceGuideTests(unittest.TestCase):
     def hash(self, s):
         return hashlib.sha256(s.encode()).hexdigest()
     def add(self, kind, args, result, state='s1'):
+        if kind == 'tool':
+            result.setdefault('check_definition','installed')
         self.full['actions'].insert(0, {'id':'r'+str(len(self.full['actions'])), 'kind':kind,'task_id':'task1','input_state':state,
             'details':{'arguments':json.dumps(args),'result':result}})
     def guide(self):
         from gantry.crew_progress import evidence_guide
-        return evidence_guide(self.full,self.files,self.cfg)
+        return evidence_guide(self.full,self.files,self.cfg,'installed')
     def read(self, value):
         self.add('inspect_json',self.cfg['source'],{'source':{'sha256':self.hash(self.raw),'path':'register.json'},
             'pointer':'/name','value':value,'next_offset':None})
@@ -89,3 +91,35 @@ class EvidenceGuideTests(unittest.TestCase):
         self.assertEqual(guide['focus_actions'],['tool'])
         self.assertEqual(guide['check']['status'],'not_observed')
         self.assertEqual(guide['previous_check']['state_id'],'older')
+
+    def test_setup_accepts_only_valid_guidance_before_manifest_is_pinned(self):
+        from gantry.crew_setup_client import _runtime_template
+        template={'name':'guide role','local_tools':{'test':{}},'evidence_guide':self.cfg}
+        self.assertEqual(_runtime_template('codex-subscription',template)['evidence_guide'],self.cfg)
+        with self.assertRaises(Fault):
+            _runtime_template('codex-subscription',{**template,'local_tools':{}})
+
+    def test_failed_receipt_demotes_only_literal_noop_and_allows_explicit_retry(self):
+        from gantry.crew_progress import choose_focused
+        menu = ['write x','write y','ask']
+        kinds = {'write x':'edit','write y':'edit','ask':'ask'}
+        guide = {'focus_actions':['edit','ask'],'candidate_hash':self.hash('x'),'check':{'status':'failed'}}
+        writes = {'write x':self.hash('x'),'write y':self.hash('y')}
+        menus=[]
+        def choose(prompt, options):
+            menus.append(options)
+            return options[-1] if len(menus)==1 else options[0]
+        self.assertEqual(choose_focused(choose,'fixture',menu,kinds,guide,writes),'write x')
+        self.assertEqual(menus[0][:-1],['write y','ask'])
+        self.assertEqual(menus[1],menu)
+        guide['check']['status']='not_observed'
+        choices=[]
+        choose_focused(lambda p,o: choices.extend(o) or o[0], 'fixture', menu, kinds, guide, writes)
+        self.assertEqual(choices,menu)
+
+    def test_changed_tool_definition_invalidates_success_even_on_same_file_state(self):
+        self.read('north')
+        self.add('tool',{'name':'test'},{'exit_code':0,'output_artifact':'r','check_definition':'superseded'})
+        guide = self.guide()
+        self.assertEqual(guide['check']['status'],'not_observed')
+        self.assertFalse(guide['previous_check']['same_definition'])

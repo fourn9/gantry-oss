@@ -129,6 +129,36 @@ reviewed by the customer. See [Crew organization](CREW_ORGANIZATION.md) and
 [Persistent Bots](PERSISTENT_BOTS.md). For the customer-command backend, include
 its exact `command` and `executable_hash` in the runtime template as well.
 
+An optional `evidence_guide` in a role's runtime config or setup template exposes
+the current source observation, peer report and candidate check to the model.
+For example, a guide for a develop task can use the following fields alongside
+the role's existing, approved `local_tools` declaration.
+
+```json
+{
+  "evidence_guide": {
+    "source": {"path": "constraints.json", "pointer": "/mount/interface"},
+    "candidate": "mount.json",
+    "check_tool": "check_mount"
+  }
+}
+```
+
+Use just `source` for a peer whose task is to return a report. A value appears
+after a matching JSON inspection and a check against the available file preview.
+The initial implementation supports small scalar values in plain JSON and an
+existing candidate in the task's write scope. The Worker scans up to 64 recent
+task actions; a missing receipt means unknown. The check outcome describes
+the configured tool's reported exit on the exact state. Evaluate all assigned
+completion conditions before submitting. Existing evaluation and adoption
+rules still apply. Roles sharing a template share its configuration; use a
+role-specific Worker config when the source or check differs.
+
+The Worker includes suggested action kinds in provider input. Choice-based
+customer bridges can use `gantry.crew_progress.choose_focused` to show a short
+menu with an escape to the original options. The menu is advisory and carries
+no extra permissions. Changing the guide changes the environment manifest.
+
 The template must not contain a token, token path, server URL or Bot ID. The setup
 adds `workflow: bot_development`, `agent_loop: true`, `experience_learning: true`,
 `learning_mode: selective` and `personal_continuity: true`. It preserves the supplied
