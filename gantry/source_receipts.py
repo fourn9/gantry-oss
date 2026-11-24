@@ -10,14 +10,14 @@ import stat
 import tempfile
 
 
-def enqueue(root, kind, relative, revision):
+def enrolled_path(root, relative):
     root = Path(root).resolve(strict=True)
     relative = Path(relative)
     if relative.is_absolute() or ".." in relative.parts or any(p.startswith(".") for p in relative.parts):
         raise ValueError("Select a relative export inside the enrolled workspace")
     path = root / relative
-    if path.resolve(strict=True) != path or kind not in {"fusion-saved", "rosbag-closed"}:
-        raise ValueError("Invalid completion path or kind")
+    if path.parent.resolve(strict=True) != path.parent or path.is_symlink():
+        raise ValueError("Linked completion path")
     meta = root / ".gantry"
     binding = meta / "studio-workspace.json"
     if meta.is_symlink() or binding.is_symlink():
@@ -29,6 +29,15 @@ def enqueue(root, kind, relative, revision):
         for scope in saved["write_scope"]
     ):
         raise ValueError("File outside bound write scope")
+    return path, saved["work_id"]
+
+
+def enqueue(root, kind, relative, revision):
+    relative = Path(relative)
+    path, work_id = enrolled_path(root, relative)
+    meta = Path(root).resolve(strict=True) / ".gantry"
+    if kind not in {"fusion-saved", "rosbag-closed"}:
+        raise ValueError("Invalid completion kind")
     fd = os.open(path, os.O_RDONLY | os.O_NONBLOCK | os.O_NOFOLLOW)
     with os.fdopen(fd, "rb") as stream:
         info = os.fstat(fd)
@@ -45,7 +54,7 @@ def enqueue(root, kind, relative, revision):
         after = os.fstat(fd)
         if (info.st_size, info.st_ctime_ns) != (after.st_size, after.st_ctime_ns):
             raise ValueError("File changed while reading completion")
-    receipt = {"work_id": saved["work_id"], "event": {"kind": kind, "path": relative.as_posix(),
+    receipt = {"work_id": work_id, "event": {"kind": kind, "path": relative.as_posix(),
                "source_revision": revision, "sha256": checksum}}
     raw = json.dumps(receipt, sort_keys=True).encode()
     if len(raw) > 8192:

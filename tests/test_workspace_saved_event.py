@@ -1,7 +1,7 @@
 import hashlib
 import unittest
 from gantry.model import Fault
-from gantry.source_receipts import enqueue
+from gantry.source_receipts import enqueue, enrolled_path
 from gantry.workspace_events import source_event, receive_events
 import test_workspace_client as fixtures
 
@@ -37,6 +37,8 @@ class SavedEventTests(unittest.TestCase):
 
     def test_rejects_stale_bytes_outside_scope_and_unclosed_bag(self):
         workspace, initial = self.workspace()
+        with self.assertRaises(ValueError):
+            enrolled_path(workspace.root,"outside-work.f3d")
         path = "control/run.mcap"
         raw = b"unfinished"
         (workspace.root / path).write_bytes(raw)

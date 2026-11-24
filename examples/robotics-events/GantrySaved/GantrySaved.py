@@ -6,7 +6,7 @@ from pathlib import Path
 import tempfile
 import adsk.core
 import adsk.fusion
-from .source_receipts import enqueue
+from .source_receipts import enqueue, enrolled_path
 
 _handler = None
 _event = None
@@ -37,6 +37,7 @@ def run(context):
                     return
                 key = hashlib.sha256(version.versionId.encode()).hexdigest()
                 target = folder / (key + ".f3d")
+                enrolled_path(root, target.relative_to(root))
                 # Export privately, then publish the completed filename once.
                 with tempfile.TemporaryDirectory(dir=root / ".gantry") as scratch:
                     archive = Path(scratch) / "export.f3d"
