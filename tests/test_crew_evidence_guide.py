@@ -123,3 +123,11 @@ class EvidenceGuideTests(unittest.TestCase):
         guide = self.guide()
         self.assertEqual(guide['check']['status'],'not_observed')
         self.assertFalse(guide['previous_check']['same_definition'])
+
+    def test_sensitive_observation_is_omitted_from_decision_projection(self):
+        marker='-----BEGIN '+'PRIVATE KEY-----'
+        self.raw=json.dumps({'name':marker})
+        self.files['register.json']=self.raw
+        self.full['development']['manifest']['register.json']['hash']=self.hash(self.raw)
+        self.read(marker)
+        self.assertIsNone(self.guide()['observed'])

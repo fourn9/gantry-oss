@@ -2,7 +2,7 @@
 import hashlib
 import json
 
-from .connection_policy import safe_path
+from .connection_policy import clean_bytes, safe_path
 from .crew_json import pointer_value
 from .crew_observe import observation_actions
 from .development import in_scope
@@ -71,6 +71,7 @@ def _observed(receipts, source, files, manifest):
             continue
         try:
             current = pointer_value(json.loads(text), source['pointer'])
+            clean_bytes(canonical(value).encode())
             if canonical(current) == canonical(value):
                 return {'value':value,'action_id':action['id'],'source_hash':origin['sha256']}
         except (ValueError, RecursionError, Fault):
@@ -95,6 +96,10 @@ def _consultation(full, receipts):
         if isinstance(report,dict):
             item = {k:report[k] for k in ('status','summary','unverified') if k in report}
             if isinstance(item.get('summary'),str) and len(canonical(item).encode()) <= 2048:
+                try:
+                    clean_bytes(canonical(item).encode())
+                except Fault:
+                    continue
                 view['report'] = {**item,'action_id':action['id']}
                 break
     return view
