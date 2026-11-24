@@ -279,8 +279,9 @@ def _execute(client, context, ref, config, action, args, workspace, step, key):
     if action == 'edit':
         validate(args, _schema({'path': S, 'content': {'type': 'string'}, 'expected_hash': S}))
         _path(workspace, args['path'], scope, create=True)
-        write_file(workspace, args['path'], args['content'].encode(), args['expected_hash'])
-        return {'path': args['path'], 'hash': hashlib.sha256(args['content'].encode()).hexdigest()}
+        raw = args['content'].encode()
+        changed = write_file(workspace, args['path'], raw, args['expected_hash'])
+        return {'path': args['path'], 'hash': hashlib.sha256(raw).hexdigest(), 'changed': changed}
     if action == 'replace':
         validate(args, action_schemas()['replace'])
         _path(workspace, args['path'], scope)
@@ -295,8 +296,8 @@ def _execute(client, context, ref, config, action, args, workspace, step, key):
         require(offset >= 0 and raw.find(old, offset+1) < 0, 'invalid_input',
                 'Replace needs exactly one matching old_text; read the target and include unique surrounding text')
         updated = clean_bytes(raw[:offset] + new + raw[offset+len(old):])
-        write_file(workspace, args['path'], updated, args['expected_hash'])
-        return {'path': args['path'], 'hash': hashlib.sha256(updated).hexdigest()}
+        changed = write_file(workspace, args['path'], updated, args['expected_hash'])
+        return {'path': args['path'], 'hash': hashlib.sha256(updated).hexdigest(), 'changed': changed}
     if action == 'tool': return _tool(client, ref, config, args, workspace, step, scope, context['zone'])
     if action in API_ACTIONS:
         require(not set(args) & {'task_id', 'fence', 'basis', 'intent'}, 'invalid_input', 'Task identity is supplied by the runtime')
@@ -407,6 +408,12 @@ def _publish_tool_evidence(client, ref, config, workspace, saved, marker, key):
 def action_input(full, workspace, config, last_result, number):
     from .bot_execution import _input, _fit_optional_previews
     context = _input(full, workspace)
+    if isinstance(last_result, dict) and type(last_result.get('changed')) is bool and isinstance(last_result.get('path'), str):
+        development = full['development']
+        file = development['manifest'].get(last_result['path'])
+        if file and file['hash'] == last_result.get('hash'):
+            last_result = {**last_result, 'saved_state_id': development['state']['id'],
+                           'recorded_verification': development['status']['verification']}
     context.update(action_guide=dict(GUIDE), action_schemas=action_schemas(),
         available_tools=config.get('local_tools', {}), tool_evidence=config.get('tool_evidence', {}),
         last_result=result_preview(last_result), round=number,

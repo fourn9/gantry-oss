@@ -44,8 +44,10 @@ def write_file(root, name, raw, expected_hash):
     clean_bytes(raw)
     with parent_fd(root, name) as (parent, leaf):
         try: old = read_file(root, name); current = hashlib.sha256(old).hexdigest()
-        except FileNotFoundError: current = 'absent'
+        except FileNotFoundError: old = None; current = 'absent'
         require(current == expected_hash, 'stale_basis', 'File changed; reread before editing')
+        if old == raw:
+            return False
         temp = '.gantry-edit-' + secrets.token_hex(12)
         fd = os.open(temp, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o600, dir_fd=parent)
         try:
@@ -54,6 +56,7 @@ def write_file(root, name, raw, expected_hash):
         finally:
             try: os.unlink(temp, dir_fd=parent)
             except FileNotFoundError: pass
+        return True
 
 
 def inventory(root, scopes=None):

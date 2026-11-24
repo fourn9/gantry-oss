@@ -183,3 +183,30 @@ class CrewRuntimeTests(CrewCoordinationTests):
         memories = self.clients['designer'].call('list_persistent_memories', {'bot_id': 'designer'})['items']
         self.assertTrue(any('Continued after peer answer' in m['observation'] for m in memories))
         self.assertTrue(self.owner.call('replay')['matched'])
+
+    def test_identical_edit_and_replace_preserve_file_and_identify_actual_checkpoint(self):
+        self.enable_loop('designer')
+        self.task('designer')
+        original = hashlib.sha256(b'1').hexdigest()
+        current = hashlib.sha256(b'guide').hexdigest()
+        observations, identities = [], []
+        script = [('edit',dict(path='mechanical.txt',content='guide',expected_hash=original)),
+                  ('edit',dict(path='mechanical.txt',content='guide',expected_hash=current)),
+                  ('replace',dict(path='mechanical.txt',old_text='guide',new_text='guide',expected_hash=current)),
+                  ('edit',dict(path='mechanical.txt',content='guide',expected_hash=original)),
+                  ('finish',self.answer())]
+        def infer(ctx, schema, directory):
+            fs=(Path(ctx['workspace'])/'mechanical.txt').stat()
+            identities.append((fs.st_ino,fs.st_mtime_ns))
+            observations.append(ctx)
+            return self.action(*script[len(observations)-1])
+        with self.worker('designer',infer) as worker:
+            result=worker.tick()[0]
+            self.assertEqual((result['status'],result['reason']),('held','stale_basis'))
+        for i, changed in [(1,True),(2,False),(3,False)]:
+            receipt=observations[i]['last_result']
+            self.assertEqual(receipt['changed'],changed)
+            self.assertEqual(receipt['saved_state_id'],observations[1]['development']['state']['id'])
+            self.assertEqual(receipt['recorded_verification'],'unverified')
+        self.assertEqual(identities[1:4],[identities[1]]*3)
+        self.assertEqual(len(observations),4)
