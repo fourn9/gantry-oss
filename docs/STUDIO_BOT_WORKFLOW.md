@@ -131,3 +131,14 @@ older binaries cannot be assumed to understand these new event effects.
 - Reasoning quality, physical correctness and development speed need real project
   evaluation. Deterministic integration tests establish the execution contract,
   not engineering intelligence.
+
+## Correct a named Bot
+
+In **Team → Guidance**, the project owner can review duties, actions, and the
+experiences the Bot reports using. Under **Recent lessons**, open **Source task**
+for the supporting work, or **Correct this lesson** to record an instruction with
+its reason. Choose this task, a recorded development phase, or the project.
+Use **Edit** and clear **Active** to withdraw an instruction. The existing Worker
+picks up applicable guidance when it next plans or executes. For routine wakeups,
+open **Standing responsibility → Configure** and set the scope, completion
+conditions and optional interval. [Personal Bot design](PERSONAL_BOT_DESIGN.md)

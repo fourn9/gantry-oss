@@ -384,7 +384,7 @@ def _publish_tool_evidence(client, ref, config, workspace, saved, marker, key):
                     'output_artifact': saved['tool_result']['output_artifact'],
                     'refreshed_paths': saved['tool_result'].get('refreshed_paths', [])})
             args.pop('work_status')
-            saved['evidence_args'] = {**ref, **args}; persist(marker, saved)
+            saved['evidence_args'] = {**ref, **args, 'preferences_basis':saved.get('preferences_basis',digest([]))}; persist(marker, saved)
         result = _return_effect(client, saved, marker, 'evidence_args', 'checkpoint_bot_task', key+':evidence', ref)
         saved['result'] = {**saved['tool_result'], 'evidence_publication': {
             'state_id': result['state']['id'], 'checks': result['state']['context']['environment']['engineering']['checks'],
@@ -520,6 +520,7 @@ def run_actions(client, initial, ref, infer, config, root):
                 state.update(next=number+1, last_result=saved['result']); persist(state_path, state); continue
             saved['record_args'] = {**ref, 'kind': action, 'details': {'rationale': output['rationale'],
                 'arguments': output['arguments_json'], 'result': saved['result'],
+                'guidance_basis': saved.get('preferences_basis'),
                 'workspace_before': saved['before'], 'workspace_after': safe_fingerprint(workspace),
                 'provider': saved['receipt'].get('provider', {'kind': 'injected_test_inference'}), 'round': number}}
             persist(marker, saved)
@@ -529,7 +530,7 @@ def run_actions(client, initial, ref, infer, config, root):
             with span(step, 'checkpoint'):
                 if 'checkpoint_args' not in saved:
                     snapshot, missing = capture_workspace(client, workspace, key+':capture', full['zone'])
-                    saved['checkpoint_args'] = {**ref, 'snapshot': snapshot['revision_id'], 'summary': output['rationale'],
+                    saved['checkpoint_args'] = {**ref, 'preferences_basis':saved.get('preferences_basis',digest([])), 'snapshot': snapshot['revision_id'], 'summary': output['rationale'],
                         'rationale': output['rationale'], 'unfinished': ['Intermediate Bot action; not adopted'],
                         'capture': {'scope': 'Brokered action and saved workspace', 'missing': missing}}
                     persist(marker, saved)
@@ -542,7 +543,7 @@ def run_actions(client, initial, ref, infer, config, root):
         if action == 'finish' and 'report' in saved['result']:
             report = saved['result']['report']
             if 'final_args' not in saved:
-                saved.update(final_args={**ref, 'report': {k: v for k, v in report.items() if k != 'edits'}},
+                saved.update(final_args={**ref, 'preferences_basis':saved.get('preferences_basis',digest([])), 'report': {k: v for k, v in report.items() if k != 'edits'}},
                              phase='finalizing')
                 persist(marker, saved)
             try:

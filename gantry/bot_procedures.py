@@ -92,14 +92,22 @@ def recalled(core, s, actor, task, memory, con):
     return result, flags
 
 
-def decorate(core, s, actor, task, memory, con):
+def decorate(core, s, actor, task, memory, con, guidance=None):
     """Expose dispositions in ordinary context too; full recall owns applicability."""
     result = copy.deepcopy(memory)
+    guidance = guidance or {}
+    guidance_basis = guidance.get('basis')
     decision, flags = recalled(core, s, actor, task, memory, con)
-    if not decision: return result
-    result['procedure_decision'] = decision
+    if any(rule.get('memory_id') == memory['id'] for rule in guidance.get('items', [])):
+        flags.append('corrected_by_owner')
+    if memory.get('lesson', {}).get('kind') == 'preference':
+        flags.append('inferred_preference_requires_owner_confirmation')
+    if memory.get('owner_guidance_basis', guidance_basis) != guidance_basis:
+        flags.append('owner_guidance_changed')
+    if not decision and not flags: return result
+    if decision: result['procedure_decision'] = decision
     result['applicability_flags'] = list(dict.fromkeys([*result.get('applicability_flags', []), *flags]))
-    result['allowed_uses'] = (['reject'] if decision['status'] == 'retired' else
+    result['allowed_uses'] = (['reject'] if decision and decision['status'] == 'retired' else
         ['recheck', 'reject'] if flags else result.get('allowed_uses', ['recheck', 'reject']))
     return result
 

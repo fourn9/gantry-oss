@@ -3,7 +3,7 @@ import copy
 
 from . import bot_learning_contracts  # Registers API contracts.
 from .bot_learning_recall import recall, context_basis
-from .model import digest, require, uid
+from .model import Fault, digest, require, uid
 
 
 class BotLearningMixin:
@@ -147,6 +147,30 @@ class BotLearningMixin:
             if record['status'] == 'pending': items.append(copy.deepcopy(record))
         return {'items': items, 'next_cursor': rows[limit-1][0] if len(rows)>limit else None}
 
+    def _previous_outcomes(self, s, actor, record, con):
+        rows = con.execute("SELECT id FROM records WHERE collection='bot_reflections' AND subject_id=? "
+            "AND session_id=? AND created_seq<? ORDER BY created_seq DESC,id DESC LIMIT 12",
+            (record['bot_id'], record['session_id'], record['created_seq']))
+        cases = []
+        seen = {record['task_id']}
+        for (ident,) in rows:
+            previous = self._dev_get(s, 'bot_reflections', ident)
+            if previous['principal_id'] != record['principal_id'] or previous['task_id'] in seen:
+                continue
+            try:
+                self._learning_reflection_access(s, actor, ident)
+            except Fault as exc:
+                if exc.code in {'unauthorized','scope_denied','mode_disabled'}:
+                    continue
+                raise
+            seen.add(previous['task_id'])
+            cases.append({'reflection_id':ident, 'task_id':previous['task_id'],
+                          'state_id':previous['report_record']['state_id'],
+                          'status':previous['report']['status'], 'summary':previous['report']['summary'][:400]})
+            if len(cases) == 3:
+                break
+        return cases
+
     def cmd_get_bot_reflection(self, s, actor, a, fx, n, con):
         record, task, plan = self._learning_reflection_access(s, actor, a['reflection_id'])
         observations = self._learning_observations(s, record, con)
@@ -161,6 +185,8 @@ class BotLearningMixin:
                 'not_evidence': 'Nested assessment IDs, requirement IDs, Bot IDs and this reflection ID are not observation citations.',
                 'observations': 'Same-attempt action, decision and experience-use IDs before this report; output_artifact IDs linked by those tool receipts',
                 'limits': 'Plans are intent; states are saved bytes; reports and use links are executor claims. None establishes physical correctness.'},
+            'current_owner_guidance': self._preference_context(s, actor, task, con),
+            'previous_outcomes': self._previous_outcomes(s, actor, record, con),
             'observations': observations,
             'experience_actions': uses,
             'feedback_rules': {'eligible_memory_ids': [d['memory_id'] for d in plan['output']['decisions'] if d['use'] != 'reject'],
@@ -184,6 +210,13 @@ class BotLearningMixin:
         team = {'session_id': task['session_id'], 'version': s['bot_projects'][task['session_id']]['version']}
         lesson_keys = [digest(v) for v in a['output']['lessons']]
         require(len(lesson_keys) == len(set(lesson_keys)), 'invalid_input', 'Do not duplicate a lesson in one reflection')
+        declared = self._preference_context(s, actor, task, con)
+        # Persist what the model actually saw, even if the owner corrected it during inference.
+        guidance_basis = a.get('guidance_basis', (plan.get('personal_preferences') or {}).get('basis', digest([])))
+        private_context = bool(declared['items'] or (plan.get('personal_preferences') or {}).get('items')
+                               or guidance_basis != digest([]) or a.get('previous_outcome_ids'))
+        permitted_cases = {row['reflection_id'] for row in self._previous_outcomes(s, actor, record, con)}
+        require(set(a.get('previous_outcome_ids', [])) <= permitted_cases, 'invalid_input', 'Use visible earlier outcomes only')
         for lesson in a['output']['lessons']:
             self._learning_evidence(s, task, record, lesson['evidence'], con)
             for relation in ('supersedes', 'contradicts'):
@@ -196,12 +229,13 @@ class BotLearningMixin:
                 state_id=record['report_record']['state_id'], visibility='role', observation=lesson['observation'],
                 applicability=lesson['when_to_use'], limitations=lesson['when_not_to_use'] + a['output']['unknowns'],
                 evidence=lesson['evidence'], paths=lesson['paths'], assessment='inconclusive', source='experience_reflection',
-                lesson=copy.deepcopy(lesson), reflection_id=record['id'], requirement_refs=record['requirement_refs'],
+                lesson=copy.deepcopy(lesson), reflection_id=record['id'],
+                owner_guidance_basis=guidance_basis, previous_outcome_ids=a.get('previous_outcome_ids', []), requirement_refs=record['requirement_refs'],
                 environment_hash=record['environment_hash'], context_basis=record['context_basis'],
                 self_assessment=copy.deepcopy(a['output'].get('self_assessment')),
                 evidence_status='bot_inferred_hypothesis'))
             memory_ids.append(memory['id'])
-            if org.get('share_reflections'): self._bd_share_memory(s, actor, org, memory, fx)
+            if org.get('share_reflections') and not private_context and lesson['kind'] != 'preference': self._bd_share_memory(s, actor, org, memory, fx)
         used = {d['memory_id'] for d in plan['output']['decisions'] if d['use'] != 'reject'}
         for feedback in a['output']['feedback']:
             mid = feedback['memory_id']
@@ -212,6 +246,7 @@ class BotLearningMixin:
                 session_id=record['session_id'], bot_id=record['bot_id'], principal_id=actor['id'],
                 created_seq=s['seq']+1, evidence_status='reported_utility_not_causal_proof'))
         record.update(status='completed', version=record['version']+1, output=copy.deepcopy(a['output']),
+            guidance_basis=guidance_basis, previous_outcome_ids=a.get('previous_outcome_ids', []),
             memory_ids=memory_ids, completed_seq=s['seq']+1)
         return self._dev_save(s, fx, 'bot_reflections', record)
 

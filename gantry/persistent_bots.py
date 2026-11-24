@@ -173,6 +173,8 @@ class PersistentBotMixin:
             binding = self._persistent_binding(s, memory['session_id'], memory['role'])
             try:
                 self._dev_session(s, actor, memory['session_id'])
+                require(binding and binding['principal_id']==memory['principal_id'] and
+                        binding['bot_id']==memory.get('bot_id'), 'unauthorized', 'Source binding changed')
                 if table == 'bot_memories':
                     require(binding and binding['bot_id'] == bot['id'] and self._binding_access(s, actor, binding),
                             'unauthorized', 'Source role access was revoked')

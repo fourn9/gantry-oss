@@ -34,5 +34,5 @@ register('complete_empty_bot_learning', {**REF, 'plan_id': S}, [*REF, 'plan_id']
 register('get_bot_learning_plan', {'plan_id': S}, ['plan_id'])
 register('get_bot_reflection', {'reflection_id': S}, ['reflection_id'])
 register('list_bot_reflections', {'bot_id': S, **PAGE}, ['bot_id'])
-register('complete_bot_reflection', {'reflection_id': S, 'version': I, 'output': REFLECTION},
+register('complete_bot_reflection', {'reflection_id': S, 'version': I, 'guidance_basis': S, 'previous_outcome_ids':items(S,3), 'output': REFLECTION},
          ['reflection_id', 'version', 'output'])

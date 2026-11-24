@@ -273,8 +273,11 @@ def process_bot_task(client, queued, root, infer_fn, runtime_fence, recovered=No
                 journal.update(phase='done', receipt=receipt, result=receipt['final_result']); persist(marker, journal)
                 return receipt['final_result']
             journal.update(phase='output_saved', receipt=receipt); persist(marker, journal)
+        # A single-response bridge may have planned edits before an owner correction.
+        # Hold for reconciliation because the external bridge can also have local effects.
+        output_ref = {**ref, 'preferences_basis': (journal.get('input', {}).get('personal_preferences') or {}).get('basis', digest([]))}
         if journal['phase'] == 'output_saved':
-            client.call('check_bot_task', ref)
+            client.call('check_bot_task', output_ref)
             seen = set()
             for edit in journal['receipt']['output']['edits']:
                 path = Path(edit['path'])
@@ -286,7 +289,7 @@ def process_bot_task(client, queued, root, infer_fn, runtime_fence, recovered=No
                 target.parent.mkdir(parents=True, exist_ok=True); target.write_text(edit['content'])
             journal.update(phase='edited', fingerprint=safe_fingerprint(workspace)); persist(marker, journal)
         if journal['phase'] == 'edited':
-            client.call('check_bot_task', ref)
+            client.call('check_bot_task', output_ref)
             require(safe_fingerprint(workspace) == journal['fingerprint'], 'stale_basis', 'Workspace changed after output was saved')
             answer = journal['receipt']['output']
             loop_saved = (loop_config and loop_config.get('agent_loop')
@@ -295,7 +298,7 @@ def process_bot_task(client, queued, root, infer_fn, runtime_fence, recovered=No
                 snapshot, missing = capture_workspace(client, workspace, journal['key'] + ':capture', claim['context']['zone'])
                 require(safe_fingerprint(workspace) == journal['fingerprint'], 'stale_basis', 'Files changed while capturing')
                 # Core checks every changed byte, including changes made by an external tool bridge.
-                args = {**ref, 'snapshot': snapshot['revision_id'], 'summary': answer['summary'],
+                args = {**output_ref, 'snapshot': snapshot['revision_id'], 'summary': answer['summary'],
                     'rationale': answer['rationale'], 'unfinished': answer['unverified'],
                     'capture': {'scope': 'saved files after customer agent execution',
                                 'missing': missing + ['Intermediate tool calls unless explicitly checkpointed by the agent']}}
@@ -303,10 +306,10 @@ def process_bot_task(client, queued, root, infer_fn, runtime_fence, recovered=No
                 journal['checkpoint'] = client.call('checkpoint_bot_task', args, journal['key'] + ':checkpoint')
             journal['phase'] = 'checkpointed'; persist(marker, journal)
         if journal['phase'] == 'checkpointed':
-            client.call('check_bot_task', ref)
+            client.call('check_bot_task', output_ref)
             require(safe_fingerprint(workspace) == journal['fingerprint'], 'stale_basis', 'Workspace changed after checkpoint')
             report = {k: v for k, v in journal['receipt']['output'].items() if k != 'edits'}
-            journal.update(phase='returning', return_args={**ref, 'report': report}); persist(marker, journal)
+            journal.update(phase='returning', return_args={**output_ref, 'report': report}); persist(marker, journal)
         # Reuse exact arguments/key after an uncertain acknowledgement. A successful
         # previous return is reconciled by Core even if the old lease has ended.
         result = client.call('finish_bot_task', journal['return_args'], journal['key'] + ':finish')
