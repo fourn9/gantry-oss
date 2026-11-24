@@ -50,7 +50,12 @@ def main(service=None):
     from .crew_setup_host_cli import add_parser as add_crew_setup_host_parser
     add_crew_setup_host_parser(sub)
     workspace = sub.add_parser('workspace', help='Connect saved CAD/code files to shared Studio work')
-    workspace.add_argument('action', choices=['import','attach','status','sync','watch','share','continue'])
+    workspace.add_argument('action', choices=['import','attach','status','sync','saved-event','receive-events','watch','share','continue'])
+    workspace.add_argument('--event-kind', choices=['fusion-saved','rosbag-closed'])
+    workspace.add_argument('--event-path', help='Workspace-relative versioned export or closed recording')
+    workspace.add_argument('--source-revision', help='Immutable producer version or recording identifier')
+    workspace.add_argument('--sha256', help='Digest of the finalized bytes reported by the producer')
+    workspace.add_argument('--follow', action='store_true', help='Keep receiving queued producer events')
     workspace.add_argument('--root', default='.')
     workspace.add_argument('--manifest', help='Project mapping JSON for import')
     workspace.add_argument('--apply', action='store_true', help='Upload the inspected import scope; default is preview')
@@ -405,6 +410,21 @@ def main(service=None):
                         result=workspace.bind(args.work_id)
                     elif args.action == 'status': result=workspace.status()
                     elif args.action == 'sync': result=workspace.sync(args.summary,args.rationale,args.unfinished,json.loads(Path(args.context).read_text()) if args.context else None)
+                    elif args.action == 'saved-event':
+                        from .workspace_events import source_event
+                        result=workspace.sync(event=source_event(args.event_kind,args.event_path,args.source_revision,args.sha256))
+                    elif args.action == 'receive-events':
+                        from .workspace_events import receive_events, follow_events
+                        if args.follow:
+                            try:
+                                for row in follow_events(workspace,args.interval,args.iterations):
+                                    print(json.dumps(row),flush=True)
+                            except KeyboardInterrupt: pass
+                            return
+                        result=receive_events(workspace)
+                        if any(item['status']=='held' for item in result):
+                            print(json.dumps(result,indent=2))
+                            raise SystemExit(1)
                     elif args.action == 'share': result=workspace.share(args.note)
                     else:
                         try:

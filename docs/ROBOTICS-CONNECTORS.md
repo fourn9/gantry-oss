@@ -53,6 +53,12 @@ gantry-integrations publish --bundle ./captures/board-01 \
 
 The change must allow `imports/main-board/`. After publication, use the returned state ID to read the versioned manifest or restore files. Check the [immutable publication contract](EXTERNAL-INTEGRATIONS.md#publish-into-a-development-change) for retry, version and requirement handling. Inputs remain subject to the existing 16 MiB per-file and 32 MiB per-bundle limits. Full fleet recordings and large model weights need a large-artifact transport before this route can preserve them.
 
+## Completed Fusion saves and ROS 2 recordings
+
+The [source event guide](SAVED-SOURCE-EVENTS.md) connects a completed export or
+recording to one bound Studio work item. Its workspace transport supports up to
+1 GiB across the workspace and checkpoints the selected artifact only.
+
 ## Use Windows CAD from a Mac
 
 1. For immediate geometry handoff, obtain a STEP export of the selected vendor design. Run `capture-step` on the Mac. A native CATPart, SLDPRT or Creo part and a STEP export carry different editing capabilities.

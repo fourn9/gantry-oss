@@ -1,5 +1,9 @@
 # Changelog
 
+## v3.6.0 — Source completion events
+
+- Receive finalized Fusion exports and ROS 2 MCAP segments from enrolled producers. Capture only the selected artifact, pin its origin and hash, and retry held events using the existing workspace transport. See the [setup and runtime limits](docs/SAVED-SOURCE-EVENTS.md).
+
 ## v3.5.0 — Local robotics connectors
 
 - Capture KiCad ERC/DRC, saved ROS 2 or Foxglove MCAPs, FreeCAD STEP imports on macOS and optional ONNX model interfaces in requirement-linked development states.

@@ -1,0 +1,35 @@
+name: Windows native connector preflight
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - 'gantry/native/**'
+      - 'gantry/integrations/bundle.py'
+      - 'pyproject.toml'
+      - '.github/workflows/native-windows.yml'
+      - 'tests/windows_native_smoke.py'
+permissions:
+  contents: read
+jobs:
+  native-cli:
+    runs-on: windows-2025
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@94527f2e458b27549849d47d273a16bec83a01e9
+        with:
+          enable-cache: false
+          version: '0.13.5'
+      - name: Install and run the Windows bridge from its wheel
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $PSNativeCommandUseErrorActionPreference = $true
+          uv python install 3.12.15
+          uv venv --managed-python --python 3.12.15 --seed .probe
+          uv build --wheel --python .probe/Scripts/python.exe --out-dir dist
+          $wheel = Get-ChildItem dist/gantry_ledger-*.whl
+          .probe/Scripts/python.exe -m pip install "$($wheel.FullName)[native-windows]"
+          .probe/Scripts/python.exe -I tests/windows_native_smoke.py
