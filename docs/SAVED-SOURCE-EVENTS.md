@@ -29,6 +29,8 @@ enqueue("/absolute/bound-work", "rosbag-closed", "control/run-015/segment-0.mcap
 
 The [ROS message contract](https://docs.ros.org/en/rolling/p/rosbag2_interfaces/msg/WriteSplitEvent.html) identifies the closed file separately from the newly opened file. The stream path checks finalized framing and byte integrity. It does not deserialize messages or establish that a robot test passed.
 
+Runtime check on Apple Silicon: ROS 2 Jazzy, rosbag2 0.26.11 and Cyclone DDS recorded a synthetic string topic on localhost. All eight split/close notifications, including the final close, reached the receiver. After restoration the native ROS reader returned all 75 messages in order. No post-exit catch-up was needed in that run.
+
 ### Ingest and review
 
 Run this on the authorized workstation after a save. Add `--follow` to process future receipts until Ctrl+C. The editor and recorder hooks need no Gantry credential.
